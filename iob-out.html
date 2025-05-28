@@ -1,0 +1,40 @@
+<script type="text/javascript">
+    RED.nodes.registerType('iobout', {
+        category: 'ioBroker',
+        color: '#a6bbcf',
+        defaults: {
+            name: {value:""},
+            state: {value:"", required:true},
+            server: {value:"", type:"iob-config"},
+        },
+        inputs:1,
+        outputs:0,
+        icon: "iobroker_out.svg",
+        label: function() {
+            return this.name||"iob-out";
+        },
+        oneditprepare: function() {
+            // Code to prepare the edit dialog goes here
+        }
+    });
+</script>
+
+<script type="text/html" data-template-name="iobout">
+    <div class="form-row">
+        <label for="node-input-name"><i class="icon-tag"></i> Name</label>
+        <input type="text" id="node-input-name" placeholder="Name">
+    </div>
+    <div class="form-row">
+        <label for="node-input-states"><i class="icon-tag"></i> State</label>
+        <input type="text" id="node-input-state" placeholder="State">
+    </div>
+    <div class="form-row">
+        <label for="node-input-globalConfig"><i class="icon-tag"></i> Server</label>
+        <input type="text" id="node-input-server">
+    </div>
+    
+</script>
+
+<script type="text/html" data-help-name="iobin">
+    <p>Dieser Node aktualisiert seine Zustände basierend auf den empfangenen Daten.</p>
+</script>

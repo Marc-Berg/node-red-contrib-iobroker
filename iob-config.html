@@ -1,0 +1,38 @@
+<script type="text/javascript">
+    RED.nodes.registerType('iob-config',{
+        category: 'config',
+        defaults: {
+            name: {value:"config1",required:true},
+            iobhost: {value:"iobroker.local",required:true},
+            iobport: {value:8082,required:true,validate:RED.validators.number()},
+            nrhost: {value:"nodered.local",required:true},
+            nrport: {value:1880,required:true,validate:RED.validators.number()},
+        },
+        label: function() {
+            return this.name;
+        }
+    });
+</script>
+
+<script type="text/html" data-template-name="iob-config">
+    <div class="form-row">
+        <label for="node-config-input-name"><i class="fa fa-bookmark"></i> Config</label>
+        <input type="text" id="node-config-input-name">
+    </div>
+    <div class="form-row">
+        <label for="node-config-input-iobhost"><i class="fa fa-bookmark"></i> ioB Host</label>
+        <input type="text" id="node-config-input-iobhost">
+    </div>
+    <div class="form-row">
+        <label for="node-config-input-iobport"><i class="fa fa-bookmark"></i> ioB Port</label>
+        <input type="number" id="node-config-input-iobport">
+    </div>
+    <div class="form-row">
+        <label for="node-config-input-nrhost"><i class="fa fa-bookmark"></i> Node-Red Host</label>
+        <input type="text" id="node-config-input-nrhost">
+    </div>
+    <div class="form-row">
+        <label for="node-config-input-nrport"><i class="fa fa-bookmark"></i> Node-Red Port</label>
+        <input type="number" id="node-config-input-nrport">
+    </div>
+</script>
