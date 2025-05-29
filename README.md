@@ -42,3 +42,32 @@ Shared configuration for ioBroker and Node-RED server settings.
 ### As npm Package
 
 1. Install the package in your Node-RED user directory:
+cd ~/.node-red
+npm install <your-package-name>
+2. Restart Node-RED.
+
+### Manual Installation
+
+1. Copy the node files (`iobin.js`, `iobin.html`, `iobout.js`, `iobout.html`, `iobget.js`, `iobget.html`, `iob-config.js`, `iob-config.html`) to your Node-RED nodes directory (usually `~/.node-red/nodes/`).
+2. Restart Node-RED.
+
+## Usage
+
+1. **Drag and drop** the nodes into your flow.
+2. **Configure** the server settings in the `iob-config` node.
+3. **Connect** the nodes to your flow as needed.
+
+## Examples
+
+- **Subscribe to state changes:** Use `iobin` to receive updates from ioBroker.
+- **Send values to ioBroker:** Use `iobout` to update ioBroker states.
+- **Read state values on demand:** Use `iobget` to query the current value of a state.
+
+## License
+
+MIT
+
+---
+
+**For support or feature requests, please open an issue on GitHub.**
+
