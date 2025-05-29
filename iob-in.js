@@ -6,22 +6,36 @@ module.exports = function(RED) {
         const uuid = Date.now().toString(36); // Unique ID per node instance
 
         const globalConfig = RED.nodes.getNode(config.server);
-        const nodeRedSrv = globalConfig.nrhost + ":" + globalConfig.nrport;
-        const ioBrokerSrv = globalConfig.iobhost + ":" + globalConfig.iobport;
+        if (!globalConfig) {
+            node.error("No server configuration selected");
+            node.status({ fill: "red", shape: "ring", text: "No server config" });
+            return;
+        }
+        if (!globalConfig.iobhost || !globalConfig.iobport) {
+            node.error("ioBroker host or port missing");
+            node.status({ fill: "red", shape: "ring", text: "Host/port missing" });
+            return;
+        }
 
-        // State ID as string (no array anymore!)
+        // State ID directly as string (no array)
         const stateId = config.state?.trim();
-        const outputType = config.outputType || "value"; // "value" or "full"
-
         if (!stateId) {
             node.error("State ID missing");
             node.status({ fill: "red", shape: "ring", text: "State ID missing" });
             return;
         }
 
-        const callbackUrl = `/ioBroker/${node.id}/${uuid}`;
+        const outputType = config.outputType || "value"; // "value" or "full"
 
-        // Register HTTP handler
+        // Determine API base path based on config
+        const apiBase = (globalConfig.apiMode === "web")
+            ? `/rest/v1/state`
+            : `/v1/state`;
+        const callbackUrl = `/ioBroker/${node.id}/${uuid}`;
+        const nodeRedSrv = globalConfig.nrhost + ":" + globalConfig.nrport;
+        const ioBrokerSrv = globalConfig.iobhost + ":" + globalConfig.iobport;
+
+        // Register HTTP handler for callbacks
         RED.httpNode.post(callbackUrl, (req, res) => {
             try {
                 res.sendStatus(200);
@@ -42,7 +56,7 @@ module.exports = function(RED) {
         const subscribe = async (stateId) => {
             try {
                 await axios.post(
-                    `http://${ioBrokerSrv}/v1/state/${stateId}/subscribe`,
+                    `http://${ioBrokerSrv}${apiBase}/${stateId}/subscribe`,
                     {
                         url: `http://${nodeRedSrv}${callbackUrl}`,
                         method: 'POST'
@@ -62,7 +76,7 @@ module.exports = function(RED) {
         this.on("close", async (done) => {
             node.log(`Unsubscribing from ${stateId}...`);
             await axios.delete(
-                `http://${ioBrokerSrv}/v1/state/${stateId}/subscribe`,
+                `http://${ioBrokerSrv}${apiBase}/${stateId}/subscribe`,
                 {
                     data: {
                         url: `http://${nodeRedSrv}${callbackUrl}`,

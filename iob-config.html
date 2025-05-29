@@ -1,12 +1,13 @@
 <script type="text/javascript">
-    RED.nodes.registerType('iob-config',{
+    RED.nodes.registerType('iob-config', {
         category: 'config',
         defaults: {
-            name: {value:"config1",required:true},
-            iobhost: {value:"iobroker.local",required:true},
-            iobport: {value:8082,required:true,validate:RED.validators.number()},
-            nrhost: {value:"nodered.local",required:true},
-            nrport: {value:1880,required:true,validate:RED.validators.number()},
+            name: { value: "config1", required: true },
+            iobhost: { value: "iobroker.local", required: true },
+            iobport: { value: 8093, required: true, validate: RED.validators.number() },
+            nrhost: { value: "nodered.local", required: true },
+            nrport: { value: 1880, required: true, validate: RED.validators.number() },
+            apiMode: { value: "native", required: true } // "native" or "web"
         },
         label: function() {
             return this.name;
@@ -16,28 +17,45 @@
 
 <script type="text/html" data-template-name="iob-config">
     <div class="form-row">
-        <label for="node-config-input-name"><i class="fa fa-bookmark"></i> Config</label>
-        <input type="text" id="node-config-input-name" placeholder="Configuration name" required>
+        <label for="node-config-input-name"><i class="fa fa-bookmark"></i> Name</label>
+        <input type="text" id="node-config-input-name" required placeholder="Configuration name">
     </div>
     <div class="form-row">
-        <label for="node-config-input-iobhost"><i class="fa fa-server"></i> ioB Host</label>
-        <input type="text" id="node-config-input-iobhost" placeholder="e.g. iobroker.local" required>
+        <label for="node-config-input-iobhost"><i class="fa fa-server"></i> ioBroker Host</label>
+        <input type="text" id="node-config-input-iobhost" required placeholder="e.g. iobroker.local">
     </div>
     <div class="form-row">
-        <label for="node-config-input-iobport"><i class="fa fa-plug"></i> ioB Port</label>
-        <input type="number" id="node-config-input-iobport" placeholder="e.g. 8082" required>
+        <label for="node-config-input-iobport"><i class="fa fa-plug"></i> ioBroker Port</label>
+        <input type="number" id="node-config-input-iobport" required placeholder="e.g. 8093">
     </div>
     <div class="form-row">
-        <label for="node-config-input-nrhost"><i class="fa fa-desktop"></i> Node-Red Host</label>
-        <input type="text" id="node-config-input-nrhost" placeholder="e.g. nodered.local" required>
+        <label for="node-config-input-apiMode"><i class="fa fa-code"></i> REST API Mode</label>
+        <select id="node-config-input-apiMode" style="width:100%">
+            <option value="native">Native (direct port)</option>
+            <option value="web">Web Plugin (/rest/ path)</option>
+        </select>
     </div>
     <div class="form-row">
-        <label for="node-config-input-nrport"><i class="fa fa-exchange"></i> Node-Red Port</label>
-        <input type="number" id="node-config-input-nrport" placeholder="e.g. 1880" required>
+        <label for="node-config-input-nrhost"><i class="fa fa-desktop"></i> Node-RED Host</label>
+        <input type="text" id="node-config-input-nrhost" required placeholder="e.g. nodered.local">
+    </div>
+    <div class="form-row">
+        <label for="node-config-input-nrport"><i class="fa fa-exchange"></i> Node-RED Port</label>
+        <input type="number" id="node-config-input-nrport" required placeholder="e.g. 1880">
     </div>
 </script>
 
 <script type="text/html" data-help-name="iob-config">
     <p>Configuration for the connection to ioBroker and Node-RED.</p>
     <p>Please enter the hostnames and ports for ioBroker and Node-RED.</p>
+    <p><b>REST API Mode:</b></p>
+    <ul>
+        <li><b>Native (direct port):</b> The REST API runs on its own port (default: 8093). Use this if you run the REST API adapter standalone.</li>
+        <li><b>Web Plugin (/rest/ path):</b> The REST API runs as a plugin in the web adapter (default port: 8082). Use this if you want to access the REST API via the web adapter.</li>
+    </ul>
+    <p>Depending on the selected mode, the API path will change:</p>
+    <ul>
+        <li><b>Native:</b> <code>http://iobroker:8093/v1/state/...</code></li>
+        <li><b>Web Plugin:</b> <code>http://iobroker:8082/rest/v1/state/...</code></li>
+    </ul>
 </script>
