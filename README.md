@@ -8,7 +8,7 @@ This repository provides custom Node-RED nodes for seamless integration with ioB
 **Input Node**  
 Subscribes to ioBroker state changes and forwards updates to your flow.
 
-- **States:** Multiple ioBroker states can be specified (one per line or as JSON array).
+- **State:** A ioBroker state can be specified.
 - **Output:** The value of the changed state is sent as `msg.payload`.  
   Optionally, the full state object can be output.
 - **Server Configuration:** Configure the ioBroker and Node-RED server details in the node settings.
