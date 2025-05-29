@@ -3,18 +3,16 @@
         category: 'ioBroker',
         color: '#a6bbcf',
         defaults: {
-            name: {value:""},
-            state: {value:"", required:true},
-            server: {value:"", type:"iob-config"},
+            name: { value: "" },
+            state: { value: "", required: true },
+            server: { value: "", type: "iob-config" },
+            setMode: { value: "value" } // "value" or "command"
         },
-        inputs:1,
-        outputs:0,
+        inputs: 1,
+        outputs: 0,
         icon: "iobroker_out.svg",
         label: function() {
-            return this.name||"iob-out";
-        },
-        oneditprepare: function() {
-            // Code to prepare the edit dialog goes here
+            return this.name || "iob-out";
         }
     });
 </script>
@@ -25,16 +23,28 @@
         <input type="text" id="node-input-name" placeholder="Name">
     </div>
     <div class="form-row">
-        <label for="node-input-states"><i class="icon-tag"></i> State</label>
-        <input type="text" id="node-input-state" placeholder="State">
+        <label for="node-input-state"><i class="icon-tag"></i> State</label>
+        <input type="text" id="node-input-state" placeholder="e.g. 0_userdata.0.test" required>
     </div>
     <div class="form-row">
-        <label for="node-input-globalConfig"><i class="icon-tag"></i> Server</label>
+        <label for="node-input-setMode"><i class="icon-tag"></i> Set as</label>
+        <select id="node-input-setMode" style="width:100%">
+            <option value="value">Value (ack=true)</option>
+            <option value="command">Command (ack=false)</option>
+        </select>
+    </div>
+    <div class="form-row">
+        <label for="node-input-server"><i class="icon-tag"></i> Server</label>
         <input type="text" id="node-input-server">
     </div>
-    
 </script>
 
-<script type="text/html" data-help-name="iobin">
-    <p>Dieser Node aktualisiert seine Zustände basierend auf den empfangenen Daten.</p>
+<script type="text/html" data-help-name="iobout">
+    <p>Sets a value in ioBroker via REST API.</p>
+    <ul>
+        <li>Enter the state ID (e.g. <code>0_userdata.0.test</code>).</li>
+        <li>Select whether to set the value as a <b>value</b> (ack=true) or as a <b>command</b> (ack=false).</li>
+        <li>The value is taken from <code>msg.payload</code>.</li>
+        <li>The REST API mode (native or web plugin) is determined by the server configuration.</li>
+    </ul>
 </script>
