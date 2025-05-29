@@ -1,0 +1,41 @@
+<script type="text/javascript">
+    RED.nodes.registerType('iobget', {
+        category: 'ioBroker',
+        color: '#a6bbcf',
+        defaults: {
+            name: {value:""},
+            state: {value:""}, // jetzt nicht mehr required!
+            server: {value:"", type:"iob-config"}
+        },
+        inputs:1,
+        outputs:1,
+        icon: "iobroker_inout.svg",
+        label: function() {
+            return this.name || "iob-get";
+        }
+    });
+</script>
+
+<script type="text/html" data-template-name="iobget">
+    <div class="form-row">
+        <label for="node-input-name"><i class="icon-tag"></i> Name</label>
+        <input type="text" id="node-input-name" placeholder="Name">
+    </div>
+    <div class="form-row">
+        <label for="node-input-state"><i class="icon-tag"></i> State</label>
+        <input type="text" id="node-input-state" placeholder="z.B. 0_userdata.0.test (leer = aus msg.topic)">
+    </div>
+    <div class="form-row">
+        <label for="node-input-server"><i class="icon-tag"></i> Server</label>
+        <input type="text" id="node-input-server">
+    </div>
+</script>
+
+<script type="text/html" data-help-name="iobget">
+    <p>Dieser Node liest den aktuellen Wert eines ioBroker-States aus, sobald eine Nachricht eintrifft.</p>
+    <ul>
+        <li>Wenn das Feld <b>State</b> leer ist, wird <code>msg.topic</code> als State-ID verwendet.</li>
+        <li>Der Wert steht in <code>msg.payload</code>.</li>
+        <li>Das vollständige State-Objekt steht in <code>msg.state</code>.</li>
+    </ul>
+</script>
