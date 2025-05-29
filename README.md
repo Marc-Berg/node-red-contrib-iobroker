@@ -12,7 +12,6 @@ Subscribes to ioBroker state changes and forwards updates to your flow.
 - **Output:** The value of the changed state is sent as `msg.payload`.  
   Optionally, the full state object can be output.
 - **Server Configuration:** Configure the ioBroker and Node-RED server details in the node settings.
-- **REST API Mode:** Supports both native (direct port) and web plugin (`/rest/` path) modes.
 
 ### iobout
 **Output Node**  
@@ -22,7 +21,6 @@ Sends values to ioBroker states.
 - **Input:** Any message with a `msg.payload` will update the specified state.
 - **Set Mode:** Choose whether to set the value as a `value` (ack=true) or as a `command` (ack=false).
 - **Server Configuration:** Configure the ioBroker server details in the node settings.
-- **REST API Mode:** Supports both native (direct port) and web plugin (`/rest/` path) modes.
 
 ### iobget
 **Getter Node**  
@@ -44,18 +42,9 @@ Shared configuration for ioBroker and Node-RED server settings.
 
 ## Installation
 
-### As npm Package
-
-1. Install the package in your Node-RED user directory:
-cd ~/.node-red
-npm install <your-package-name>
-
-text
-2. Restart Node-RED.
-
 ### Manual Installation
 
-1. Copy the node files (`iobin.js`, `iobin.html`, `iobout.js`, `iobout.html`, `iobget.js`, `iobget.html`, `iob-config.js`, `iob-config.html`) to your Node-RED nodes directory (usually `~/.node-red/nodes/`).
+1. Copy the node files (`iobin.js`, `iobin.html`, `iobout.js`, `iobout.html`, `iobget.js`, `iobget.html`, `iob-config.js`, `iob-config.html`) and `/icons` to your Node-RED nodes directory (usually `~/.node-red/nodes/`).
 2. Restart Node-RED.
 
 ## Usage
@@ -64,8 +53,7 @@ text
 2. **Configure** the server settings in the `iob-config` node.
 - Select the REST API mode (`native` for direct port, `web` for web plugin).
 - Enter the ioBroker and Node-RED host/port details.
-3. **Configure** the `iobout` node to set values as `value` (ack=true) or `command` (ack=false).
-4. **Connect** the nodes to your flow as needed.
+3. **Connect** the nodes to your flow as needed.
 
 ## Examples
 
