@@ -1,6 +1,6 @@
 # Node-RED Nodes for ioBroker Integration
 
-This repository provides custom Node-RED nodes for seamless integration with ioBroker via its REST API.
+This repository provides custom Node-RED nodes for seamless integration with ioBroker via its REST API Adapter.
 
 ## Nodes
 
@@ -64,10 +64,10 @@ Shared configuration for ioBroker and Node-RED server settings.
 ## REST API Modes
 
 - **Native (direct port):**  
-The REST API runs on its own port (default: 8093).  
+The REST API Adapter runs on its own port (default: 8093).  
 Example: `http://iobroker:8093/v1/state/<stateId>`
 - **Web Plugin (`/rest/` path):**  
-The REST API runs as a plugin in the web adapter (default port: 8082).  
+The REST API Adapter runs as a plugin in the web adapter (default port: 8082).  
 Example: `http://iobroker:8082/rest/v1/state/<stateId>`
 
 > **Note:**  
