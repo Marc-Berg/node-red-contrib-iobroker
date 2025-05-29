@@ -6,8 +6,8 @@ module.exports = function(RED) {
 
         const globalConfig = RED.nodes.getNode(config.server);
         if (!globalConfig?.iobhost || !globalConfig?.iobport) {
-            node.error("Server-Konfiguration fehlt");
-            node.status({ fill: "red", shape: "ring", text: "Konfigurationsfehler" });
+            node.error("Server configuration missing");
+            node.status({ fill: "red", shape: "ring", text: "Configuration error" });
             return;
         }
 
@@ -15,28 +15,28 @@ module.exports = function(RED) {
         const configState = config.state?.trim();
 
         this.on('input', function(msg, send, done) {
-            // State-ID aus Config oder aus msg.topic
+            // State ID from config or from msg.topic
             const stateId = configState || (typeof msg.topic === "string" ? msg.topic.trim() : "");
 
             if (!stateId) {
-                node.status({ fill: "red", shape: "ring", text: "State-ID fehlt" });
-                done && done("State-ID fehlt (weder konfiguriert noch in msg.topic)");
+                node.status({ fill: "red", shape: "ring", text: "State ID missing" });
+                done && done("State ID missing (neither configured nor in msg.topic)");
                 return;
             }
 
-            node.status({ fill: "blue", shape: "dot", text: `Lese ${stateId}...` });
+            node.status({ fill: "blue", shape: "dot", text: `Reading ${stateId}...` });
 
             axios.get(`${ioBrokerSrv}/v1/state/${stateId}`)
                 .then(response => {
                     node.status({ fill: "green", shape: "dot", text: "OK" });
                     msg.payload = response.data?.val !== undefined ? response.data.val : response.data;
-                    msg.state = response.data; // gesamtes Objekt zusätzlich
+                    msg.state = response.data; // complete object additionally
                     send(msg);
                     done && done();
                 })
                 .catch(error => {
-                    node.status({ fill: "red", shape: "ring", text: "Fehler" });
-                    node.error(`Fehler beim Lesen von ${stateId}: ${error.message}`);
+                    node.status({ fill: "red", shape: "ring", text: "Error" });
+                    node.error(`Error reading ${stateId}: ${error.message}`);
                     done && done(error);
                 });
         });

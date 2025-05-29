@@ -3,18 +3,25 @@ module.exports = function(RED) {
         RED.nodes.createNode(this, config);
         const node = this;
         const axios = require('axios');
-        const uuid = Date.now().toString(36); // Eindeutige ID pro Node-Instanz
+        const uuid = Date.now().toString(36); // Unique ID per node instance
 
         const globalConfig = RED.nodes.getNode(config.server);
         const nodeRedSrv = globalConfig.nrhost + ":" + globalConfig.nrport;
         const ioBrokerSrv = globalConfig.iobhost + ":" + globalConfig.iobport;
 
-        const states = Array.isArray(config.states) ? config.states : JSON.parse(config.states || "[]");
-        const outputType = config.outputType || "value"; // "value" oder "full"
+        // State ID as string (no array anymore!)
+        const stateId = config.state?.trim();
+        const outputType = config.outputType || "value"; // "value" or "full"
+
+        if (!stateId) {
+            node.error("State ID missing");
+            node.status({ fill: "red", shape: "ring", text: "State ID missing" });
+            return;
+        }
 
         const callbackUrl = `/ioBroker/${node.id}/${uuid}`;
-        
-        // HTTP-Handler registrieren
+
+        // Register HTTP handler
         RED.httpNode.post(callbackUrl, (req, res) => {
             try {
                 res.sendStatus(200);
@@ -31,7 +38,7 @@ module.exports = function(RED) {
             }
         });
 
-        // Abonnieren mit eindeutiger URL
+        // Subscribe with unique URL
         const subscribe = async (stateId) => {
             try {
                 await axios.post(
@@ -41,28 +48,28 @@ module.exports = function(RED) {
                         method: 'POST'
                     }
                 );
-                node.status({fill:"green",shape:"dot",text:"connected"});
+                node.status({ fill: "green", shape: "dot", text: "connected" });
             } catch (error) {
-                node.status({fill:"red",shape:"ring",text:error.message});
+                node.status({ fill: "red", shape: "ring", text: error.message });
             }
         };
 
-        // Initiale Subscriptions
-        Promise.all(states.map(subscribe))
-            .then(() => node.log(`${states.length} Subscriptions erfolgreich`))
-            .catch((e) => node.error("Fehler beim Abonnieren"));
+        subscribe(stateId)
+            .then(() => node.log("Subscription successful"))
+            .catch((e) => node.error("Error subscribing"));
 
-        // Cleanup bei Redeploy
+        // Cleanup on redeploy
         this.on("close", async (done) => {
-            node.log(`Unsubscribe von ${states.length} States...`);
-            await Promise.all(states.map(stateId => 
-                axios.delete(`http://${ioBrokerSrv}/v1/state/${stateId}/subscribe`, {
-                    data: { 
+            node.log(`Unsubscribing from ${stateId}...`);
+            await axios.delete(
+                `http://${ioBrokerSrv}/v1/state/${stateId}/subscribe`,
+                {
+                    data: {
                         url: `http://${nodeRedSrv}${callbackUrl}`,
-                        method: 'POST' 
+                        method: 'POST'
                     }
-                }).catch(e => {})
-            ));
+                }
+            ).catch(e => {});
             done();
         });
     }

@@ -17,22 +17,27 @@
 <script type="text/html" data-template-name="iob-config">
     <div class="form-row">
         <label for="node-config-input-name"><i class="fa fa-bookmark"></i> Config</label>
-        <input type="text" id="node-config-input-name">
+        <input type="text" id="node-config-input-name" placeholder="Configuration name" required>
     </div>
     <div class="form-row">
         <label for="node-config-input-iobhost"><i class="fa fa-server"></i> ioB Host</label>
-        <input type="text" id="node-config-input-iobhost">
+        <input type="text" id="node-config-input-iobhost" placeholder="e.g. iobroker.local" required>
     </div>
     <div class="form-row">
         <label for="node-config-input-iobport"><i class="fa fa-plug"></i> ioB Port</label>
-        <input type="number" id="node-config-input-iobport">
+        <input type="number" id="node-config-input-iobport" placeholder="e.g. 8082" required>
     </div>
     <div class="form-row">
         <label for="node-config-input-nrhost"><i class="fa fa-desktop"></i> Node-Red Host</label>
-        <input type="text" id="node-config-input-nrhost">
+        <input type="text" id="node-config-input-nrhost" placeholder="e.g. nodered.local" required>
     </div>
     <div class="form-row">
         <label for="node-config-input-nrport"><i class="fa fa-exchange"></i> Node-Red Port</label>
-        <input type="number" id="node-config-input-nrport">
+        <input type="number" id="node-config-input-nrport" placeholder="e.g. 1880" required>
     </div>
+</script>
+
+<script type="text/html" data-help-name="iob-config">
+    <p>Configuration for the connection to ioBroker and Node-RED.</p>
+    <p>Please enter the hostnames and ports for ioBroker and Node-RED.</p>
 </script>

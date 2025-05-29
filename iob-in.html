@@ -3,16 +3,16 @@
         category: 'ioBroker',
         color: '#a6bbcf',
         defaults: {
-            name: {value:""},
-            states: {value:"", required:true},
-            server: {value:"", type:"iob-config"},
-            outputType: {value:"value"} // Neue Option
+            name: { value: "" },
+            state: { value: "", required: true },
+            server: { value: "", type: "iob-config" },
+            outputType: { value: "value" }
         },
-        inputs:0,
-        outputs:1,
+        inputs: 0,
+        outputs: 1,
         icon: "iobroker_in.svg",
         label: function() {
-            return this.name||"iob-in";
+            return this.name || "iob-in";
         }
     });
 </script>
@@ -23,14 +23,14 @@
         <input type="text" id="node-input-name" placeholder="Name">
     </div>
     <div class="form-row">
-        <label for="node-input-states"><i class="icon-tag"></i> States</label>
-        <input type="text" id="node-input-states" placeholder="JSON-Array, z.B. [\"id1\",\"id2\"]">
+        <label for="node-input-state"><i class="icon-tag"></i> State</label>
+        <input type="text" id="node-input-state" placeholder="e.g. 0_userdata.0.test">
     </div>
     <div class="form-row">
-        <label for="node-input-outputType"><i class="icon-tag"></i> Ausgabetyp</label>
+        <label for="node-input-outputType"><i class="icon-tag"></i> Output type</label>
         <select id="node-input-outputType" style="width:100%">
-            <option value="value">Nur Wert</option>
-            <option value="full">Volles Objekt</option>
+            <option value="value">Value only</option>
+            <option value="full">Full object</option>
         </select>
     </div>
     <div class="form-row">
@@ -40,10 +40,10 @@
 </script>
 
 <script type="text/html" data-help-name="iobin">
-    <p>Abonniert ioBroker-States und gibt entweder nur den Wert oder das gesamte State-Objekt aus.</p>
-    <p><b>Ausgabetypen:</b></p>
+    <p>Subscribes to an ioBroker state and outputs its value or the complete object.</p>
     <ul>
-        <li><b>Nur Wert:</b> msg.payload = State-Wert</li>
-        <li><b>Volles Objekt:</b> msg.payload = komplettes State-Objekt</li>
+        <li>Enter the state ID (e.g. <code>0_userdata.0.test</code>).</li>
+        <li>Select whether only the value or the full object should be output.</li>
+        <li>The value is available in <code>msg.payload</code>.</li>
     </ul>
 </script>

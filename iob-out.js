@@ -4,20 +4,20 @@ module.exports = function(RED) {
         var node = this;
         const axios = require('axios');
 
-        const globalConfig=RED.nodes.getNode(config.server);
-        const ioBrokerSrv = globalConfig.iobhost + ":" + globalConfig.iobport
+        const globalConfig = RED.nodes.getNode(config.server);
+        const ioBrokerSrv = globalConfig.iobhost + ":" + globalConfig.iobport;
 
         const state = config.state;
 
-        // Reagieren auf eingehende Nachrichten
+        // React to incoming messages
         this.on('input', function(msg, send, done) {
-            // Erstellen Sie die URL für die REST-API
+            // Build the URL for the REST API
             const url = `http://${ioBrokerSrv}/v1/state/${state}?withInfo=false&value=${msg.payload}`;
-			console.log(url);
-            // Senden Sie die Anforderung an die REST-API
+            console.log(url);
+            // Send the request to the REST API
             axios.get(url)
                 .then(response => {
-                    console.log("Erfolg!");
+                    console.log("Success!");
                 })
                 .catch(error => {
                     console.log(`Error: ${error}`);
@@ -33,4 +33,4 @@ module.exports = function(RED) {
         });
     }
     RED.nodes.registerType("iobout", iobout);
-}
+};
