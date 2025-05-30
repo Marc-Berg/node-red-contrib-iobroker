@@ -16,13 +16,7 @@ module.exports = function(RED) {
             return;
         }
 
-        const state = config.state?.trim();
-        if (!state) {
-            node.error("State ID missing");
-            node.status({ fill: "red", shape: "ring", text: "State ID missing" });
-            return;
-        }
-
+        const configState = config.state?.trim();
         const apiBase = (globalConfig.apiMode === "web")
             ? "/rest/v1/state"
             : "/v1/state";
@@ -31,6 +25,14 @@ module.exports = function(RED) {
         const inputProperty = config.inputProperty?.trim() || "payload";
 
         this.on('input', function(msg, send, done) {
+            // State ID from config or msg.topic
+            const stateId = configState || (typeof msg.topic === "string" ? msg.topic.trim() : "");
+            if (!stateId) {
+                node.status({ fill: "red", shape: "ring", text: "State ID missing" });
+                done && done("State ID missing (neither configured nor in msg.topic)");
+                return;
+            }
+
             const value = msg[inputProperty];
             if (value === undefined) {
                 node.error(`Input property "${inputProperty}" not found in message`);
@@ -41,9 +43,9 @@ module.exports = function(RED) {
 
             let url;
             if (setMode === "command") {
-                url = `${ioBrokerSrv}${apiBase}/${state}?withInfo=false&value=${encodeURIComponent(value)}&ack=false`;
+                url = `${ioBrokerSrv}${apiBase}/${stateId}?withInfo=false&value=${encodeURIComponent(value)}&ack=false`;
             } else {
-                url = `${ioBrokerSrv}${apiBase}/${state}?withInfo=false&value=${encodeURIComponent(value)}&ack=true`;
+                url = `${ioBrokerSrv}${apiBase}/${stateId}?withInfo=false&value=${encodeURIComponent(value)}&ack=true`;
             }
 
             axios.get(url)
