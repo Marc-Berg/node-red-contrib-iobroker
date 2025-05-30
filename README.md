@@ -42,10 +42,9 @@ Shared configuration for ioBroker and Node-RED server settings.
 
 ## Installation
 
-### Manual Installation
+### Upload .tgz
 
-1. Copy the node files (`iobin.js`, `iobin.html`, `iobout.js`, `iobout.html`, `iobget.js`, `iobget.html`, `iob-config.js`, `iob-config.html`) and `/icons` to your Node-RED nodes directory (usually `~/.node-red/nodes/`).
-2. Restart Node-RED.
+You can install this package manually by downloading the .tgz file from the GitHub Releases page and uploading it directly into your Node-RED palette.
 
 ## Usage
 
