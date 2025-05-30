@@ -5,8 +5,9 @@
         defaults: {
             name: { value: "" },
             state: { value: "", required: true },
-            server: { value: "", type: "iob-config" },
-            setMode: { value: "value" } // "value" or "command"
+            inputProperty: { value: "payload" },
+            setMode: { value: "value" },
+            server: { value: "", type: "iob-config" }
         },
         inputs: 1,
         outputs: 0,
@@ -27,24 +28,12 @@
         <input type="text" id="node-input-state" placeholder="e.g. 0_userdata.0.test" required>
     </div>
     <div class="form-row">
+        <label for="node-input-inputProperty"><i class="icon-tag"></i> Input Property</label>
+        <input type="text" id="node-input-inputProperty" placeholder="e.g. payload">
+    </div>
+    <div class="form-row">
         <label for="node-input-setMode"><i class="icon-tag"></i> Set as</label>
         <select id="node-input-setMode" style="width:100%">
             <option value="value">Value (ack=true)</option>
             <option value="command">Command (ack=false)</option>
-        </select>
-    </div>
-    <div class="form-row">
-        <label for="node-input-server"><i class="icon-tag"></i> Server</label>
-        <input type="text" id="node-input-server">
-    </div>
-</script>
-
-<script type="text/html" data-help-name="iobout">
-    <p>Sets a value in ioBroker via REST API.</p>
-    <ul>
-        <li>Enter the state ID (e.g. <code>0_userdata.0.test</code>).</li>
-        <li>Select whether to set the value as a <b>value</b> (ack=true) or as a <b>command</b> (ack=false).</li>
-        <li>The value is taken from <code>msg.payload</code>.</li>
-        <li>The REST API mode (native or web plugin) is determined by the server configuration.</li>
-    </ul>
-</script>
+        </select

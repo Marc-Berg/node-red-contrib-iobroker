@@ -26,6 +26,7 @@ module.exports = function(RED) {
         }
 
         const outputType = config.outputType || "value"; // "value" or "full"
+        const outputProperty = config.outputProperty?.trim() || "payload";
 
         // Determine API base path based on config
         const apiBase = (globalConfig.apiMode === "web")
@@ -41,9 +42,9 @@ module.exports = function(RED) {
                 res.sendStatus(200);
                 if (req.body?.state?.val !== undefined) {
                     const msg = {
-                        payload: outputType === "full" ? req.body : req.body.state.val,
+                        [outputProperty]: outputType === "full" ? req.body : req.body.state.val,
                         topic: req.body.id,
-                        state: req.body.state // <-- Hier das State-Objekt als "state"
+                        state: req.body.state
                     };
                     node.send(msg);
                 }

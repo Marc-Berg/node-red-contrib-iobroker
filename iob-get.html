@@ -3,12 +3,13 @@
         category: 'ioBroker',
         color: '#a6bbcf',
         defaults: {
-            name: {value:""},
-            state: {value:""}, // no longer required!
-            server: {value:"", type:"iob-config"}
+            name: { value: "" },
+            state: { value: "" },
+            outputProperty: { value: "payload" },
+            server: { value: "", type: "iob-config" }
         },
-        inputs:1,
-        outputs:1,
+        inputs: 1,
+        outputs: 1,
         icon: "iobroker_inout.svg",
         label: function() {
             return this.name || "iob-get";
@@ -26,6 +27,10 @@
         <input type="text" id="node-input-state" placeholder="e.g. 0_userdata.0.test (if empty, msg.topic is used)">
     </div>
     <div class="form-row">
+        <label for="node-input-outputProperty"><i class="icon-tag"></i> Output Property</label>
+        <input type="text" id="node-input-outputProperty" placeholder="e.g. payload">
+    </div>
+    <div class="form-row">
         <label for="node-input-server"><i class="icon-tag"></i> Server</label>
         <input type="text" id="node-input-server">
     </div>
@@ -35,7 +40,7 @@
     <p>This node reads the current value of an ioBroker state whenever a message is received.</p>
     <ul>
         <li>If the <b>State</b> field is empty, <code>msg.topic</code> is used as the state ID.</li>
-        <li>The value is available in <code>msg.payload</code>.</li>
+        <li>The value is stored in <code>msg.[outputProperty]</code> (default: <code>msg.payload</code>).</li>
         <li>The complete state object is available in <code>msg.state</code>.</li>
     </ul>
 </script>

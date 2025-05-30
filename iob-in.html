@@ -5,8 +5,9 @@
         defaults: {
             name: { value: "" },
             state: { value: "", required: true },
-            server: { value: "", type: "iob-config" },
-            outputType: { value: "value" }
+            outputProperty: { value: "payload" },
+            outputType: { value: "value" },
+            server: { value: "", type: "iob-config" }
         },
         inputs: 0,
         outputs: 1,
@@ -27,7 +28,11 @@
         <input type="text" id="node-input-state" placeholder="e.g. 0_userdata.0.test">
     </div>
     <div class="form-row">
-        <label for="node-input-outputType"><i class="icon-tag"></i> Output type</label>
+        <label for="node-input-outputProperty"><i class="icon-tag"></i> Output Property</label>
+        <input type="text" id="node-input-outputProperty" placeholder="e.g. payload">
+    </div>
+    <div class="form-row">
+        <label for="node-input-outputType"><i class="icon-tag"></i> Output Type</label>
         <select id="node-input-outputType" style="width:100%">
             <option value="value">Value only</option>
             <option value="full">Full object</option>
@@ -44,6 +49,7 @@
     <ul>
         <li>Enter the state ID (e.g. <code>0_userdata.0.test</code>).</li>
         <li>Select whether only the value or the full object should be output.</li>
-        <li>The value is available in <code>msg.payload</code>.</li>
+        <li>The value is stored in <code>msg.[outputProperty]</code> (default: <code>msg.payload</code>).</li>
+        <li>The complete state object is available in <code>msg.state</code>.</li>
     </ul>
 </script>

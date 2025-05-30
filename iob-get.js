@@ -13,9 +13,9 @@ module.exports = function(RED) {
 
         const ioBrokerSrv = `http://${globalConfig.iobhost}:${globalConfig.iobport}`;
         const configState = config.state?.trim();
+        const outputProperty = config.outputProperty?.trim() || "payload";
 
         this.on('input', function(msg, send, done) {
-            // State ID from config or from msg.topic
             const stateId = configState || (typeof msg.topic === "string" ? msg.topic.trim() : "");
 
             if (!stateId) {
@@ -29,8 +29,8 @@ module.exports = function(RED) {
             axios.get(`${ioBrokerSrv}/v1/state/${stateId}`)
                 .then(response => {
                     node.status({ fill: "green", shape: "dot", text: "OK" });
-                    msg.payload = response.data?.val !== undefined ? response.data.val : response.data;
-                    msg.state = response.data; // complete object additionally
+                    msg[outputProperty] = response.data?.val !== undefined ? response.data.val : response.data;
+                    msg.state = response.data;
                     send(msg);
                     done && done();
                 })

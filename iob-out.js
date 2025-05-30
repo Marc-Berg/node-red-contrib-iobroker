@@ -28,23 +28,27 @@ module.exports = function(RED) {
             : "/v1/state";
         const ioBrokerSrv = `http://${globalConfig.iobhost}:${globalConfig.iobport}`;
         const setMode = config.setMode || "value"; // "value" or "command"
+        const inputProperty = config.inputProperty?.trim() || "payload";
 
         this.on('input', function(msg, send, done) {
-            const value = msg.payload;
+            const value = msg[inputProperty];
+            if (value === undefined) {
+                node.error(`Input property "${inputProperty}" not found in message`);
+                node.status({ fill: "red", shape: "ring", text: "Input missing" });
+                done && done();
+                return;
+            }
+
             let url;
             if (setMode === "command") {
-                // Set as command (ack=false)
                 url = `${ioBrokerSrv}${apiBase}/${state}?withInfo=false&value=${encodeURIComponent(value)}&ack=false`;
             } else {
-                // Set as value (ack=true)
                 url = `${ioBrokerSrv}${apiBase}/${state}?withInfo=false&value=${encodeURIComponent(value)}&ack=true`;
             }
-            console.log("Request URL:", url);
 
             axios.get(url)
                 .then(response => {
                     node.status({ fill: "green", shape: "dot", text: "OK" });
-                    node.log("Value set successfully");
                     done && done();
                 })
                 .catch(error => {
