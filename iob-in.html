@@ -7,6 +7,7 @@
             state: { value: "", required: true },
             outputProperty: { value: "payload" },
             outputType: { value: "value" },
+            ackFilter: { value: "both" },
             server: { value: "", type: "iob-config" }
         },
         inputs: 0,
@@ -39,6 +40,14 @@
         </select>
     </div>
     <div class="form-row">
+        <label for="node-input-ackFilter"><i class="icon-tag"></i> Trigger on</label>
+        <select id="node-input-ackFilter" style="width:100%">
+            <option value="both">Both (ack and no-ack)</option>
+            <option value="ack">Acknowledged (ack=true)</option>
+            <option value="noack">Unacknowledged (ack=false)</option>
+        </select>
+    </div>
+    <div class="form-row">
         <label for="node-input-server"><i class="icon-tag"></i> Server</label>
         <input type="text" id="node-input-server">
     </div>
@@ -47,9 +56,15 @@
 <script type="text/html" data-help-name="iobin">
     <p>Subscribes to an ioBroker state and outputs its value or the complete object.</p>
     <ul>
-        <li>Enter the state ID (e.g. <code>0_userdata.0.test</code>).</li>
-        <li>Select whether only the value or the full object should be output.</li>
-        <li>The value is stored in <code>msg.[outputProperty]</code> (default: <code>msg.payload</code>).</li>
-        <li>The complete state object is available in <code>msg.state</code>.</li>
+        <li><b>State:</b> The ioBroker state ID (e.g. <code>0_userdata.0.test</code>).</li>
+        <li><b>Output Property:</b> Where to store the value (default: <code>msg.payload</code>).</li>
+        <li><b>Output Type:</b> Output the value only or the full state object.</li>
+        <li><b>Trigger on:</b> Filter updates by acknowledgment status:
+            <ul>
+                <li><b>Both:</b> All updates (default)</li>
+                <li><b>Acknowledged:</b> Only updates with <code>ack: true</code></li>
+                <li><b>Unacknowledged:</b> Only updates with <code>ack: false</code></li>
+            </ul>
+        </li>
     </ul>
 </script>

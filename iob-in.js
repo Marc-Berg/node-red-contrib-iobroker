@@ -27,6 +27,7 @@ module.exports = function(RED) {
 
         const outputType = config.outputType || "value"; // "value" or "full"
         const outputProperty = config.outputProperty?.trim() || "payload";
+        const ackFilter = config.ackFilter || "both"; // "both", "ack", "noack"
 
         // Determine API base path based on config
         const apiBase = (globalConfig.apiMode === "web")
@@ -41,12 +42,29 @@ module.exports = function(RED) {
             try {
                 res.sendStatus(200);
                 if (req.body?.state?.val !== undefined) {
-                    const msg = {
-                        [outputProperty]: outputType === "full" ? req.body : req.body.state.val,
-                        topic: req.body.id,
-                        state: req.body.state
-                    };
-                    node.send(msg);
+                    const stateAck = req.body.state?.ack ?? false;
+                    let shouldSend = false;
+
+                    switch (ackFilter) {
+                        case "ack":
+                            shouldSend = stateAck === true;
+                            break;
+                        case "noack":
+                            shouldSend = stateAck === false;
+                            break;
+                        default: // "both"
+                            shouldSend = true;
+                            break;
+                    }
+
+                    if (shouldSend) {
+                        const msg = {
+                            [outputProperty]: outputType === "full" ? req.body : req.body.state.val,
+                            topic: req.body.id,
+                            state: req.body.state
+                        };
+                        node.send(msg);
+                    }
                 }
             } catch (error) {
                 node.error(`Callback error: ${error.message}`);
