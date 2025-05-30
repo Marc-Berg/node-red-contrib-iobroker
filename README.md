@@ -43,8 +43,12 @@ Shared configuration for ioBroker and Node-RED server settings.
 ## Installation
 
 ### Upload .tgz
-
-You can install this package manually by downloading the .tgz file from the GitHub Releases page and uploading it directly into your Node-RED palette.
+- Download the .tgz file from the latest release (https://github.com/Marc-Berg/node-red-contrib-iobroker/releases) on GitHub.
+- Open your Node-RED editor.
+- Go to the palette manager (Menu → "Manage palette").
+- Switch to the "Install" tab.
+- Click on "Upload a .tgz file" and select the downloaded .tgz file.
+- Wait for the installation to complete and restart Node-RED if prompted.
 
 ## Usage
 
