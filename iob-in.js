@@ -43,7 +43,7 @@ module.exports = function(RED) {
                     const msg = {
                         payload: outputType === "full" ? req.body : req.body.state.val,
                         topic: req.body.id,
-                        _original: req.body
+                        state: req.body.state // <-- Hier das State-Objekt als "state"
                     };
                     node.send(msg);
                 }
