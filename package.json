@@ -1,5 +1,5 @@
 {
-  "name"         : "node-red-contrib-iobnode",
+  "name"         : "node-red-contrib-iobroker",
   "version"      : "0.0.1",
   "description"  : "REST-API Anbindung an ioBroker.",
   "dependencies" : {},
