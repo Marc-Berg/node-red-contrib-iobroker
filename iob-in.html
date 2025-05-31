@@ -1,23 +1,214 @@
 <script type="text/javascript">
-    RED.nodes.registerType('iobin', {
-        category: 'ioBroker',
-        color: '#a6bbcf',
-        defaults: {
-            name: { value: "" },
-            state: { value: "", required: true },
-            outputProperty: { value: "payload" },
-            outputType: { value: "value" },
-            ackFilter: { value: "both" },
-            server: { value: "", type: "iob-config" }
-        },
-        inputs: 0,
-        outputs: 1,
-        icon: "iobroker_in.svg",
-        label: function() {
-            return this.name || "iob-in";
+RED.nodes.registerType('iobin', {
+    category: 'ioBroker',
+    color: '#a6bbcf',
+    defaults: {
+        name: { value: "" },
+        state: { value: "", required: true },
+        outputProperty: { value: "payload" },
+        outputType: { value: "value" },
+        ackFilter: { value: "both" },
+        server: { value: "", type: "iob-config" }
+    },
+    inputs: 0,
+    outputs: 1,
+    icon: "iobroker_in.svg",
+    label: function() {
+        return this.name || "iob-in";
+    },
+    oneditprepare: function() {
+        const node = this;
+        // Baum-Container und Umschalter vorbereiten
+        const treeContainer = $('<div class="iob-tree-container" style="display:none;max-height:300px;overflow-y:auto;border:1px solid #ddd;padding:10px;margin-top:5px"></div>');
+        const toggleButton = $('<button id="toggle-input" class="red-ui-button" style="margin-top:5px"></button>');
+        $('#node-input-state').after(toggleButton).after(treeContainer);
+
+        // Umschalter-Logik
+        function toggleInputMode() {
+            if ($('#node-input-state').is(':visible')) {
+                $('#node-input-state').hide();
+                treeContainer.show();
+                $(this).text('Switch to manual input');
+            } else {
+                treeContainer.hide();
+                $('#node-input-state').show();
+                $(this).text('Switch to tree selection');
+            }
         }
-    });
+        toggleButton.click(toggleInputMode);
+
+        // Button-Text beim ersten Öffnen korrekt setzen
+        if ($('#node-input-state').is(':visible')) {
+            toggleButton.text('Switch to tree selection');
+        } else {
+            toggleButton.text('Switch to manual input');
+        }
+
+        // Funktion zum Laden des Baums
+        function loadTree() {
+            const serverNode = RED.nodes.node($('#node-input-server').val());
+            if (!serverNode) {
+                treeContainer.html('<ul class="iob-tree"><li>No server selected</li></ul>');
+                return;
+            }
+            const serverConfig = {
+                iobhost: serverNode.iobhost,
+                iobport: serverNode.iobport,
+                apiMode: serverNode.apiMode,
+                nrhost: serverNode.nrhost,
+                nrport: serverNode.nrport
+            };
+            const apiBase = serverConfig.apiMode === "web" 
+                ? "rest/v1/objects?filter=*" 
+                : "v1/objects?filter=*";
+            const apiUrl = `http://${serverConfig.iobhost}:${serverConfig.iobport}/${apiBase}`;
+
+            treeContainer.html('<ul class="iob-tree"><li>Loading states...</li></ul>');
+
+            $.ajax({
+                url: apiUrl,
+                dataType: "json",
+                success: function(data) {
+                    // Baumstruktur bauen
+                    const tree = {};
+                    Object.keys(data).filter(id => data[id].type === "state").forEach(id => {
+                        let currentNode = tree;
+                        const parts = id.split('.');
+                        parts.forEach((part, index) => {
+                            if (!currentNode[part]) {
+                                currentNode[part] = { 
+                                    children: {}, 
+                                    isLeaf: false, 
+                                    path: parts.slice(0, index + 1).join('.') 
+                                };
+                            }
+                            if (index === parts.length - 1) {
+                                currentNode[part].isLeaf = true;
+                            }
+                            currentNode = currentNode[part].children;
+                        });
+                    });
+
+                    // Baum als HTML rendern (OHNE Emojis im HTML, MIT SORTIERUNG)
+                    function renderTree(node) {
+                        return Object.keys(node)
+                            .sort((a, b) => a.localeCompare(b))
+                            .map(key => {
+                                const child = node[key];
+                                return `<li class="${child.isLeaf ? 'leaf' : 'folder'}" data-path="${child.path}">
+                                    <span class="iob-tree-icon"></span>
+                                    <span class="iob-tree-label">${key}</span>
+                                    ${!child.isLeaf ? `<ul>${renderTree(child.children)}</ul>` : ''}
+                                </li>`;
+                            })
+                            .join('');
+                    }
+
+                    treeContainer.html(`<ul class="iob-tree">${renderTree(tree)}</ul>`);
+
+                    // Event-Handler für Ordner: Klick auf das gesamte li.folder
+                    treeContainer.off('click', '.folder').on('click', '.folder', function(e) {
+                        if (!$(e.target).is('.iob-tree-icon')) {
+                            e.stopImmediatePropagation();
+                            const icon = $(this).find('.iob-tree-icon');
+                            const ul = $(this).children('ul').first();
+                            ul.toggle();
+                            icon.toggleClass('open', ul.is(':visible'));
+                        }
+                    });
+
+                    // Event-Handler für Icon: Klick auf das Icon
+                    treeContainer.off('click', '.folder > .iob-tree-icon').on('click', '.folder > .iob-tree-icon', function(e) {
+                        e.stopImmediatePropagation();
+                        const icon = $(this);
+                        const ul = icon.parent().children('ul').first();
+                        ul.toggle();
+                        icon.toggleClass('open', ul.is(':visible'));
+                    });
+
+                    // Event-Handler für Doppelklick auf Blätter (nur einmalig)
+                    treeContainer.off('dblclick', '.leaf').on('dblclick', '.leaf', function(e) {
+                        e.stopPropagation();
+                        const path = $(this).data('path');
+                        $('#node-input-state').val(path).trigger('change');
+                        RED.notify("State selected: " + path, { type: "success", timeout: 1000 });
+                        $('#toggle-input').trigger('click');
+                    });
+
+                    // Optional: Einfacher Klick auf Blatt markiert
+                    treeContainer.off('click', '.leaf').on('click', '.leaf', function(e) {
+                        e.stopPropagation();
+                        $('.iob-tree li').removeClass('selected');
+                        $(this).addClass('selected');
+                    });
+                },
+                error: function(xhr, status, error) {
+                    treeContainer.html('<ul class="iob-tree"><li>Error loading states</li></ul>');
+                }
+            });
+        }
+
+        // Event-Handler für Server-Auswahl
+        $('#node-input-server').change(loadTree);
+
+        // Baum beim ersten Öffnen laden, falls Server bereits ausgewählt
+        if ($('#node-input-server').val()) {
+            loadTree();
+        }
+    },
+    oneditsave: function() {
+        // Manuellen Wert übernehmen, falls sichtbar
+        if ($('#node-input-state-custom').is(':visible')) {
+            $('#node-input-state').val($('#node-input-state-custom').val());
+        }
+        $('#node-input-state').show().nextAll('.iob-tree-container, #toggle-input').remove();
+    }
+});
 </script>
+
+<style>
+    .iob-tree-container {
+        max-height: 300px;
+        overflow-y: auto;
+        border: 1px solid #ddd;
+        padding: 10px;
+        margin-top: 5px;
+    }
+    .iob-tree {
+        list-style: none;
+        padding-left: 10px;
+        margin: 0;
+    }
+    .iob-tree li {
+        cursor: pointer;
+        padding: 2px 0;
+        white-space: nowrap;
+    }
+    .iob-tree li.selected {
+        background: #e0e0ff;
+    }
+    .iob-tree li ul {
+        display: none;
+        padding-left: 20px;
+    }
+    .iob-tree li.open > ul {
+        display: block;
+    }
+    .iob-tree-icon {
+        display: inline-block;
+        width: 20px;
+        text-align: center;
+    }
+    .folder > .iob-tree-icon::before {
+        content: '📁';
+    }
+    .folder > .iob-tree-icon.open::before {
+        content: '📂';
+    }
+    .leaf > .iob-tree-icon::before {
+        content: '📄';
+    }
+</style>
 
 <script type="text/html" data-template-name="iobin">
     <div class="form-row">
@@ -56,15 +247,8 @@
 <script type="text/html" data-help-name="iobin">
     <p>Subscribes to an ioBroker state and outputs its value or the complete object.</p>
     <ul>
-        <li><b>State:</b> The ioBroker state ID (e.g. <code>0_userdata.0.test</code>).</li>
+        <li><b>State:</b> The ioBroker state ID. Select from the tree or enter manually.</li>
         <li><b>Output Property:</b> Where to store the value (default: <code>msg.payload</code>).</li>
-        <li><b>Output Type:</b> Output the value only or the full state object.</li>
-        <li><b>Trigger on:</b> Filter updates by acknowledgment status:
-            <ul>
-                <li><b>Both:</b> All updates (default)</li>
-                <li><b>Acknowledged:</b> Only updates with <code>ack: true</code></li>
-                <li><b>Unacknowledged:</b> Only updates with <code>ack: false</code></li>
-            </ul>
-        </li>
+        <li><b>Trigger on:</b> Filter updates by <code>ack</code> status.</li>
     </ul>
 </script>

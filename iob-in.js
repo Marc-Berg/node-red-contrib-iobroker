@@ -1,8 +1,9 @@
+const axios = require('axios');
+
 module.exports = function(RED) {
     function iobin(config) {
         RED.nodes.createNode(this, config);
         const node = this;
-        const axios = require('axios');
         const uuid = Date.now().toString(36); // Unique ID per node instance
 
         const globalConfig = RED.nodes.getNode(config.server);
