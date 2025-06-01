@@ -18,237 +18,455 @@ RED.nodes.registerType('iobin', {
     },
     oneditprepare: function() {
         const node = this;
-        // Baum-Container und Umschalter vorbereiten
-        const treeContainer = $('<div class="iob-tree-container" style="display:none;max-height:300px;overflow-y:auto;border:1px solid #ddd;padding:10px;margin-top:5px"></div>');
-        const toggleButton = $('<button id="toggle-input" class="red-ui-button" style="margin-top:5px"></button>');
-        $('#node-input-state').after(toggleButton).after(treeContainer);
+        
+        // UI-Elemente erstellen
+        const treeContainer = $('<div class="iob-tree-container"></div>');
+        const toggleButton = $('<button id="toggle-input" class="red-ui-button">Switch to tree selection</button>');
+        const searchContainer = $('<div class="iob-search-container" style="display:none;"><input type="text" id="iob-search" placeholder="Search states..." class="red-ui-searchbox-input" style="width:100%;margin-bottom:10px;"></div>');
+        
+        $('#node-input-state').after(toggleButton).after(searchContainer).after(treeContainer);
 
-        // Umschalter-Logik
-        function toggleInputMode() {
-            if ($('#node-input-state').is(':visible')) {
-                $('#node-input-state').hide();
-                treeContainer.show();
-                $(this).text('Switch to manual input');
-            } else {
-                treeContainer.hide();
-                $('#node-input-state').show();
-                $(this).text('Switch to tree selection');
+        // State für Tree-Management
+        let treeData = {};
+        let filteredData = {};
+        let searchTimeout;
+
+        // Toggle zwischen manueller Eingabe und Tree-Auswahl
+        const toggleInputMode = () => {
+            const isManualVisible = $('#node-input-state').is(':visible');
+            
+            $('#node-input-state').toggle(!isManualVisible);
+            treeContainer.toggle(isManualVisible);
+            searchContainer.toggle(isManualVisible);
+            
+            toggleButton.text(isManualVisible ? 'Switch to manual input' : 'Switch to tree selection');
+            
+            if (isManualVisible && Object.keys(treeData).length === 0) {
+                loadTree();
             }
-        }
-        toggleButton.click(toggleInputMode);
+        };
 
-        // Button-Text beim ersten Öffnen korrekt setzen
-        if ($('#node-input-state').is(':visible')) {
-            toggleButton.text('Switch to tree selection');
-        } else {
-            toggleButton.text('Switch to manual input');
-        }
+        toggleButton.on('click', toggleInputMode);
 
-        // Funktion zum Laden des Baums
-        function loadTree() {
-            const serverNode = RED.nodes.node($('#node-input-server').val());
-            if (!serverNode) {
-                treeContainer.html('<ul class="iob-tree"><li>No server selected</li></ul>');
-                return;
-            }
-            const serverConfig = {
-                iobhost: serverNode.iobhost,
-                iobport: serverNode.iobport,
-                apiMode: serverNode.apiMode,
-                nrhost: serverNode.nrhost,
-                nrport: serverNode.nrport
-            };
-            const apiBase = serverConfig.apiMode === "web" 
-                ? "rest/v1/objects?filter=*" 
-                : "v1/objects?filter=*";
-            const apiUrl = `http://${serverConfig.iobhost}:${serverConfig.iobport}/${apiBase}`;
-
-            treeContainer.html('<ul class="iob-tree"><li>Loading states...</li></ul>');
-
-            $.ajax({
-                url: apiUrl,
-                dataType: "json",
-                success: function(data) {
-                    // Baumstruktur bauen
-                    const tree = {};
-                    Object.keys(data).filter(id => data[id].type === "state").forEach(id => {
-                        let currentNode = tree;
-                        const parts = id.split('.');
-                        parts.forEach((part, index) => {
-                            if (!currentNode[part]) {
-                                currentNode[part] = { 
-                                    children: {}, 
-                                    isLeaf: false, 
-                                    path: parts.slice(0, index + 1).join('.') 
-                                };
-                            }
-                            if (index === parts.length - 1) {
-                                currentNode[part].isLeaf = true;
-                            }
-                            currentNode = currentNode[part].children;
-                        });
-                    });
-
-                    // Baum als HTML rendern (OHNE Emojis im HTML, MIT SORTIERUNG)
-                    function renderTree(node) {
-                        return Object.keys(node)
-                            .sort((a, b) => a.localeCompare(b))
-                            .map(key => {
-                                const child = node[key];
-                                return `<li class="${child.isLeaf ? 'leaf' : 'folder'}" data-path="${child.path}">
-                                    <span class="iob-tree-icon"></span>
-                                    <span class="iob-tree-label">${key}</span>
-                                    ${!child.isLeaf ? `<ul>${renderTree(child.children)}</ul>` : ''}
-                                </li>`;
-                            })
-                            .join('');
+        // Optimierte Tree-Erstellung mit Caching
+        const buildTreeStructure = (data) => {
+            const tree = {};
+            const states = Object.keys(data).filter(id => data[id].type === "state");
+            
+            states.forEach(id => {
+                const parts = id.split('.');
+                let currentNode = tree;
+                
+                parts.forEach((part, index) => {
+                    if (!currentNode[part]) {
+                        currentNode[part] = { 
+                            children: {}, 
+                            isLeaf: false, 
+                            path: parts.slice(0, index + 1).join('.'),
+                            fullId: index === parts.length - 1 ? id : null
+                        };
                     }
+                    if (index === parts.length - 1) {
+                        currentNode[part].isLeaf = true;
+                        currentNode[part].fullId = id;
+                    }
+                    currentNode = currentNode[part].children;
+                });
+            });
+            
+            return tree;
+        };
 
-                    treeContainer.html(`<ul class="iob-tree">${renderTree(tree)}</ul>`);
+        // Optimiertes Tree-Rendering mit Fragment
+        const renderTree = (node, searchTerm = '') => {
+            const fragment = document.createDocumentFragment();
+            
+            Object.keys(node)
+                .sort((a, b) => {
+                    // Ordner vor Dateien, dann alphabetisch
+                    const aIsFolder = !node[a].isLeaf;
+                    const bIsFolder = !node[b].isLeaf;
+                    if (aIsFolder !== bIsFolder) return bIsFolder - aIsFolder;
+                    return a.localeCompare(b, undefined, { numeric: true });
+                })
+                .forEach(key => {
+                    const child = node[key];
+                    const li = document.createElement('li');
+                    
+                    // Highlight bei Suche
+                    const displayKey = searchTerm && key.toLowerCase().includes(searchTerm.toLowerCase()) 
+                        ? key.replace(new RegExp(`(${searchTerm})`, 'gi'), '<mark>$1</mark>')
+                        : key;
+                    
+                    li.className = child.isLeaf ? 'leaf' : 'folder';
+                    li.dataset.path = child.path;
+                    li.dataset.fullId = child.fullId || '';
+                    
+                    li.innerHTML = `
+                        <span class="iob-tree-icon" aria-label="${child.isLeaf ? 'State' : 'Folder'}"></span>
+                        <span class="iob-tree-label" title="${child.path}">${displayKey}</span>
+                    `;
+                    
+                    if (!child.isLeaf && Object.keys(child.children).length > 0) {
+                        const ul = document.createElement('ul');
+                        ul.appendChild(renderTree(child.children, searchTerm));
+                        li.appendChild(ul);
+                    }
+                    
+                    fragment.appendChild(li);
+                });
+            
+            return fragment;
+        };
 
-                    // Event-Handler für Ordner: Klick auf das gesamte li.folder
-                    treeContainer.off('click', '.folder').on('click', '.folder', function(e) {
-                        if (!$(e.target).is('.iob-tree-icon')) {
-                            e.stopImmediatePropagation();
-                            const icon = $(this).find('.iob-tree-icon');
-                            const ul = $(this).children('ul').first();
-                            ul.toggle();
-                            icon.toggleClass('open', ul.is(':visible'));
+        // Suchfunktion mit Debouncing
+        const handleSearch = (searchTerm) => {
+            clearTimeout(searchTimeout);
+            searchTimeout = setTimeout(() => {
+                if (!searchTerm.trim()) {
+                    filteredData = treeData;
+                } else {
+                    // Filtere nur States die den Suchterm enthalten
+                    filteredData = {};
+                    Object.keys(treeData).forEach(key => {
+                        if (key.toLowerCase().includes(searchTerm.toLowerCase())) {
+                            const parts = key.split('.');
+                            let currentNode = filteredData;
+                            
+                            parts.forEach((part, index) => {
+                                if (!currentNode[part]) {
+                                    currentNode[part] = { 
+                                        children: {}, 
+                                        isLeaf: false, 
+                                        path: parts.slice(0, index + 1).join('.'),
+                                        fullId: index === parts.length - 1 ? key : null
+                                    };
+                                }
+                                if (index === parts.length - 1) {
+                                    currentNode[part].isLeaf = true;
+                                    currentNode[part].fullId = key;
+                                }
+                                currentNode = currentNode[part].children;
+                            });
                         }
                     });
+                }
+                
+                const treeElement = treeContainer.find('.iob-tree')[0];
+                if (treeElement) {
+                    treeElement.innerHTML = '';
+                    treeElement.appendChild(renderTree(filteredData, searchTerm));
+                }
+            }, 300);
+        };
 
-                    // Event-Handler für Icon: Klick auf das Icon
-                    treeContainer.off('click', '.folder > .iob-tree-icon').on('click', '.folder > .iob-tree-icon', function(e) {
-                        e.stopImmediatePropagation();
-                        const icon = $(this);
-                        const ul = icon.parent().children('ul').first();
-                        ul.toggle();
-                        icon.toggleClass('open', ul.is(':visible'));
-                    });
+        $('#iob-search').on('input', function() {
+            handleSearch($(this).val());
+        });
 
-                    // Event-Handler für Doppelklick auf Blätter (nur einmalig)
-                    treeContainer.off('dblclick', '.leaf').on('dblclick', '.leaf', function(e) {
-                        e.stopPropagation();
-                        const path = $(this).data('path');
-                        $('#node-input-state').val(path).trigger('change');
-                        RED.notify("State selected: " + path, { type: "success", timeout: 1000 });
-                        $('#toggle-input').trigger('click');
-                    });
-
-                    // Optional: Einfacher Klick auf Blatt markiert
-                    treeContainer.off('click', '.leaf').on('click', '.leaf', function(e) {
-                        e.stopPropagation();
-                        $('.iob-tree li').removeClass('selected');
-                        $(this).addClass('selected');
-                    });
-                },
-                error: function(xhr, status, error) {
-                    treeContainer.html('<ul class="iob-tree"><li>Error loading states</li></ul>');
+        // Optimierte Event-Handler mit Event-Delegation
+        const setupEventHandlers = () => {
+            // Ordner toggle
+            treeContainer.off('click').on('click', '.folder', function(e) {
+                if ($(e.target).hasClass('iob-tree-label') || $(e.target).hasClass('iob-tree-icon')) {
+                    e.stopPropagation();
+                    const $li = $(this);
+                    const $ul = $li.children('ul').first();
+                    const $icon = $li.find('.iob-tree-icon').first();
+                    
+                    if ($ul.length) {
+                        $ul.slideToggle(200);
+                        $icon.toggleClass('open');
+                        $li.toggleClass('open');
+                    }
                 }
             });
-        }
 
-        // Event-Handler für Server-Auswahl
-        $('#node-input-server').change(loadTree);
+            // State-Auswahl
+            treeContainer.on('dblclick', '.leaf', function(e) {
+                e.stopPropagation();
+                const fullId = $(this).data('full-id') || $(this).data('path');
+                $('#node-input-state').val(fullId).trigger('change');
+                RED.notify(`State selected: ${fullId}`, { type: "success", timeout: 2000 });
+                
+                // Automatisch zurück zur manuellen Eingabe
+                setTimeout(() => toggleInputMode(), 500);
+            });
 
-        // Baum beim ersten Öffnen laden, falls Server bereits ausgewählt
-        if ($('#node-input-server').val()) {
+            // Visuelles Feedback bei Klick
+            treeContainer.on('click', '.leaf', function(e) {
+                e.stopPropagation();
+                $('.iob-tree li').removeClass('selected');
+                $(this).addClass('selected');
+            });
+        };
+
+        // Optimierte Tree-Loading mit Error-Handling und Caching
+        const loadTree = async () => {
+            const serverNode = RED.nodes.node($('#node-input-server').val());
+            if (!serverNode) {
+                treeContainer.html('<div class="iob-error">No server selected</div>');
+                return;
+            }
+
+            const { iobhost, iobport, apiMode } = serverNode;
+            const apiBase = apiMode === "web" ? "rest/v1/objects" : "v1/objects";
+            const apiUrl = `http://${iobhost}:${iobport}/${apiBase}?filter=*`;
+
+            // Loading-Anzeige
+            treeContainer.html('<div class="iob-loading"><i class="fa fa-spinner fa-spin"></i> Loading states...</div>');
+
+            try {
+                const response = await $.ajax({
+                    url: apiUrl,
+                    dataType: "json",
+                    timeout: 10000,
+                    cache: true
+                });
+
+                // Cache für Raw-Data
+                const rawStates = {};
+                Object.keys(response).forEach(id => {
+                    if (response[id].type === "state") {
+                        rawStates[id] = response[id];
+                    }
+                });
+
+                treeData = rawStates;
+                filteredData = rawStates;
+
+                // Tree-Struktur aufbauen
+                const treeStructure = buildTreeStructure(rawStates);
+
+                // Tree rendern
+                const treeHtml = $('<ul class="iob-tree"></ul>')[0];
+                treeHtml.appendChild(renderTree(treeStructure));
+                
+                treeContainer.empty().append(treeHtml);
+                setupEventHandlers();
+
+                // Info über Anzahl States
+                const stateCount = Object.keys(rawStates).length;
+                RED.notify(`Loaded ${stateCount} states`, { type: "info", timeout: 1000 });
+
+            } catch (error) {
+                console.error('Tree loading error:', error);
+                const errorMsg = error.status ? `HTTP ${error.status}: ${error.statusText}` : 'Connection failed';
+                treeContainer.html(`<div class="iob-error">Error loading states: ${errorMsg}</div>`);
+            }
+        };
+
+        // Server-Änderung Handler
+        $('#node-input-server').on('change', function() {
+            if ($(this).val()) {
+                treeData = {};
+                filteredData = {};
+                if (treeContainer.is(':visible')) {
+                    loadTree();
+                }
+            }
+        });
+
+        // Initialer Load falls Server bereits gesetzt
+        if ($('#node-input-server').val() && treeContainer.is(':visible')) {
             loadTree();
         }
     },
+
     oneditsave: function() {
-        // Manuellen Wert übernehmen, falls sichtbar
-        if ($('#node-input-state-custom').is(':visible')) {
-            $('#node-input-state').val($('#node-input-state-custom').val());
-        }
-        $('#node-input-state').show().nextAll('.iob-tree-container, #toggle-input').remove();
+        // Cleanup beim Speichern
+        $('#node-input-state').show();
+        $('.iob-tree-container, #toggle-input, .iob-search-container').remove();
     }
 });
 </script>
 
 <style>
+.iob-tree-container {
+    max-height: 350px;
+    overflow-y: auto;
+    border: 1px solid #ccc;
+    border-radius: 4px;
+    padding: 8px;
+    margin-top: 5px;
+    background: #fafafa;
+    display: none;
+}
+
+.iob-search-container {
+    margin-top: 5px;
+}
+
+.iob-tree {
+    list-style: none;
+    padding-left: 0;
+    margin: 0;
+    font-family: monospace;
+    font-size: 13px;
+}
+
+.iob-tree ul {
+    list-style: none;
+    padding-left: 20px;
+    margin: 0;
+    display: none;
+}
+
+.iob-tree li {
+    cursor: pointer;
+    padding: 3px 5px;
+    white-space: nowrap;
+    border-radius: 3px;
+    transition: background-color 0.2s ease;
+    user-select: none;
+}
+
+.iob-tree li:hover {
+    background-color: #e8f4f8;
+}
+
+.iob-tree li.selected {
+    background-color: #d4edda;
+    border-left: 3px solid #28a745;
+}
+
+.iob-tree li.open > ul {
+    display: block;
+}
+
+.iob-tree-icon {
+    display: inline-block;
+    width: 18px;
+    text-align: center;
+    margin-right: 5px;
+    font-size: 14px;
+}
+
+.folder > .iob-tree-icon::before {
+    content: '📁';
+}
+
+.folder.open > .iob-tree-icon::before {
+    content: '📂';
+}
+
+.leaf > .iob-tree-icon::before {
+    content: '🔗';
+    font-size: 12px;
+}
+
+.iob-tree-label {
+    vertical-align: middle;
+}
+
+.iob-tree-label mark {
+    background-color: #fff3cd;
+    padding: 1px 2px;
+    border-radius: 2px;
+}
+
+.iob-loading, .iob-error {
+    text-align: center;
+    padding: 20px;
+    color: #666;
+}
+
+.iob-error {
+    color: #dc3545;
+    background-color: #f8d7da;
+    border: 1px solid #f5c6cb;
+    border-radius: 4px;
+}
+
+.red-ui-button {
+    margin-top: 5px;
+    padding: 5px 12px;
+}
+
+/* Responsive Design */
+@media (max-width: 768px) {
     .iob-tree-container {
-        max-height: 300px;
-        overflow-y: auto;
-        border: 1px solid #ddd;
-        padding: 10px;
-        margin-top: 5px;
+        max-height: 250px;
     }
+    
     .iob-tree {
-        list-style: none;
-        padding-left: 10px;
-        margin: 0;
+        font-size: 12px;
     }
-    .iob-tree li {
-        cursor: pointer;
-        padding: 2px 0;
-        white-space: nowrap;
-    }
-    .iob-tree li.selected {
-        background: #e0e0ff;
-    }
-    .iob-tree li ul {
-        display: none;
-        padding-left: 20px;
-    }
-    .iob-tree li.open > ul {
-        display: block;
-    }
-    .iob-tree-icon {
-        display: inline-block;
-        width: 20px;
-        text-align: center;
-    }
-    .folder > .iob-tree-icon::before {
-        content: '📁';
-    }
-    .folder > .iob-tree-icon.open::before {
-        content: '📂';
-    }
-    .leaf > .iob-tree-icon::before {
-        content: '📄';
-    }
+}
 </style>
 
 <script type="text/html" data-template-name="iobin">
     <div class="form-row">
         <label for="node-input-name"><i class="icon-tag"></i> Name</label>
-        <input type="text" id="node-input-name" placeholder="Name">
+        <input type="text" id="node-input-name" placeholder="Node name (optional)">
     </div>
     <div class="form-row">
-        <label for="node-input-state"><i class="icon-tag"></i> State</label>
-        <input type="text" id="node-input-state" placeholder="e.g. 0_userdata.0.test">
+        <label for="node-input-state"><i class="icon-tag"></i> State ID</label>
+        <input type="text" id="node-input-state" placeholder="e.g. 0_userdata.0.test" required>
     </div>
     <div class="form-row">
         <label for="node-input-outputProperty"><i class="icon-tag"></i> Output Property</label>
-        <input type="text" id="node-input-outputProperty" placeholder="e.g. payload">
+        <input type="text" id="node-input-outputProperty" placeholder="payload">
     </div>
     <div class="form-row">
         <label for="node-input-outputType"><i class="icon-tag"></i> Output Type</label>
         <select id="node-input-outputType" style="width:100%">
             <option value="value">Value only</option>
-            <option value="full">Full object</option>
+            <option value="full">Full state object</option>
         </select>
     </div>
     <div class="form-row">
         <label for="node-input-ackFilter"><i class="icon-tag"></i> Trigger on</label>
         <select id="node-input-ackFilter" style="width:100%">
             <option value="both">Both (ack and no-ack)</option>
-            <option value="ack">Acknowledged (ack=true)</option>
-            <option value="noack">Unacknowledged (ack=false)</option>
+            <option value="ack">Acknowledged only (ack=true)</option>
+            <option value="noack">Unacknowledged only (ack=false)</option>
         </select>
     </div>
     <div class="form-row">
         <label for="node-input-server"><i class="icon-tag"></i> Server</label>
-        <input type="text" id="node-input-server">
+        <input type="text" id="node-input-server" required>
     </div>
 </script>
 
 <script type="text/html" data-help-name="iobin">
-    <p>Subscribes to an ioBroker state and outputs its value or the complete object.</p>
-    <ul>
-        <li><b>State:</b> The ioBroker state ID. Select from the tree or enter manually.</li>
-        <li><b>Output Property:</b> Where to store the value (default: <code>msg.payload</code>).</li>
-        <li><b>Trigger on:</b> Filter updates by <code>ack</code> status.</li>
-    </ul>
+    <p>Subscribes to an ioBroker state and outputs its value when it changes.</p>
+    
+    <h3>Configuration</h3>
+    <dl class="message-properties">
+        <dt>State ID <span class="property-type">string</span></dt>
+        <dd>The ioBroker state identifier to monitor. Use the tree browser or enter manually.</dd>
+        
+        <dt>Output Property <span class="property-type">string</span></dt>
+        <dd>Message property to store the state value (default: <code>payload</code>).</dd>
+        
+        <dt>Output Type <span class="property-type">string</span></dt>
+        <dd>Choose between value only or complete state object with metadata.</dd>
+        
+        <dt>Trigger on <span class="property-type">string</span></dt>
+        <dd>Filter updates by acknowledgment status.</dd>
+        
+        <dt>Server <span class="property-type">config</span></dt>
+        <dd>ioBroker server configuration node.</dd>
+    </dl>
+
+    <h3>Output</h3>
+    <dl class="message-properties">
+        <dt>payload <span class="property-type">any</span></dt>
+        <dd>The state value or complete state object.</dd>
+        
+        <dt>topic <span class="property-type">string</span></dt>
+        <dd>The state ID that triggered the update.</dd>
+        
+        <dt>state <span class="property-type">object</span></dt>
+        <dd>Complete state information including value, acknowledgment, timestamp, etc.</dd>
+        
+        <dt>timestamp <span class="property-type">number</span></dt>
+        <dd>Unix timestamp when the message was processed.</dd>
+    </dl>
+
+    <h3>Usage</h3>
+    <p>This node automatically subscribes to the specified ioBroker state and emits messages whenever the state changes. Use the tree browser to easily select states or enter the state ID manually.</p>
+    
+    <p><strong>Note:</strong> Double-click on a state in the tree to select it automatically.</p>
 </script>
