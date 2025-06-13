@@ -1,9 +1,11 @@
 {
-  "name"         : "node-red-contrib-iobroker",
-  "version"      : "0.0.6",
-  "description"  : "REST-API Anbindung an ioBroker.",
-  "dependencies" : {},
-  "node-red"     : {
+  "name": "node-red-contrib-iobroker",
+  "version": "0.0.6",
+  "description": "Websocket Anbindung an ioBroker.",
+  "dependencies": {
+    "ws": "^8.18.2"
+  },
+  "node-red": {
     "nodes": {
       "iobin": "iob-in.js",
       "iobout": "iob-out.js",

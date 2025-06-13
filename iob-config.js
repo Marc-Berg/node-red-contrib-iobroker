@@ -3,9 +3,8 @@ module.exports = function(RED) {
         RED.nodes.createNode(this, n);
         this.iobhost = n.iobhost;
         this.iobport = n.iobport;
-        this.nrhost = n.nrhost;
-        this.nrport = n.nrport;
-        this.apiMode = n.apiMode; // "native" or "web"
+        this.user = n.user;
+        this.password = n.password;
     }
     RED.nodes.registerType("iob-config", ioBConfig);
-}
+};
