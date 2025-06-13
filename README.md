@@ -2,6 +2,10 @@
 
 This repository provides custom Node-RED nodes for seamless integration with ioBroker via its REST API Adapter.
 
+
+⚠️ Migration Notice:
+This project is currently being migrated from REST API to WebSocket communication for improved real-time performance and bidirectional communication.
+
 ## Nodes
 
 ### iobin
