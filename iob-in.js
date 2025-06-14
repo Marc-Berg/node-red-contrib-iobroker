@@ -32,16 +32,25 @@ module.exports = function(RED) {
 
         // Store current config for change detection
         node.currentConfig = { iobhost, iobport };
+        node.isInitialized = false;
+        node.isReconnecting = false;
+        node.currentStatus = { fill: "", shape: "", text: "" }; // Track status internally
 
         // Helper function for error handling
         function setError(message, statusText) {
             node.error(message);
-            node.status({ fill: "red", shape: "ring", text: statusText });
+            setStatus("red", "ring", statusText);
         }
 
         // Helper function for status updates
         function setStatus(fill, shape, text) {
-            node.status({ fill, shape, text });
+            try {
+                const statusObj = { fill, shape, text };
+                node.status(statusObj);
+                node.currentStatus = statusObj; // Store for comparison
+            } catch (error) {
+                node.warn(`Status update error: ${error.message}`);
+            }
         }
 
         // Filter function for acknowledgment status
@@ -64,7 +73,7 @@ module.exports = function(RED) {
             return message;
         }
 
-        // State change callback
+        // State change callback with enhanced error handling
         function onStateChange(stateId, state) {
             try {
                 // Validate state data
@@ -92,6 +101,31 @@ module.exports = function(RED) {
             }
         }
 
+        // Enhanced callback with status update capability
+        function enhancedCallback(stateId, state) {
+            onStateChange(stateId, state);
+        }
+
+        // Add status update function to callback
+        enhancedCallback.updateStatus = function(status) {
+            switch (status) {
+                case 'connected':
+                    setStatus("green", "dot", "Connected");
+                    break;
+                case 'connecting':
+                    setStatus("yellow", "ring", "Connecting...");
+                    break;
+                case 'disconnected':
+                    setStatus("red", "ring", "Disconnected");
+                    break;
+                case 'reconnecting':
+                    setStatus("yellow", "ring", "Reconnecting...");
+                    break;
+                default:
+                    setStatus("grey", "ring", "Unknown");
+            }
+        };
+
         // Check if configuration has changed
         function hasConfigChanged() {
             const currentGlobalConfig = RED.nodes.getNode(config.server);
@@ -103,10 +137,16 @@ module.exports = function(RED) {
             );
         }
 
-        // Initialize subscription
+        // Initialize subscription with retry logic
         async function initialize() {
+            if (node.isReconnecting) {
+                node.log("Already reconnecting, skipping initialization");
+                return;
+            }
+            
             try {
                 setStatus("yellow", "ring", "Connecting...");
+                node.isReconnecting = true;
                 
                 // Check if config has changed
                 if (hasConfigChanged()) {
@@ -126,12 +166,13 @@ module.exports = function(RED) {
                     settings.nodeId,
                     settings.serverId,
                     stateId,
-                    onStateChange,
+                    enhancedCallback,
                     globalConfig
                 );
                 
                 setStatus("green", "dot", "Connected");
                 node.log(`Successfully subscribed to ${stateId} via WebSocket`);
+                node.isInitialized = true;
                 
             } catch (error) {
                 const errorMsg = error.message || 'Unknown error';
@@ -139,12 +180,17 @@ module.exports = function(RED) {
                 node.error(`WebSocket subscription failed: ${errorMsg}`);
                 
                 // Retry after delay for connection errors
-                if (errorMsg.includes('timeout') || errorMsg.includes('refused')) {
+                if (errorMsg.includes('timeout') || errorMsg.includes('refused') || errorMsg.includes('ECONNREFUSED')) {
                     setTimeout(() => {
-                        node.log("Retrying WebSocket connection...");
-                        initialize();
+                        if (node.context) { // Check if node still exists
+                            node.log("Retrying WebSocket connection...");
+                            node.isReconnecting = false;
+                            initialize();
+                        }
                     }, 5000);
                 }
+            } finally {
+                node.isReconnecting = false;
             }
         }
 
@@ -159,7 +205,14 @@ module.exports = function(RED) {
                     stateId
                 );
                 
-                setStatus("", "", "");
+                // Clear status properly
+                try {
+                    node.status({});
+                    node.currentStatus = { fill: "", shape: "", text: "" };
+                } catch (statusError) {
+                    // Ignore status errors during cleanup
+                }
+                
                 node.log(`Successfully unsubscribed from ${stateId}`);
                 
             } catch (error) {
@@ -167,19 +220,39 @@ module.exports = function(RED) {
             }
         }
 
-        // Status monitoring
+        // Enhanced status monitoring with reconnection detection
         function startStatusMonitoring() {
             const statusInterval = setInterval(() => {
                 if (!node.context) return; // Node is being destroyed
                 
-                const status = connectionManager.getConnectionStatus(settings.serverId);
-                
-                if (!status.connected) {
-                    setStatus("red", "ring", "Disconnected");
-                } else {
-                    // Keep current status if connected
+                try {
+                    const status = connectionManager.getConnectionStatus(settings.serverId);
+                    
+                    if (!status.connected && node.isInitialized) {
+                        // Connection lost after being initialized
+                        if (node.currentStatus.fill !== "red") {
+                            setStatus("red", "ring", "Disconnected");
+                        }
+                        
+                        // Try to reinitialize if not already doing so
+                        if (!node.isReconnecting) {
+                            node.log("Connection lost, attempting to reconnect...");
+                            setTimeout(() => {
+                                if (node.context && !node.isReconnecting) {
+                                    initialize();
+                                }
+                            }, 2000);
+                        }
+                    } else if (status.connected && node.isInitialized) {
+                        // Connection is healthy
+                        if (node.currentStatus.fill !== "green") {
+                            setStatus("green", "dot", "Connected");
+                        }
+                    }
+                } catch (error) {
+                    node.warn(`Status monitoring error: ${error.message}`);
                 }
-            }, 10000); // Check every 10 seconds
+            }, 5000); // Check every 5 seconds
 
             // Store interval for cleanup
             node.statusInterval = statusInterval;
@@ -191,7 +264,11 @@ module.exports = function(RED) {
                 // Return connection status
                 const status = connectionManager.getConnectionStatus(settings.serverId);
                 const statusMsg = {
-                    payload: status,
+                    payload: {
+                        ...status,
+                        nodeInitialized: node.isInitialized,
+                        nodeReconnecting: node.isReconnecting
+                    },
                     topic: "status",
                     timestamp: Date.now()
                 };
@@ -199,27 +276,53 @@ module.exports = function(RED) {
             } else if (msg.topic === "reconnect") {
                 // Force reconnection
                 node.log("Manual reconnection requested");
+                node.isInitialized = false;
                 cleanup().then(() => initialize());
             } else if (msg.topic === "config-update") {
                 // Handle configuration update
                 node.log("Configuration update requested");
-                initialize(); // This will detect config changes and reset connection
+                node.isInitialized = false;
+                initialize();
             }
         });
 
         // Listen for configuration changes from Node-RED
         node.on("config-update", function() {
             node.log("Node configuration updated");
+            node.isInitialized = false;
             initialize();
         });
 
+        // Connection event handlers
+        function setupConnectionHandlers() {
+            // Listen for reconnection events from connection manager
+            const originalCallback = enhancedCallback;
+            enhancedCallback.onReconnect = function() {
+                node.log("Reconnection detected by node");
+                setStatus("green", "dot", "Reconnected");
+                node.isInitialized = true;
+            };
+            
+            enhancedCallback.onDisconnect = function() {
+                node.log("Disconnection detected by node");
+                setStatus("red", "ring", "Disconnected");
+                // Don't set isInitialized to false here, let status monitoring handle reconnection
+            };
+        }
+
         // Cleanup on node close
         node.on("close", async function(removed, done) {
+            node.log("Node closing...");
+            
             // Clear status monitoring
             if (node.statusInterval) {
                 clearInterval(node.statusInterval);
                 node.statusInterval = null;
             }
+
+            // Mark as not initialized to prevent reconnection attempts
+            node.isInitialized = false;
+            node.isReconnecting = false;
 
             // Cleanup subscription
             try {
@@ -243,6 +346,7 @@ module.exports = function(RED) {
         });
 
         // Initialize the node
+        setupConnectionHandlers();
         initialize();
         startStatusMonitoring();
     }
@@ -250,21 +354,18 @@ module.exports = function(RED) {
     // Register the node type
     RED.nodes.registerType("iobin", iobin);
 
-    // Add admin endpoint for WebSocket states
+    // Keep the existing admin endpoints unchanged
     RED.httpAdmin.get("/iobroker/ws/states/:serverId", async function(req, res) {
         try {
             const serverId = decodeURIComponent(req.params.serverId);
             console.log(`[Admin API] Getting states for server: ${serverId}`);
             
-            // Parse serverId to get host and port
             const [iobhost, iobport] = serverId.split(':');
             if (!iobhost || !iobport) {
                 return res.status(400).json({ error: 'Invalid server ID format' });
             }
 
             const serverConfig = { iobhost, iobport };
-            
-            // Get states via WebSocket connection manager
             const states = await connectionManager.getStates(serverId);
             
             if (!states || typeof states !== 'object') {
@@ -283,14 +384,12 @@ module.exports = function(RED) {
         }
     });
 
-    // Add admin endpoint for connection status
     RED.httpAdmin.get("/iobroker/connection-status/:serverId", function(req, res) {
         const serverId = decodeURIComponent(req.params.serverId);
         const status = connectionManager.getConnectionStatus(serverId);
         res.json(status);
     });
 
-    // Add admin endpoint for connection list
     RED.httpAdmin.get("/iobroker/connections", function(req, res) {
         const connections = Array.from(connectionManager.connections.keys()).map(serverId => ({
             serverId,
@@ -299,7 +398,6 @@ module.exports = function(RED) {
         res.json(connections);
     });
 
-    // Add admin endpoint to reset connection
     RED.httpAdmin.post("/iobroker/reset-connection/:serverId", async function(req, res) {
         try {
             const serverId = decodeURIComponent(req.params.serverId);
