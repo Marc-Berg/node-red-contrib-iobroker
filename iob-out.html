@@ -45,11 +45,39 @@
 </script>
 
 <script type="text/html" data-help-name="iobout">
-    <p>Sets a value in ioBroker via REST API.</p>
+    <p>Sets a value in ioBroker via WebSocket connection.</p>
+    <h3>Configuration</h3>
     <ul>
-        <li>Enter the state ID (e.g. <code>0_userdata.0.test</code>). If the field is empty, <code>msg.topic</code> is used as the state ID.</li>
-        <li>Select whether to set the value as a <b>value</b> (ack=true) or as a <b>command</b> (ack=false).</li>
-        <li>The value is taken from <code>msg.[inputProperty]</code> (default: <code>msg.payload</code>).</li>
-        <li>The REST API mode (native or web plugin) is determined by the server configuration.</li>
+        <li><b>State:</b> The ioBroker state ID (e.g. <code>0_userdata.0.test</code>). If empty, <code>msg.topic</code> is used.</li>
+        <li><b>Input Property:</b> The message property containing the value to set (default: <code>payload</code>).</li>
+        <li><b>Set Mode:</b>
+            <ul>
+                <li><b>Value (ack=true):</b> Sets the state as a confirmed value</li>
+                <li><b>Command (ack=false):</b> Sets the state as a command for devices</li>
+            </ul>
+        </li>
+        <li><b>Server:</b> The ioBroker server configuration</li>
     </ul>
+    <h3>Features</h3>
+    <ul>
+        <li>WebSocket-based communication for real-time performance</li>
+        <li>Automatic reconnection and connection status display</li>
+        <li>Shared connection management with other ioBroker nodes</li>
+        <li>Proper error handling and status feedback</li>
+        <li>Consistent API with iobin and iobget nodes</li>
+    </ul>
+    <h3>Input Messages</h3>
+    <ul>
+        <li><b>Normal operation:</b> Send any message with the value in the configured input property</li>
+        <li><b>Status check:</b> Send <code>msg.topic = "status"</code> to get connection status</li>
+        <li><b>Manual reconnect:</b> Send <code>msg.topic = "reconnect"</code> to force reconnection</li>
+    </ul>
+    <h3>State Object Structure</h3>
+    <p>When setting states, the node sends a complete state object to ioBroker:</p>
+    <pre>{
+    "val": [your_value],
+    "ack": [true_for_value_false_for_command],
+    "from": "system.adapter.node-red",
+    "ts": [timestamp]
+}</pre>
 </script>
