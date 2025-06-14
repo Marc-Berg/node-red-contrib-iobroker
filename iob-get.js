@@ -67,7 +67,6 @@ module.exports = function(RED) {
                     node.log(`Configuration changed, connection reset for ${settings.serverId}`);
                 }
 
-                // Get WebSocket connection (without subscription setup)
                 const client = await connectionManager.getConnection(
                     settings.serverId,
                     globalConfig

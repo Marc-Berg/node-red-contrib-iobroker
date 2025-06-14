@@ -1,16 +1,16 @@
 <script type="text/javascript">
-// Geteilte Tree View - wird nur einmal initialisiert, egal welche Node zuerst geladen wird
-// Geteilte Tree View mit Caching - wird nur einmal initialisiert, egal welche Node zuerst geladen wird
-// Geteilte Tree View mit Caching - wird nur einmal initialisiert, egal welche Node zuerst geladen wird
+// Shared Tree View - initialized only once, regardless of which node loads first
+// Shared Tree View with Caching - initialized only once, regardless of which node loads first
+// Shared Tree View with Caching - initialized only once, regardless of which node loads first
 (function() {
     if (typeof window.ioBrokerTreeViewLoader !== 'undefined') return;
     window.ioBrokerTreeViewLoader = true;
     
-    // Globaler Cache für States pro Server
+    // Global cache for states per server
     const stateCache = new Map(); // serverId -> { data, timestamp, isLoading }
-    const CACHE_DURATION = 5 * 60 * 1000; // 5 Minuten Cache
+    const CACHE_DURATION = 5 * 60 * 1000; // 5 minutes cache
     
-    // CSS Styles einmalig hinzufügen
+    // Add CSS styles once
     if (!document.getElementById('iob-tree-styles')) {
         const style = document.createElement('style');
         style.id = 'iob-tree-styles';
@@ -58,7 +58,7 @@
         document.head.appendChild(style);
     }
     
-    // Cache-Management Funktionen
+    // Cache management functions
     function getCacheKey(serverHost, serverPort) {
         return `${serverHost}:${serverPort}`;
     }
@@ -91,7 +91,7 @@
         return cacheEntry && cacheEntry.isLoading;
     }
     
-    // Cache-Statistiken für Debugging
+    // Cache statistics for debugging
     function getCacheStats() {
         const stats = {
             totalEntries: stateCache.size,
@@ -109,7 +109,7 @@
         return stats;
     }
     
-    // Cache-Cleanup (entfernt abgelaufene Einträge)
+    // Cache cleanup (removes expired entries)
     function cleanupCache() {
         const toDelete = [];
         stateCache.forEach((entry, serverId) => {
@@ -124,10 +124,10 @@
         }
     }
     
-    // Periodisches Cache-Cleanup (alle 10 Minuten)
+    // Periodic cache cleanup (every 10 minutes)
     setInterval(cleanupCache, 10 * 60 * 1000);
     
-    // Geteilte Tree View Setup Funktion
+    // Shared Tree View setup function
     window.ioBrokerTreeView = {
         setup: function(nodeType, stateInputId, serverInputId) {
             const stateInput = $('#' + stateInputId);
@@ -254,7 +254,7 @@
                 const serverId = getCacheKey(serverNode.iobhost, serverNode.iobport);
                 currentServerId = serverId;
 
-                // Prüfe Cache zuerst (außer bei forceRefresh)
+                // Check cache first (except on forceRefresh)
                 if (!forceRefresh) {
                     const cachedData = getCachedStates(serverId);
                     if (cachedData) {
@@ -275,14 +275,14 @@
                     }
                 }
 
-                // Prüfe ob bereits geladen wird
+                // Check if already loading
                 if (isLoading(serverId)) {
                     console.log(`[ioBroker Tree View] Already loading data for ${serverId}, skipping duplicate request`);
                     statusElement.html('<span class="iob-status iob-status-info"><i class="fa fa-spinner fa-spin"></i> Loading in progress...</span>');
                     return;
                 }
 
-                // Starte neuen Load-Vorgang
+                // Start new loading process
                 setLoadingState(serverId, true);
                 treeContainer.html('<div class="iob-loading"><i class="fa fa-spinner fa-spin"></i> Loading states...</div>');
                 statusElement.html('<span class="iob-status iob-status-info"><i class="fa fa-spinner fa-spin"></i> Loading states from ioBroker...</span>');
@@ -299,7 +299,7 @@
                     const stateCount = Object.keys(response).length;
                     if (stateCount === 0) throw new Error('No states received');
 
-                    // Cache die Daten
+                    // Cache the data
                     setCachedStates(serverId, response);
                     console.log(`[ioBroker Tree View] Loaded and cached ${stateCount} states for ${serverId}`);
 
@@ -365,7 +365,7 @@
             
             refreshButton.on('click', function() {
                 if (currentServerId) {
-                    // Cache für aktuellen Server löschen
+                    // Clear cache for current server
                     stateCache.delete(currentServerId);
                     console.log(`[ioBroker Tree View] Cache cleared for ${currentServerId}`);
                     
@@ -375,7 +375,7 @@
                     
                     // Force refresh
                     loadTree(true).finally(() => {
-                        // Animation stoppen nach dem Laden
+                        // Stop animation after loading
                         setTimeout(() => icon.removeClass('fa-spin'), 500);
                     });
                     
@@ -390,7 +390,7 @@
                 if (treeContainer.is(':visible')) loadTree();
             });
 
-            // Globale Referenz für Debug/Retry-Funktionen
+            // Global reference for debug/retry functions
             window.currentTreeController = {
                 forceRefresh: () => loadTree(true),
                 getCacheStats: getCacheStats,
@@ -409,7 +409,7 @@
                     statusElement.remove();
                     stateInput.show();
                     
-                    // Cleanup globale Referenz wenn es der aktuelle Controller ist
+                    // Cleanup global reference if it's the current controller
                     if (window.currentTreeController && currentServerId) {
                         delete window.currentTreeController;
                     }
@@ -419,7 +419,7 @@
             };
         },
         
-        // Globale Cache-Management-Funktionen
+        // Global cache management functions
         getCacheStats: getCacheStats,
         clearCache: () => {
             stateCache.clear();
