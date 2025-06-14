@@ -107,7 +107,7 @@ The nodes use a **shared WebSocket connection manager** that provides:
 The nodes connect to ioBroker's WebSocket interface via one of three options:
 
 - **WebSocket adapter** (default port 8084)
-- **Web adapter** (default port 8082)
+- **Web adapter** (default port 8082, requires "Use pure web-sockets (iobroker.ws)" to be enabled)
 - **Admin adapter** (default port 8081)
 
 Make sure that:
