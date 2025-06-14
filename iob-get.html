@@ -444,9 +444,41 @@ RED.nodes.registerType('iobget', {
     label: function() {
         return this.name || "iob-get";
     },
+    
+    
+    // Erweiterte oneditprepare Funktion für automatische Server-Auswahl
     oneditprepare: function() {
+        const serverInput = $('#node-input-server');
+        
+        // Prüfe ob bereits ein Server ausgewählt ist
+        if (!this.server || this.server === '') {
+            // Hole alle verfügbaren iob-config Nodes
+            const configNodes = [];
+            RED.nodes.eachConfig(function(config) {
+                if (config.type === 'iob-config') {
+                    configNodes.push(config);
+                }
+            });
+            
+            // Wenn genau eine Konfiguration gefunden wurde, wähle sie automatisch aus
+            if (configNodes.length === 1) {
+                this.server = configNodes[0].id;
+                serverInput.val(this.server);
+                
+                // Optional: Benutzer über automatische Auswahl informieren
+                setTimeout(() => {
+                    RED.notify(`Automatically selected server: ${configNodes[0].name || configNodes[0].iobhost}`, {
+                        type: "info",
+                        timeout: 3000
+                    });
+                }, 500);
+            }
+        }
+        
+        // Tree View Setup (bestehender Code)
         this.treeController = window.ioBrokerTreeView.setup('iobget', 'node-input-state', 'node-input-server');
     },
+    
     oneditsave: function() {
         if (this.treeController) this.treeController.cleanup();
     }
