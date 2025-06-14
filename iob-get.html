@@ -1,20 +1,456 @@
 <script type="text/javascript">
-    RED.nodes.registerType('iobget', {
-        category: 'ioBroker',
-        color: '#a6bbcf',
-        defaults: {
-            name: { value: "" },
-            state: { value: "" },
-            outputProperty: { value: "payload" },
-            server: { value: "", type: "iob-config" }
-        },
-        inputs: 1,
-        outputs: 1,
-        icon: "iobroker_inout.svg",
-        label: function() {
-            return this.name || "iob-get";
+// Geteilte Tree View - wird nur einmal initialisiert, egal welche Node zuerst geladen wird
+// Geteilte Tree View mit Caching - wird nur einmal initialisiert, egal welche Node zuerst geladen wird
+// Geteilte Tree View mit Caching - wird nur einmal initialisiert, egal welche Node zuerst geladen wird
+(function() {
+    if (typeof window.ioBrokerTreeViewLoader !== 'undefined') return;
+    window.ioBrokerTreeViewLoader = true;
+    
+    // Globaler Cache für States pro Server
+    const stateCache = new Map(); // serverId -> { data, timestamp, isLoading }
+    const CACHE_DURATION = 5 * 60 * 1000; // 5 Minuten Cache
+    
+    // CSS Styles einmalig hinzufügen
+    if (!document.getElementById('iob-tree-styles')) {
+        const style = document.createElement('style');
+        style.id = 'iob-tree-styles';
+        style.textContent = `
+            .iob-tree-container {
+                max-height: 250px; overflow-y: auto; border: 1px solid #ccc; border-radius: 4px;
+                padding: 8px; margin-top: 5px; background: #fafafa; display: none;
+            }
+            .iob-search-container { margin-top: 5px; }
+            .iob-status { 
+                padding: 5px 10px; border-radius: 3px; font-size: 12px; font-weight: bold; margin-top: 5px; 
+            }
+            .iob-status-success { background-color: #d4edda; color: #155724; border: 1px solid #c3e6cb; }
+            .iob-status-info { background-color: #d1ecf1; color: #0c5460; border: 1px solid #bee5eb; }
+            .iob-status-error { background-color: #f8d7da; color: #721c24; border: 1px solid #f5c6cb; }
+            .iob-tree { 
+                list-style: none; padding-left: 0; margin: 0; font-family: monospace; font-size: 13px; 
+            }
+            .iob-tree ul { list-style: none; padding-left: 20px; margin: 0; display: none; }
+            .iob-tree li { 
+                cursor: pointer; padding: 3px 5px; white-space: nowrap; border-radius: 3px;
+                transition: background-color 0.2s ease; user-select: none; 
+            }
+            .iob-tree li:hover { background-color: #e8f4f8; }
+            .iob-tree li.selected { background-color: #d4edda; border-left: 3px solid #28a745; }
+            .iob-tree li.open > ul { display: block; }
+            .iob-tree-icon { 
+                display: inline-block; width: 18px; text-align: center; margin-right: 5px; font-size: 14px; 
+            }
+            .folder > .iob-tree-icon::before { content: '📁'; }
+            .folder.open > .iob-tree-icon::before { content: '📂'; }
+            .leaf > .iob-tree-icon::before { content: '🔗'; font-size: 12px; }
+            .iob-tree-label { vertical-align: middle; }
+            .iob-tree-label mark { background-color: #fff3cd; padding: 1px 2px; border-radius: 2px; }
+            .iob-loading, .iob-error { text-align: center; padding: 20px; color: #666; }
+            .iob-error { 
+                color: #dc3545; background-color: #f8d7da; border: 1px solid #f5c6cb; border-radius: 4px; 
+            }
+            .iob-error small { display: block; margin-top: 5px; font-style: italic; }
+            .red-ui-button { margin-top: 5px; padding: 5px 12px; }
+            .iob-cache-info { 
+                font-size: 11px; color: #6c757d; margin-left: 5px; 
+            }
+        `;
+        document.head.appendChild(style);
+    }
+    
+    // Cache-Management Funktionen
+    function getCacheKey(serverHost, serverPort) {
+        return `${serverHost}:${serverPort}`;
+    }
+    
+    function isCacheValid(cacheEntry) {
+        if (!cacheEntry) return false;
+        return (Date.now() - cacheEntry.timestamp) < CACHE_DURATION;
+    }
+    
+    function getCachedStates(serverId) {
+        const cacheEntry = stateCache.get(serverId);
+        return isCacheValid(cacheEntry) ? cacheEntry.data : null;
+    }
+    
+    function setCachedStates(serverId, data) {
+        stateCache.set(serverId, {
+            data: data,
+            timestamp: Date.now(),
+            isLoading: false
+        });
+    }
+    
+    function setLoadingState(serverId, isLoading) {
+        const existing = stateCache.get(serverId) || {};
+        stateCache.set(serverId, { ...existing, isLoading });
+    }
+    
+    function isLoading(serverId) {
+        const cacheEntry = stateCache.get(serverId);
+        return cacheEntry && cacheEntry.isLoading;
+    }
+    
+    // Cache-Statistiken für Debugging
+    function getCacheStats() {
+        const stats = {
+            totalEntries: stateCache.size,
+            validEntries: 0,
+            expiredEntries: 0,
+            loadingEntries: 0
+        };
+        
+        stateCache.forEach((entry, serverId) => {
+            if (entry.isLoading) stats.loadingEntries++;
+            else if (isCacheValid(entry)) stats.validEntries++;
+            else stats.expiredEntries++;
+        });
+        
+        return stats;
+    }
+    
+    // Cache-Cleanup (entfernt abgelaufene Einträge)
+    function cleanupCache() {
+        const toDelete = [];
+        stateCache.forEach((entry, serverId) => {
+            if (!isCacheValid(entry) && !entry.isLoading) {
+                toDelete.push(serverId);
+            }
+        });
+        toDelete.forEach(serverId => stateCache.delete(serverId));
+        
+        if (toDelete.length > 0) {
+            console.log(`[ioBroker Tree View] Cleaned up ${toDelete.length} expired cache entries`);
         }
-    });
+    }
+    
+    // Periodisches Cache-Cleanup (alle 10 Minuten)
+    setInterval(cleanupCache, 10 * 60 * 1000);
+    
+    // Geteilte Tree View Setup Funktion
+    window.ioBrokerTreeView = {
+        setup: function(nodeType, stateInputId, serverInputId) {
+            const stateInput = $('#' + stateInputId);
+            const serverInput = $('#' + serverInputId);
+            
+            const treeContainer = $('<div class="iob-tree-container"></div>');
+            const toggleButton = $('<button type="button" class="red-ui-button">Switch to tree selection</button>');
+            const refreshButton = $('<button type="button" class="red-ui-button" style="margin-left: 5px;" title="Refresh states from ioBroker"><i class="fa fa-refresh"></i> Refresh</button>');
+            const searchContainer = $('<div class="iob-search-container" style="display:none;"><input type="text" placeholder="Search states..." class="red-ui-searchbox-input" style="width:100%;margin-bottom:10px;"></div>');
+            const statusElement = $('<div class="iob-status"></div>');
+
+            stateInput.after(statusElement).after(treeContainer).after(searchContainer).after(refreshButton).after(toggleButton);
+            
+            const searchInput = searchContainer.find('input');
+            let treeData = {};
+            let searchTimeout;
+            let statesLoaded = false;
+            let currentServerId = null;
+
+            function buildTreeStructure(data) {
+                const tree = {};
+                Object.keys(data).forEach(id => {
+                    const parts = id.split('.');
+                    let currentNode = tree;
+                    parts.forEach((part, index) => {
+                        if (!currentNode[part]) {
+                            currentNode[part] = {
+                                children: {},
+                                isLeaf: index === parts.length - 1,
+                                path: parts.slice(0, index + 1).join('.'),
+                                fullId: index === parts.length - 1 ? id : null
+                            };
+                        }
+                        currentNode = currentNode[part].children;
+                    });
+                });
+                return tree;
+            }
+
+            function renderTree(node, searchTerm = '') {
+                const fragment = document.createDocumentFragment();
+                Object.keys(node)
+                    .sort((a, b) => {
+                        const aIsFolder = !node[a].isLeaf;
+                        const bIsFolder = !node[b].isLeaf;
+                        if (aIsFolder !== bIsFolder) return bIsFolder - aIsFolder;
+                        return a.localeCompare(b, undefined, { numeric: true });
+                    })
+                    .forEach(key => {
+                        const child = node[key];
+                        const li = document.createElement('li');
+                        const displayKey = searchTerm && key.toLowerCase().includes(searchTerm.toLowerCase())
+                            ? key.replace(new RegExp(`(${searchTerm.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')})`, 'gi'), '<mark>$1</mark>')
+                            : key;
+                        li.className = child.isLeaf ? 'leaf' : 'folder';
+                        li.dataset.path = child.path;
+                        li.dataset.fullId = child.fullId || '';
+                        li.innerHTML = `<span class="iob-tree-icon"></span><span class="iob-tree-label" title="${child.path}">${displayKey}</span>`;
+                        if (!child.isLeaf && Object.keys(child.children).length > 0) {
+                            const ul = document.createElement('ul');
+                            ul.appendChild(renderTree(child.children, searchTerm));
+                            li.appendChild(ul);
+                        }
+                        fragment.appendChild(li);
+                    });
+                return fragment;
+            }
+
+            function setupEventHandlers() {
+                treeContainer.off('click').on('click', '.folder', function(e) {
+                    if ($(e.target).hasClass('iob-tree-label') || $(e.target).hasClass('iob-tree-icon')) {
+                        e.stopPropagation();
+                        const $li = $(this);
+                        const $ul = $li.children('ul').first();
+                        if ($ul.length) {
+                            $ul.slideToggle(200);
+                            $li.toggleClass('open');
+                        }
+                    }
+                });
+                
+                treeContainer.on('dblclick', '.leaf', function(e) {
+                    e.stopPropagation();
+                    const fullId = $(this).data('full-id') || $(this).data('path');
+                    stateInput.val(fullId).trigger('change');
+                    RED.notify(`State selected: ${fullId}`, { type: "success", timeout: 2000 });
+                    setTimeout(() => toggleInputMode(), 500);
+                });
+                
+                treeContainer.on('click', '.leaf', function(e) {
+                    e.stopPropagation();
+                    $('.iob-tree li').removeClass('selected');
+                    $(this).addClass('selected');
+                });
+            }
+
+            function toggleInputMode() {
+                const isManualVisible = stateInput.is(':visible');
+                stateInput.toggle(!isManualVisible);
+                treeContainer.toggle(isManualVisible);
+                searchContainer.toggle(isManualVisible);
+                refreshButton.toggle(isManualVisible);
+                if (!isManualVisible) statusElement.hide();
+                toggleButton.text(isManualVisible ? 'Switch to manual input' : 'Switch to tree selection');
+                if (isManualVisible && !statesLoaded) loadTree();
+            }
+
+            function formatCacheAge(timestamp) {
+                const ageMs = Date.now() - timestamp;
+                const ageMinutes = Math.floor(ageMs / 60000);
+                if (ageMinutes < 1) return 'just now';
+                if (ageMinutes === 1) return '1 min ago';
+                return `${ageMinutes} mins ago`;
+            }
+
+            async function loadTree(forceRefresh = false) {
+                const serverNode = RED.nodes.node(serverInput.val());
+                if (!serverNode) {
+                    treeContainer.html('<div class="iob-error">No server selected</div>');
+                    statusElement.html('<span class="iob-status iob-status-error"><i class="fa fa-exclamation-triangle"></i> No server selected</span>');
+                    return;
+                }
+
+                const serverId = getCacheKey(serverNode.iobhost, serverNode.iobport);
+                currentServerId = serverId;
+
+                // Prüfe Cache zuerst (außer bei forceRefresh)
+                if (!forceRefresh) {
+                    const cachedData = getCachedStates(serverId);
+                    if (cachedData) {
+                        console.log(`[ioBroker Tree View] Using cached data for ${serverId} (${Object.keys(cachedData).length} states)`);
+                        
+                        treeData = cachedData;
+                        const treeStructure = buildTreeStructure(cachedData);
+                        const treeHtml = $('<ul class="iob-tree"></ul>')[0];
+                        treeHtml.appendChild(renderTree(treeStructure));
+                        treeContainer.empty().append(treeHtml);
+                        setupEventHandlers();
+                        statesLoaded = true;
+                        
+                        const cacheEntry = stateCache.get(serverId);
+                        const cacheAge = formatCacheAge(cacheEntry.timestamp);
+                        statusElement.html(`<span class="iob-status iob-status-success"><i class="fa fa-check-circle"></i> Loaded ${Object.keys(cachedData).length} states <span class="iob-cache-info">(cached ${cacheAge})</span></span>`);
+                        return;
+                    }
+                }
+
+                // Prüfe ob bereits geladen wird
+                if (isLoading(serverId)) {
+                    console.log(`[ioBroker Tree View] Already loading data for ${serverId}, skipping duplicate request`);
+                    statusElement.html('<span class="iob-status iob-status-info"><i class="fa fa-spinner fa-spin"></i> Loading in progress...</span>');
+                    return;
+                }
+
+                // Starte neuen Load-Vorgang
+                setLoadingState(serverId, true);
+                treeContainer.html('<div class="iob-loading"><i class="fa fa-spinner fa-spin"></i> Loading states...</div>');
+                statusElement.html('<span class="iob-status iob-status-info"><i class="fa fa-spinner fa-spin"></i> Loading states from ioBroker...</span>');
+
+                try {
+                    const encodedServerId = encodeURIComponent(serverId);
+                    const response = await $.ajax({
+                        url: `/iobroker/ws/states/${encodedServerId}`,
+                        method: 'GET',
+                        timeout: 15000,
+                        dataType: 'json'
+                    });
+                    
+                    const stateCount = Object.keys(response).length;
+                    if (stateCount === 0) throw new Error('No states received');
+
+                    // Cache die Daten
+                    setCachedStates(serverId, response);
+                    console.log(`[ioBroker Tree View] Loaded and cached ${stateCount} states for ${serverId}`);
+
+                    treeData = response;
+                    const treeStructure = buildTreeStructure(response);
+                    const treeHtml = $('<ul class="iob-tree"></ul>')[0];
+                    treeHtml.appendChild(renderTree(treeStructure));
+                    treeContainer.empty().append(treeHtml);
+                    setupEventHandlers();
+                    statesLoaded = true;
+                    statusElement.html(`<span class="iob-status iob-status-success"><i class="fa fa-check-circle"></i> Loaded ${stateCount} states <span class="iob-cache-info">(fresh)</span></span>`);
+                    
+                } catch (error) {
+                    setLoadingState(serverId, false);
+                    let errorMessage = 'Unknown error';
+                    if (error.status === 404) errorMessage = 'WebSocket endpoint not found';
+                    else if (error.status === 500) errorMessage = 'Server error loading states';
+                    else if (error.timeout) errorMessage = 'Connection timeout';
+                    else if (error.message) errorMessage = error.message;
+                    
+                    treeContainer.html(`<div class="iob-error">Error loading states: ${errorMessage}<br><small>Check server connection or <button type="button" onclick="window.currentTreeController.forceRefresh(); return false;" class="red-ui-button" style="font-size: 11px; padding: 2px 6px; margin-top: 5px;"><i class="fa fa-refresh"></i> Retry</button></small></div>`);
+                    statusElement.html('<span class="iob-status iob-status-error"><i class="fa fa-exclamation-triangle"></i> Error loading states</span>');
+                }
+            }
+
+            searchInput.on('input', function() {
+                clearTimeout(searchTimeout);
+                searchTimeout = setTimeout(() => {
+                    const searchTerm = $(this).val();
+                    const treeElement = treeContainer.find('.iob-tree')[0];
+                    if (treeElement && treeData) {
+                        treeElement.innerHTML = '';
+                        let filteredData = treeData;
+                        
+                        if (searchTerm.trim()) {
+                            filteredData = {};
+                            Object.keys(treeData).forEach(key => {
+                                if (key.toLowerCase().includes(searchTerm.toLowerCase())) {
+                                    const parts = key.split('.');
+                                    let currentNode = filteredData;
+                                    parts.forEach((part, index) => {
+                                        if (!currentNode[part]) {
+                                            currentNode[part] = {
+                                                children: {},
+                                                isLeaf: index === parts.length - 1,
+                                                path: parts.slice(0, index + 1).join('.'),
+                                                fullId: index === parts.length - 1 ? key : null
+                                            };
+                                        }
+                                        currentNode = currentNode[part].children;
+                                    });
+                                }
+                            });
+                        }
+                        
+                        const treeStructure = buildTreeStructure(filteredData);
+                        treeElement.appendChild(renderTree(treeStructure, searchTerm));
+                    }
+                }, 300);
+            });
+
+            toggleButton.on('click', toggleInputMode);
+            
+            refreshButton.on('click', function() {
+                if (currentServerId) {
+                    // Cache für aktuellen Server löschen
+                    stateCache.delete(currentServerId);
+                    console.log(`[ioBroker Tree View] Cache cleared for ${currentServerId}`);
+                    
+                    // Icon rotation animation
+                    const icon = refreshButton.find('i');
+                    icon.addClass('fa-spin');
+                    
+                    // Force refresh
+                    loadTree(true).finally(() => {
+                        // Animation stoppen nach dem Laden
+                        setTimeout(() => icon.removeClass('fa-spin'), 500);
+                    });
+                    
+                    RED.notify('Refreshing states from ioBroker...', { type: "info", timeout: 2000 });
+                }
+            });
+            
+            serverInput.on('change', function() {
+                treeData = {};
+                statesLoaded = false;
+                statusElement.html('');
+                if (treeContainer.is(':visible')) loadTree();
+            });
+
+            // Globale Referenz für Debug/Retry-Funktionen
+            window.currentTreeController = {
+                forceRefresh: () => loadTree(true),
+                getCacheStats: getCacheStats,
+                clearCache: () => {
+                    stateCache.clear();
+                    console.log('[ioBroker Tree View] Cache cleared');
+                }
+            };
+
+            return {
+                cleanup: function() {
+                    toggleButton.remove();
+                    refreshButton.remove();
+                    searchContainer.remove();
+                    treeContainer.remove();
+                    statusElement.remove();
+                    stateInput.show();
+                    
+                    // Cleanup globale Referenz wenn es der aktuelle Controller ist
+                    if (window.currentTreeController && currentServerId) {
+                        delete window.currentTreeController;
+                    }
+                },
+                forceRefresh: () => loadTree(true),
+                getCacheStats: getCacheStats
+            };
+        },
+        
+        // Globale Cache-Management-Funktionen
+        getCacheStats: getCacheStats,
+        clearCache: () => {
+            stateCache.clear();
+            console.log('[ioBroker Tree View] Global cache cleared');
+        },
+        getCacheSize: () => stateCache.size
+    };
+})();
+
+RED.nodes.registerType('iobget', {
+    category: 'ioBroker',
+    color: '#a6bbcf',
+    defaults: {
+        name: { value: "" },
+        state: { value: "" },
+        outputProperty: { value: "payload" },
+        server: { value: "", type: "iob-config" }
+    },
+    inputs: 1,
+    outputs: 1,
+    icon: "iobroker_inout.svg",
+    label: function() {
+        return this.name || "iob-get";
+    },
+    oneditprepare: function() {
+        this.treeController = window.ioBrokerTreeView.setup('iobget', 'node-input-state', 'node-input-server');
+    },
+    oneditsave: function() {
+        if (this.treeController) this.treeController.cleanup();
+    }
+});
 </script>
 
 <script type="text/html" data-template-name="iobget">
@@ -38,9 +474,30 @@
 
 <script type="text/html" data-help-name="iobget">
     <p>This node reads the current value of an ioBroker state whenever a message is received.</p>
+    <h3>Configuration</h3>
     <ul>
-        <li>If the <b>State</b> field is empty, <code>msg.topic</code> is used as the state ID.</li>
-        <li>The value is stored in <code>msg.[outputProperty]</code> (default: <code>msg.payload</code>).</li>
-        <li>The complete state object is available in <code>msg.state</code>.</li>
+        <li><b>State:</b> The ioBroker state ID. If empty, <code>msg.topic</code> is used as the state ID.</li>
+        <li><b>Output Property:</b> The message property to store the value (default: <code>payload</code>).</li>
+        <li><b>Server:</b> The ioBroker server configuration.</li>
+    </ul>
+    <h3>Features</h3>
+    <ul>
+        <li>WebSocket-based communication for real-time performance</li>
+        <li>Interactive state browser with search functionality</li>
+        <li>Automatic reconnection and connection status display</li>
+        <li>Shared connection management with other ioBroker nodes</li>
+    </ul>
+    <h3>State Selection</h3>
+    <ul>
+        <li><b>Manual input:</b> Type the state ID directly</li>
+        <li><b>Tree browser:</b> Click "Switch to tree selection" to browse available states</li>
+        <li><b>Search:</b> Use the search box to filter states in tree view</li>
+        <li><b>Selection:</b> Double-click a state in the tree to select it</li>
+    </ul>
+    <h3>Output</h3>
+    <ul>
+        <li>The value is stored in <code>msg.[outputProperty]</code> (default: <code>msg.payload</code>)</li>
+        <li>The complete state object is available in <code>msg.state</code></li>
+        <li>Timestamp information is included in the state object</li>
     </ul>
 </script>
