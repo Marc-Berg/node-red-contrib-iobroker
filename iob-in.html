@@ -464,12 +464,12 @@ RED.nodes.registerType('iobin', {
             setTimeout(() => {
                 RED.notify(`Auto-selected server: ${configNodes[0].name || configNodes[0].iobhost}`, {
                     type: "info",
-                    timeout: 3000
+                    timeout: 1500
                 });
             }, 500);
         }
-    }
-    this.treeController = window.ioBrokerTreeView.setup('iobin', 'node-input-state', 'node-input-server');
+        }
+        this.treeController = window.ioBrokerTreeView.setup('iobin', 'node-input-state', 'node-input-server');
     },
     oneditsave: function() {
         if (this.treeController) this.treeController.cleanup();

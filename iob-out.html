@@ -464,7 +464,7 @@ RED.nodes.registerType('iobout', {
                 setTimeout(() => {
                     RED.notify(`Auto-selected server: ${configNodes[0].name || configNodes[0].iobhost}`, {
                         type: "info",
-                        timeout: 3000
+                        timeout: 1500
                     });
                 }, 500);
             }

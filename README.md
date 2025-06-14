@@ -4,7 +4,7 @@ This repository provides custom Node-RED nodes for seamless integration with ioB
 
 ## Features
 
-- **Real-time WebSocket communication** for optimal performance
+- **Real-time WebSocket communication**
 - **Shared connection management** - multiple nodes share WebSocket connections
 - **Interactive state browser** with search functionality
 - **Automatic reconnection** and connection status monitoring
@@ -27,7 +27,7 @@ Subscribes to ioBroker state changes and forwards updates to your flow in real-t
 
 ### iobout
 **Output Node**  
-Sends values to ioBroker states via WebSocket.
+Sends values to ioBroker states.
 
 - **State:** Specify the target ioBroker state using the tree browser or manual input.  
   If left empty, `msg.topic` is used as the state ID.
@@ -37,7 +37,7 @@ Sends values to ioBroker states via WebSocket.
 
 ### iobget
 **Getter Node**  
-Reads the current value of an ioBroker state on demand via WebSocket.
+Reads the current value of an ioBroker state on demand.
 
 - **State:** Specify the ioBroker state to read using the tree browser or manual input.  
   If left empty, `msg.topic` is used as state ID.
@@ -65,7 +65,7 @@ Shared configuration for ioBroker server settings.
 
 1. **Drag and drop** the nodes into your flow.
 2. **Configure** the server settings in the `iob-config` node:
-   - Enter the ioBroker host and WebSocket port details (typically port 8084).
+   - Enter the ioBroker host and port details.
    - Add authentication credentials if required.
 3. **Configure** each node as needed:
    - Use the **interactive tree browser** to select states or enter them manually.
@@ -104,28 +104,31 @@ The nodes use a **shared WebSocket connection manager** that provides:
 
 ## WebSocket Connection
 
-The nodes connect to ioBroker's WebSocket (ws) or Web adapter, which typically runs on **port 8084**. Make sure that:
+The nodes connect to ioBroker's WebSocket interface via one of three options:
 
-1. **ioBroker WebSocket adapter is installed and running**
-2. **Use pure web-sockets** (only for Web adapter)
-2. **Port 8084 is accessible** from your Node-RED instance
+- **WebSocket adapter** (default port 8084)
+- **Web adapter** (default port 8082)
+- **Admin adapter** (default port 8081)
+
+Make sure that:
+
+1. **One of the WebSocket-capable adapters is installed and running**
+2. **The appropriate port is accessible** from your Node-RED instance
 3. **Authentication is configured** if your ioBroker installation requires it
-
-The WebSocket connection provides:
-- **Real-time state updates** without polling
-- **Bidirectional communication** for both reading and writing states
-- **Efficient bandwidth usage** compared to HTTP-based solutions
-- **Automatic subscription management** for optimal performance
 
 ## Troubleshooting
 
 If you experience connection issues:
 
-1. **Check ioBroker WebSocket or Web adapter:** Ensure it's installed, enabled, and running on the expected port
-2. **Verify network connectivity:** Test if the WebSocket port is reachable from Node-RED
-3. **Check authentication:** Verify username/password if authentication is enabled
+1. **Check WebSocket adapters:** 
+   - **WebSocket adapter (8084):** Ensure it's installed via `iobroker add ws` and running
+   - **Web adapter (8082):** Ensure it's installed via `iobroker add web` and running
+   - **Admin adapter (8081):** Ensure it's installed via `iobroker add admin` and running
+2. **Verify network connectivity:** Test if the chosen port is reachable from Node-RED
+3. **Check authentication:** Verify username/password if authentication is enabled in ioBroker
 4. **Review logs:** Check both Node-RED debug logs and ioBroker logs for error messages
 5. **Use status monitoring:** Send status messages to nodes to check connection health
+6. **Try alternative ports:** If one port doesn't work, try the other WebSocket options
 
 ## License
 
