@@ -219,11 +219,8 @@ module.exports = function(RED) {
                     timestamp: Date.now()
                 };
                 node.send(statusMsg);
-            } else if (msg.topic === "reconnect") {
-                node.log("Manual reconnection requested");
-                node.isInitialized = false;
-                initialize();
             }
+            // Manual reconnect functionality removed
         });
 
         // Cleanup on node close

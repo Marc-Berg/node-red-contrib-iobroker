@@ -167,19 +167,7 @@ module.exports = function(RED) {
                     done && done();
                     return;
                 }
-                
-                if (msg.topic === "reconnect") {
-                    node.log("Manual reconnection requested");
-                    try {
-                        node.isInitialized = false;
-                        await connectionManager.resetConnection(settings.serverId, globalConfig);
-                        setStatus("green", "dot", "Reconnected");
-                    } catch (error) {
-                        setError(`Reconnection failed: ${error.message}`, "Reconnect failed");
-                    }
-                    done && done();
-                    return;
-                }
+                // Manual reconnect functionality removed
                 
                 const configState = config.state?.trim();
                 const stateId = configState || (typeof msg.topic === "string" ? msg.topic.trim() : "");

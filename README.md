@@ -100,7 +100,6 @@ The nodes use a **shared WebSocket connection manager** that provides:
 - **Send values to ioBroker:** Use `iobout` to update ioBroker states (as value or command).
 - **Read state values on demand:** Use `iobget` to query the current value of a state.
 - **Status monitoring:** Send `msg.topic = "status"` to any node to get connection information.
-- **Manual reconnection:** Send `msg.topic = "reconnect"` to force a reconnection.
 
 ## WebSocket Connection
 
