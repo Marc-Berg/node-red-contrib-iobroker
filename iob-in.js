@@ -11,7 +11,7 @@ module.exports = function(RED) {
             return setError("No server configuration selected", "No server config");
         }
 
-        const { iobhost, iobport } = globalConfig;
+        const { iobhost, iobport, user, password } = globalConfig;
         if (!iobhost || !iobport) {
             return setError("ioBroker host or port missing", "Host/port missing");
         }
@@ -30,7 +30,7 @@ module.exports = function(RED) {
             nodeId: node.id
         };
 
-        node.currentConfig = { iobhost, iobport };
+        node.currentConfig = { iobhost, iobport, user, password };
         node.isInitialized = false;
 
         // Helper functions
@@ -100,7 +100,6 @@ module.exports = function(RED) {
             const callback = onStateChange;
 
             callback.updateStatus = function(status) {
-                // Use Node-RED compatible timestamp format
                 const now = new Date();
                 const day = now.getDate().toString().padStart(2, '0');
                 const month = now.toLocaleDateString('en', { month: 'short' });
@@ -152,10 +151,18 @@ module.exports = function(RED) {
             const currentGlobalConfig = RED.nodes.getNode(config.server);
             if (!currentGlobalConfig) return false;
             
-            return (
+            const configChanged = (
                 node.currentConfig.iobhost !== currentGlobalConfig.iobhost ||
-                node.currentConfig.iobport !== currentGlobalConfig.iobport
+                node.currentConfig.iobport !== currentGlobalConfig.iobport ||
+                node.currentConfig.user !== currentGlobalConfig.user ||
+                node.currentConfig.password !== currentGlobalConfig.password
             );
+            
+            if (configChanged) {
+                node.log(`Configuration change detected: ${node.currentConfig.iobhost}:${node.currentConfig.iobport} -> ${currentGlobalConfig.iobhost}:${currentGlobalConfig.iobport}`);
+            }
+            
+            return configChanged;
         }
 
         // Initialize subscription
@@ -163,17 +170,27 @@ module.exports = function(RED) {
             try {
                 setStatus("yellow", "ring", "Connecting...");
                 
-                // Check if config has changed
+                // Always check for configuration changes
                 if (hasConfigChanged()) {
                     const newGlobalConfig = RED.nodes.getNode(config.server);
-                    node.currentConfig = { 
-                        iobhost: newGlobalConfig.iobhost, 
-                        iobport: newGlobalConfig.iobport 
-                    };
-                    settings.serverId = `${newGlobalConfig.iobhost}:${newGlobalConfig.iobport}`;
+                    const oldServerId = settings.serverId;
                     
-                    await connectionManager.resetConnection(settings.serverId, newGlobalConfig);
-                    node.log(`Configuration changed, connection reset for ${settings.serverId}`);
+                    // Update internal configuration
+                    node.currentConfig = {
+                        iobhost: newGlobalConfig.iobhost,
+                        iobport: newGlobalConfig.iobport,
+                        user: newGlobalConfig.user,
+                        password: newGlobalConfig.password
+                    };
+                    
+                    const newServerId = `${newGlobalConfig.iobhost}:${newGlobalConfig.iobport}`;
+                    settings.serverId = newServerId;
+                    
+                    // Force connection reset for configuration changes
+                    if (oldServerId !== newServerId) {
+                        node.log(`Server changed from ${oldServerId} to ${newServerId}, forcing connection reset`);
+                        await connectionManager.forceServerSwitch(oldServerId, newServerId, newGlobalConfig);
+                    }
                 }
                 
                 const callback = createCallback();
@@ -206,7 +223,7 @@ module.exports = function(RED) {
             }
         }
 
-        // Input handler (for manual triggers or commands)
+        // Input handler (for status requests)
         node.on("input", function(msg) {
             if (msg.topic === "status") {
                 const status = connectionManager.getConnectionStatus(settings.serverId);
@@ -220,7 +237,6 @@ module.exports = function(RED) {
                 };
                 node.send(statusMsg);
             }
-            // Manual reconnect functionality removed
         });
 
         // Cleanup on node close
@@ -289,26 +305,5 @@ module.exports = function(RED) {
         const serverId = decodeURIComponent(req.params.serverId);
         const status = connectionManager.getConnectionStatus(serverId);
         res.json(status);
-    });
-
-    RED.httpAdmin.post("/iobroker/reset-connection/:serverId", async function(req, res) {
-        try {
-            const serverId = decodeURIComponent(req.params.serverId);
-            const [iobhost, iobport] = serverId.split(':');
-            
-            if (!iobhost || !iobport) {
-                return res.status(400).json({ error: 'Invalid server ID format' });
-            }
-
-            const serverConfig = { iobhost, iobport };
-            await connectionManager.resetConnection(serverId, serverConfig);
-            
-            res.json({ success: true, message: 'Connection reset successfully' });
-        } catch (error) {
-            res.status(500).json({ 
-                error: 'Failed to reset connection', 
-                details: error.message 
-            });
-        }
     });
 };

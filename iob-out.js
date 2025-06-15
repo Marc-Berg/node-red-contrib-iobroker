@@ -11,7 +11,7 @@ module.exports = function(RED) {
             return setError("No server configuration selected", "No server config");
         }
 
-        const { iobhost, iobport } = globalConfig;
+        const { iobhost, iobport, user, password } = globalConfig;
         if (!iobhost || !iobport) {
             return setError("ioBroker host or port missing", "Host/port missing");
         }
@@ -25,6 +25,7 @@ module.exports = function(RED) {
         };
 
         const configState = config.state?.trim();
+        node.currentConfig = { iobhost, iobport, user, password };
         node.currentStatus = { fill: "", shape: "", text: "" };
         node.isInitialized = false;
 
@@ -49,7 +50,6 @@ module.exports = function(RED) {
             const callback = function() {};
 
             callback.updateStatus = function(status) {
-                // Use Node-RED compatible timestamp format
                 const now = new Date();
                 const day = now.getDate().toString().padStart(2, '0');
                 const month = now.toLocaleDateString('en', { month: 'short' });
@@ -61,7 +61,6 @@ module.exports = function(RED) {
                             setStatus("green", "dot", "Connected");
                             node.isInitialized = true;
                         } else {
-                            // Auch bei bereits initialisierten Nodes den Status aktualisieren
                             setStatus("green", "dot", "Connected");
                         }
                         break;
@@ -70,7 +69,7 @@ module.exports = function(RED) {
                         break;
                     case 'disconnected':
                         setStatus("red", "ring", "Disconnected");
-                        node.isInitialized = false; // Reset bei Disconnection
+                        node.isInitialized = false;
                         break;
                     case 'reconnecting':
                         setStatus("yellow", "ring", "Reconnecting...");
@@ -97,10 +96,52 @@ module.exports = function(RED) {
             return callback;
         }
 
+        // Check if configuration has changed
+        function hasConfigChanged() {
+            const currentGlobalConfig = RED.nodes.getNode(config.server);
+            if (!currentGlobalConfig) return false;
+            
+            const configChanged = (
+                node.currentConfig.iobhost !== currentGlobalConfig.iobhost ||
+                node.currentConfig.iobport !== currentGlobalConfig.iobport ||
+                node.currentConfig.user !== currentGlobalConfig.user ||
+                node.currentConfig.password !== currentGlobalConfig.password
+            );
+            
+            if (configChanged) {
+                node.log(`Configuration change detected: ${node.currentConfig.iobhost}:${node.currentConfig.iobport} -> ${currentGlobalConfig.iobhost}:${currentGlobalConfig.iobport}`);
+            }
+            
+            return configChanged;
+        }
+
         // Initialize connection
         async function initializeConnection() {
             try {
                 setStatus("yellow", "ring", "Connecting...");
+                
+                // Always check for configuration changes
+                if (hasConfigChanged()) {
+                    const newGlobalConfig = RED.nodes.getNode(config.server);
+                    const oldServerId = settings.serverId;
+                    
+                    // Update internal configuration
+                    node.currentConfig = {
+                        iobhost: newGlobalConfig.iobhost,
+                        iobport: newGlobalConfig.iobport,
+                        user: newGlobalConfig.user,
+                        password: newGlobalConfig.password
+                    };
+                    
+                    const newServerId = `${newGlobalConfig.iobhost}:${newGlobalConfig.iobport}`;
+                    settings.serverId = newServerId;
+                    
+                    // Force connection reset for configuration changes
+                    if (oldServerId !== newServerId) {
+                        node.log(`Server changed from ${oldServerId} to ${newServerId}, forcing connection reset`);
+                        await connectionManager.forceServerSwitch(oldServerId, newServerId, newGlobalConfig);
+                    }
+                }
                 
                 // Register for events only
                 const eventCallback = createEventCallback();
@@ -145,7 +186,6 @@ module.exports = function(RED) {
                     done && done();
                     return;
                 }
-                // Manual reconnect functionality removed
 
                 const stateId = configState || (typeof msg.topic === "string" ? msg.topic.trim() : "");
                 if (!stateId) {

@@ -149,21 +149,51 @@
 
             function buildTreeStructure(data) {
                 const tree = {};
-                Object.keys(data).forEach(id => {
+                const allStateIds = Object.keys(data);
+                
+                // Create a set of all partial paths to determine what should be folders
+                const allPaths = new Set();
+                allStateIds.forEach(id => {
+                    const parts = id.split('.');
+                    for (let i = 0; i < parts.length; i++) {
+                        allPaths.add(parts.slice(0, i + 1).join('.'));
+                    }
+                });
+                
+                allStateIds.forEach(id => {
                     const parts = id.split('.');
                     let currentNode = tree;
+                    
                     parts.forEach((part, index) => {
+                        const currentPath = parts.slice(0, index + 1).join('.');
+                        const isLastPart = index === parts.length - 1;
+                        
+                        // Check if this path has any children (longer paths that start with this path + '.')
+                        const hasChildren = Array.from(allPaths).some(path => 
+                            path.startsWith(currentPath + '.') && path !== currentPath
+                        );
+                        
                         if (!currentNode[part]) {
                             currentNode[part] = {
                                 children: {},
-                                isLeaf: index === parts.length - 1,
-                                path: parts.slice(0, index + 1).join('.'),
-                                fullId: index === parts.length - 1 ? id : null
+                                isLeaf: isLastPart && !hasChildren, // Only leaf if it's the last part AND has no children
+                                path: currentPath,
+                                fullId: isLastPart ? id : null
                             };
+                        } else {
+                            // Update existing node - it might have been created as leaf but now we know it has children
+                            if (hasChildren) {
+                                currentNode[part].isLeaf = false;
+                            }
+                            if (isLastPart) {
+                                currentNode[part].fullId = id;
+                            }
                         }
+                        
                         currentNode = currentNode[part].children;
                     });
                 });
+                
                 return tree;
             }
 
@@ -328,35 +358,38 @@
             searchInput.on('input', function() {
                 clearTimeout(searchTimeout);
                 searchTimeout = setTimeout(() => {
-                    const searchTerm = $(this).val();
+                    const searchTerm = $(this).val().trim();
                     const treeElement = treeContainer.find('.iob-tree')[0];
-                    if (treeElement && treeData) {
-                        treeElement.innerHTML = '';
-                        let filteredData = treeData;
+                    
+                    if (!treeElement || !treeData) return;
+                    
+                    treeElement.innerHTML = '';
+                    let filteredData = treeData;
+                    
+                    if (searchTerm) {
+                        // Filter states that match the search term
+                        filteredData = {};
+                        Object.keys(treeData).forEach(stateId => {
+                            if (stateId.toLowerCase().includes(searchTerm.toLowerCase())) {
+                                filteredData[stateId] = treeData[stateId];
+                            }
+                        });
                         
-                        if (searchTerm.trim()) {
-                            filteredData = {};
-                            Object.keys(treeData).forEach(key => {
-                                if (key.toLowerCase().includes(searchTerm.toLowerCase())) {
-                                    const parts = key.split('.');
-                                    let currentNode = filteredData;
-                                    parts.forEach((part, index) => {
-                                        if (!currentNode[part]) {
-                                            currentNode[part] = {
-                                                children: {},
-                                                isLeaf: index === parts.length - 1,
-                                                path: parts.slice(0, index + 1).join('.'),
-                                                fullId: index === parts.length - 1 ? key : null
-                                            };
-                                        }
-                                        currentNode = currentNode[part].children;
-                                    });
-                                }
-                            });
+                        // If no matches found, show empty tree
+                        if (Object.keys(filteredData).length === 0) {
+                            treeElement.innerHTML = '<li class="iob-loading">No states found matching "' + searchTerm + '"</li>';
+                            return;
                         }
-                        
-                        const treeStructure = buildTreeStructure(filteredData);
-                        treeElement.appendChild(renderTree(treeStructure, searchTerm));
+                    }
+                    
+                    // Build tree structure with proper folder/leaf detection
+                    const treeStructure = buildTreeStructure(filteredData);
+                    treeElement.appendChild(renderTree(treeStructure, searchTerm));
+                    
+                    // Auto-expand all folders when searching to show results
+                    if (searchTerm) {
+                        treeContainer.find('.folder').addClass('open');
+                        treeContainer.find('.folder > ul').show();
                     }
                 }, 300);
             });
