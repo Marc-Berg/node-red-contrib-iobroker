@@ -19,13 +19,14 @@ module.exports = function(RED) {
         // Configuration with defaults
         const settings = {
             inputProperty: config.inputProperty?.trim() || "payload",
-            setMode: config.setMode || "value", // "value" (ack=true) or "command" (ack=false)
+            setMode: config.setMode || "value",
             serverId: `${iobhost}:${iobport}`,
             nodeId: node.id
         };
 
         const configState = config.state?.trim();
         node.currentStatus = { fill: "", shape: "", text: "" };
+        node.isInitialized = false;
         let connectionClient = null;
 
         // Helper function for error handling
@@ -45,6 +46,52 @@ module.exports = function(RED) {
             }
         }
 
+        // Create enhanced callback for reconnection notifications
+        function createEnhancedCallback() {
+            const callback = function() {
+                // This is a dummy callback since iobout doesn't subscribe to states
+                // But we need it for the reconnection events
+            };
+
+            // Add status update function to callback
+            callback.updateStatus = function(status) {
+                switch (status) {
+                    case 'connected':
+                        if (!node.isInitialized) {
+                            setStatus("green", "dot", "Connected");
+                            node.isInitialized = true;
+                        }
+                        break;
+                    case 'connecting':
+                        setStatus("yellow", "ring", "Connecting...");
+                        break;
+                    case 'disconnected':
+                        setStatus("red", "ring", "Disconnected");
+                        break;
+                    case 'reconnecting':
+                        setStatus("yellow", "ring", "Reconnecting...");
+                        break;
+                    default:
+                        setStatus("grey", "ring", "Unknown");
+                }
+            };
+
+            // Add reconnection handler
+            callback.onReconnect = function() {
+                node.log("Reconnection detected by output node");
+                setStatus("green", "dot", "Reconnected");
+                node.isInitialized = true;
+            };
+
+            // Add disconnection handler
+            callback.onDisconnect = function() {
+                node.log("Disconnection detected by output node");
+                setStatus("red", "ring", "Disconnected");
+            };
+
+            return callback;
+        }
+
         // Initialize WebSocket connection
         async function initializeConnection() {
             try {
@@ -54,8 +101,19 @@ module.exports = function(RED) {
                     settings.serverId,
                     globalConfig
                 );
+
+                // Register dummy subscription to get reconnection events
+                const enhancedCallback = createEnhancedCallback();
+                await connectionManager.subscribe(
+                    settings.nodeId,
+                    settings.serverId,
+                    `_dummy_${settings.nodeId}`, // Dummy state ID
+                    enhancedCallback,
+                    globalConfig
+                );
                 
                 setStatus("green", "dot", "Connected");
+                node.isInitialized = true;
                 node.log(`WebSocket connection established for output node`);
                 
             } catch (error) {
@@ -63,7 +121,6 @@ module.exports = function(RED) {
                 setError(`Connection failed: ${errorMsg}`, "Connection failed");
                 node.error(`WebSocket connection failed: ${errorMsg}`);
                 
-                // Retry after delay for connection errors
                 if (errorMsg.includes('timeout') || errorMsg.includes('refused')) {
                     setTimeout(() => {
                         if (node.context) {
@@ -75,7 +132,7 @@ module.exports = function(RED) {
             }
         }
 
-        // Set state value via WebSocket using the correct ioBroker API
+        // Set state value via WebSocket
         async function setState(stateId, value, ack) {
             return new Promise((resolve, reject) => {
                 if (!connectionClient || !connectionClient.connected) {
@@ -88,8 +145,6 @@ module.exports = function(RED) {
                 }, 8000);
 
                 try {
-                    // Use the correct ioBroker WebSocket setState API
-                    // Based on ioBroker documentation: setState(id, state, callback)
                     const stateObject = {
                         val: value,
                         ack: ack,
@@ -97,22 +152,17 @@ module.exports = function(RED) {
                         ts: Date.now()
                     };
 
-                    console.log(`[iobout] Setting state ${stateId} =`, stateObject);
-
                     connectionClient.emit('setState', stateId, stateObject, (error, result) => {
                         clearTimeout(timeoutId);
                         if (error) {
-                            console.error(`[iobout] setState failed for ${stateId}:`, error);
                             reject(new Error(`setState failed for ${stateId}: ${error}`));
                         } else {
-                            console.log(`[iobout] setState success: ${stateId} = ${value} (ack: ${ack})`);
                             resolve(result);
                         }
                     });
 
                 } catch (emitError) {
                     clearTimeout(timeoutId);
-                    console.error(`[iobout] Error emitting setState for ${stateId}:`, emitError);
                     reject(new Error(`Emit error for ${stateId}: ${emitError.message}`));
                 }
             });
@@ -121,7 +171,31 @@ module.exports = function(RED) {
         // Input message handler
         this.on('input', async function(msg, send, done) {
             try {
-                // Determine state ID from config or msg.topic
+                // Handle command messages
+                if (msg.topic === "status") {
+                    const status = connectionManager.getConnectionStatus(settings.serverId);
+                    const statusMsg = {
+                        payload: {
+                            websocket: status,
+                            nodeStatus: node.currentStatus,
+                            connected: !!connectionClient && connectionClient.connected
+                        },
+                        topic: "status",
+                        timestamp: Date.now()
+                    };
+                    send(statusMsg);
+                    done && done();
+                    return;
+                } else if (msg.topic === "reconnect") {
+                    node.log("Manual reconnection requested");
+                    connectionClient = null;
+                    node.isInitialized = false;
+                    await initializeConnection();
+                    done && done();
+                    return;
+                }
+
+                // Normal operation
                 const stateId = configState || (typeof msg.topic === "string" ? msg.topic.trim() : "");
                 if (!stateId) {
                     setStatus("red", "ring", "State ID missing");
@@ -129,7 +203,6 @@ module.exports = function(RED) {
                     return;
                 }
 
-                // Get value from message
                 const value = msg[settings.inputProperty];
                 if (value === undefined) {
                     node.error(`Input property "${settings.inputProperty}" not found in message`);
@@ -138,7 +211,6 @@ module.exports = function(RED) {
                     return;
                 }
 
-                // Check WebSocket connection
                 if (!connectionClient || !connectionClient.connected) {
                     setStatus("yellow", "ring", "Reconnecting...");
                     await initializeConnection();
@@ -148,12 +220,9 @@ module.exports = function(RED) {
                     }
                 }
 
-                // Determine acknowledgment based on setMode
-                const ack = settings.setMode === "value"; // true for "value", false for "command"
-                
+                const ack = settings.setMode === "value";
                 setStatus("blue", "dot", "Setting...");
                 
-                // Set state via WebSocket
                 await setState(stateId, value, ack);
                 
                 setStatus("green", "dot", "OK");
@@ -168,10 +237,10 @@ module.exports = function(RED) {
             }
         });
 
-        // Status monitoring for connection health
+        // Status monitoring
         function startStatusMonitoring() {
             const statusInterval = setInterval(() => {
-                if (!node.context) return; // Node is being destroyed
+                if (!node.context) return;
                 
                 try {
                     const status = connectionManager.getConnectionStatus(settings.serverId);
@@ -180,9 +249,8 @@ module.exports = function(RED) {
                         if (node.currentStatus.fill !== "red") {
                             setStatus("red", "ring", "Disconnected");
                         }
-                        connectionClient = null; // Clear invalid connection
+                        connectionClient = null;
                     } else if (status.connected && !connectionClient) {
-                        // Try to get the connection again
                         connectionManager.getConnection(settings.serverId, globalConfig)
                             .then(client => {
                                 connectionClient = client;
@@ -197,45 +265,31 @@ module.exports = function(RED) {
                 } catch (error) {
                     node.warn(`Status monitoring error: ${error.message}`);
                 }
-            }, 10000); // Check every 10 seconds
+            }, 10000);
 
             node.statusInterval = statusInterval;
         }
 
-        // Input handler for commands
-        node.on("input", function(msg) {
-            if (msg.topic === "status") {
-                // Return connection status
-                const status = connectionManager.getConnectionStatus(settings.serverId);
-                const statusMsg = {
-                    payload: {
-                        websocket: status,
-                        nodeStatus: node.currentStatus,
-                        connected: !!connectionClient && connectionClient.connected
-                    },
-                    topic: "status",
-                    timestamp: Date.now()
-                };
-                node.send(statusMsg);
-            } else if (msg.topic === "reconnect") {
-                // Force reconnection
-                node.log("Manual reconnection requested");
-                connectionClient = null;
-                initializeConnection();
-            }
-        });
-
         // Cleanup on node close
-        node.on("close", function(done) {
+        node.on("close", async function(done) {
             node.log("Output node closing...");
             
-            // Clear status monitoring
             if (node.statusInterval) {
                 clearInterval(node.statusInterval);
                 node.statusInterval = null;
             }
 
-            // Clear status
+            // Unsubscribe dummy subscription
+            try {
+                await connectionManager.unsubscribe(
+                    settings.nodeId,
+                    settings.serverId,
+                    `_dummy_${settings.nodeId}`
+                );
+            } catch (error) {
+                node.warn(`Cleanup error: ${error.message}`);
+            }
+
             try {
                 node.status({});
                 node.currentStatus = { fill: "", shape: "", text: "" };
@@ -243,10 +297,7 @@ module.exports = function(RED) {
                 // Ignore status errors during cleanup
             }
             
-            // Note: We don't clean up the WebSocket connection here since
-            // it might be shared with other nodes (iobin, iobget)
             connectionClient = null;
-            
             done();
         });
 
