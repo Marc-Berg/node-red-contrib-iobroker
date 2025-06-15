@@ -9,6 +9,7 @@ This repository provides custom Node-RED nodes for seamless integration with ioB
 - **Interactive state browser** with search functionality
 - **Automatic reconnection** and connection status monitoring
 - **Bidirectional communication** for state changes and commands
+- **Object management** for accessing ioBroker object definitions
 
 ## Nodes
 
@@ -44,6 +45,16 @@ Reads the current value of an ioBroker state on demand.
 - **Output:** The current value of the state is sent as `msg.[outputProperty]` (default: `msg.payload`).
 - **Server Configuration:** Configure the ioBroker server details in the node settings.
 
+### iobgetobject
+**Object Getter Node**  
+Retrieves ioBroker object definitions, including metadata and configuration information.
+
+- **Object ID:** Specify the ioBroker object identifier using the tree browser or manual input.  
+  If left empty, `msg.topic` is used as object ID.
+- **Output:** The complete object definition is sent as `msg.[outputProperty]` (default: `msg.payload`).
+- **Object Structure:** Returns the full ioBroker object including type, common properties, native configuration, and access control information.
+- **Server Configuration:** Configure the ioBroker server details in the node settings.
+
 ### iob-config
 **Configuration Node**  
 Shared configuration for ioBroker server settings.
@@ -68,11 +79,11 @@ Shared configuration for ioBroker server settings.
    - Enter the ioBroker host and port details.
    - Add authentication credentials if required.
 3. **Configure** each node as needed:
-   - Use the **interactive tree browser** to select states or enter them manually.
+   - Use the **interactive tree browser** to select states or objects, or enter them manually.
    - Set the output/input property for the value (default: `msg.payload`).
    - For `iobin`, select whether to trigger on all updates or only on acknowledged/unacknowledged changes.
    - For `iobout`, choose between "value" (ack=true) or "command" (ack=false) mode.
-   - For `iobout` and `iobget`, set the state ID or leave it empty to use `msg.topic`.
+   - For `iobget` and `iobgetobject`, set the state or object ID or leave empty to use `msg.topic`.
 4. **Connect** the nodes to your flow as needed.
 
 ## State Selection
@@ -84,6 +95,12 @@ All nodes feature an **interactive state browser** that makes it easy to find an
 - **Search functionality:** Use the search box to filter states in tree view
 - **Smart caching:** State lists are cached for better performance
 - **Real-time refresh:** Update the state list with the refresh button
+
+## Object Management
+
+The `iobgetobject` node provides access to ioBroker object definitions, which contain the structural and configuration information for all ioBroker entities. Object definitions include essential metadata such as object type classification (state, channel, device, adapter), common properties including names and roles, adapter-specific native configurations, and access control settings.
+
+This functionality enables advanced automation scenarios that require inspection of object metadata, dynamic discovery of available devices and states, configuration validation and system monitoring, and integration with external systems that need detailed ioBroker structure information.
 
 ## Connection Management
 
@@ -99,6 +116,7 @@ The nodes use a **shared WebSocket connection manager** that provides:
 - **Subscribe to state changes:** Use `iobin` to receive real-time updates from ioBroker.
 - **Send values to ioBroker:** Use `iobout` to update ioBroker states (as value or command).
 - **Read state values on demand:** Use `iobget` to query the current value of a state.
+- **Inspect object definitions:** Use `iobgetobject` to retrieve metadata and configuration information for any ioBroker object.
 - **Status monitoring:** Send `msg.topic = "status"` to any node to get connection information.
 
 ## WebSocket Connection
