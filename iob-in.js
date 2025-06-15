@@ -4,41 +4,13 @@ module.exports = function(RED) {
     function iobin(config) {
         RED.nodes.createNode(this, config);
         const node = this;
-
-        // Get server configuration
-        const globalConfig = RED.nodes.getNode(config.server);
-        if (!globalConfig) {
-            return setError("No server configuration selected", "No server config");
-        }
-
-        const { iobhost, iobport, user, password } = globalConfig;
-        if (!iobhost || !iobport) {
-            return setError("ioBroker host or port missing", "Host/port missing");
-        }
-
-        // Validate state ID
-        const stateId = config.state?.trim();
-        if (!stateId) {
-            return setError("State ID missing", "State ID missing");
-        }
-
-        // Configuration with defaults
-        const settings = {
-            outputProperty: config.outputProperty?.trim() || "payload",
-            ackFilter: config.ackFilter || "both",
-            serverId: `${iobhost}:${iobport}`,
-            nodeId: node.id
-        };
-
-        node.currentConfig = { iobhost, iobport, user, password };
-        node.isInitialized = false;
-
+        
         // Helper functions
         function setError(message, statusText) {
             node.error(message);
             setStatus("red", "ring", statusText);
         }
-
+        
         function setStatus(fill, shape, text) {
             try {
                 node.status({ fill, shape, text });
@@ -46,7 +18,35 @@ module.exports = function(RED) {
                 node.warn(`Status update error: ${error.message}`);
             }
         }
-
+        
+        // Get server configuration
+        const globalConfig = RED.nodes.getNode(config.server);
+        if (!globalConfig) {
+            return setError("No server configuration selected", "No server config");
+        }
+        
+        const { iobhost, iobport, user, password } = globalConfig;
+        if (!iobhost || !iobport) {
+            return setError("ioBroker host or port missing", "Host/port missing");
+        }
+        
+        // Validate state ID
+        const stateId = config.state?.trim();
+        if (!stateId) {
+            return setError("State ID missing", "State ID missing");
+        }
+        
+        // Configuration with defaults
+        const settings = {
+            outputProperty: config.outputProperty?.trim() || "payload",
+            ackFilter: config.ackFilter || "both",
+            serverId: `${iobhost}:${iobport}`,
+            nodeId: node.id
+        };
+        
+        node.currentConfig = { iobhost, iobport, user, password };
+        node.isInitialized = false;
+        
         // Filter function for acknowledgment status
         function shouldSendMessage(ack, filter) {
             switch (filter) {
@@ -55,7 +55,7 @@ module.exports = function(RED) {
                 default: return true; // "both"
             }
         }
-
+        
         // Create message from state change
         function createMessage(stateId, state) {
             const message = {
@@ -66,7 +66,7 @@ module.exports = function(RED) {
             message[settings.outputProperty] = state.val;
             return message;
         }
-
+        
         // State change callback
         function onStateChange(stateId, state) {
             try {
@@ -75,12 +75,12 @@ module.exports = function(RED) {
                     node.warn(`Invalid state data received for ${stateId}`);
                     return;
                 }
-
+                
                 // Filter by acknowledgment status
                 if (!shouldSendMessage(state.ack, settings.ackFilter)) {
                     return;
                 }
-
+                
                 // Create and send message
                 const message = createMessage(stateId, state);
                 node.send(message);
@@ -88,17 +88,16 @@ module.exports = function(RED) {
                 // Update status to show last activity
                 const timestamp = new Date().toLocaleTimeString();
                 setStatus("green", "dot", `Last: ${timestamp}`);
-                
             } catch (error) {
                 node.error(`State change processing error: ${error.message}`);
                 setError(`Processing error: ${error.message}`, "Process error");
             }
         }
-
+        
         // Create enhanced callback for the new manager
         function createCallback() {
             const callback = onStateChange;
-
+            
             callback.updateStatus = function(status) {
                 const now = new Date();
                 const day = now.getDate().toString().padStart(2, '0');
@@ -125,27 +124,26 @@ module.exports = function(RED) {
                         setStatus("grey", "ring", "Unknown");
                 }
             };
-
+            
             callback.onReconnect = function() {
                 const now = new Date();
                 const day = now.getDate().toString().padStart(2, '0');
                 const month = now.toLocaleDateString('en', { month: 'short' });
                 const time = now.toTimeString().slice(0, 8);
                 console.log(`${day} ${month} ${time} - [debug] [Node ${settings.nodeId}] Reconnection event received`);
-                
                 node.log("Reconnection detected by node");
                 setStatus("green", "dot", "Reconnected");
                 node.isInitialized = true;
             };
-
+            
             callback.onDisconnect = function() {
                 node.log("Disconnection detected by node");
                 setStatus("red", "ring", "Disconnected");
             };
-
+            
             return callback;
         }
-
+        
         // Check if configuration has changed
         function hasConfigChanged() {
             const currentGlobalConfig = RED.nodes.getNode(config.server);
@@ -164,7 +162,7 @@ module.exports = function(RED) {
             
             return configChanged;
         }
-
+        
         // Initialize subscription
         async function initialize() {
             try {
@@ -222,7 +220,7 @@ module.exports = function(RED) {
                 }
             }
         }
-
+        
         // Input handler (for status requests)
         node.on("input", function(msg) {
             if (msg.topic === "status") {
@@ -238,43 +236,40 @@ module.exports = function(RED) {
                 node.send(statusMsg);
             }
         });
-
+        
         // Cleanup on node close
         node.on("close", async function(removed, done) {
             node.log("Node closing...");
-            
             node.isInitialized = false;
-
+            
             try {
                 await connectionManager.unsubscribe(
                     settings.nodeId,
                     settings.serverId,
                     stateId
                 );
-                
                 node.status({});
                 node.log(`Successfully unsubscribed from ${stateId}`);
-                
             } catch (error) {
                 node.warn(`Cleanup error: ${error.message}`);
             } finally {
                 done();
             }
         });
-
+        
         // Error handling
         node.on("error", function(error) {
             node.error(`Node error: ${error.message}`);
             setError(`Node error: ${error.message}`, "Node error");
         });
-
+        
         // Initialize the node
         initialize();
     }
-
+    
     // Register the node type
     RED.nodes.registerType("iobin", iobin);
-
+    
     // Admin endpoints for the tree view
     RED.httpAdmin.get("/iobroker/ws/states/:serverId", async function(req, res) {
         try {
@@ -284,23 +279,21 @@ module.exports = function(RED) {
             if (!iobhost || !iobport) {
                 return res.status(400).json({ error: 'Invalid server ID format' });
             }
-
-            const states = await connectionManager.getStates(serverId);
             
+            const states = await connectionManager.getStates(serverId);
             if (!states || typeof states !== 'object') {
                 return res.status(404).json({ error: 'No states found' });
             }
-
-            res.json(states);
             
+            res.json(states);
         } catch (error) {
-            res.status(500).json({ 
-                error: 'Failed to load states', 
-                details: error.message 
+            res.status(500).json({
+                error: 'Failed to load states',
+                details: error.message
             });
         }
     });
-
+    
     RED.httpAdmin.get("/iobroker/connection-status/:serverId", function(req, res) {
         const serverId = decodeURIComponent(req.params.serverId);
         const status = connectionManager.getConnectionStatus(serverId);
