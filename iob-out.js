@@ -27,15 +27,13 @@ module.exports = function(RED) {
         const configState = config.state?.trim();
         node.currentStatus = { fill: "", shape: "", text: "" };
         node.isInitialized = false;
-        let connectionClient = null;
 
-        // Helper function for error handling
+        // Helper functions
         function setError(message, statusText) {
             node.error(message);
             setStatus("red", "ring", statusText);
         }
 
-        // Helper function for status updates
         function setStatus(fill, shape, text) {
             try {
                 const statusObj = { fill, shape, text };
@@ -46,20 +44,20 @@ module.exports = function(RED) {
             }
         }
 
-        // Create enhanced callback for reconnection notifications
-        function createEnhancedCallback() {
-            const callback = function() {
-                // This is a dummy callback since iobout doesn't subscribe to states
-                // But we need it for the reconnection events
-            };
+        // Create callback for event notifications
+        function createEventCallback() {
+            const callback = function() {};
 
-            // Add status update function to callback
             callback.updateStatus = function(status) {
+                console.log(`[Node ${settings.nodeId}] Status update received: ${status}`);
                 switch (status) {
                     case 'connected':
                         if (!node.isInitialized) {
                             setStatus("green", "dot", "Connected");
                             node.isInitialized = true;
+                        } else {
+                            // Auch bei bereits initialisierten Nodes den Status aktualisieren
+                            setStatus("green", "dot", "Connected");
                         }
                         break;
                     case 'connecting':
@@ -67,23 +65,21 @@ module.exports = function(RED) {
                         break;
                     case 'disconnected':
                         setStatus("red", "ring", "Disconnected");
+                        node.isInitialized = false; // Reset bei Disconnection
                         break;
                     case 'reconnecting':
                         setStatus("yellow", "ring", "Reconnecting...");
                         break;
-                    default:
-                        setStatus("grey", "ring", "Unknown");
                 }
             };
 
-            // Add reconnection handler
             callback.onReconnect = function() {
+                console.log(`[Node ${settings.nodeId}] Reconnection event received`);
                 node.log("Reconnection detected by output node");
                 setStatus("green", "dot", "Reconnected");
                 node.isInitialized = true;
             };
 
-            // Add disconnection handler
             callback.onDisconnect = function() {
                 node.log("Disconnection detected by output node");
                 setStatus("red", "ring", "Disconnected");
@@ -92,39 +88,33 @@ module.exports = function(RED) {
             return callback;
         }
 
-        // Initialize WebSocket connection
+        // Initialize connection
         async function initializeConnection() {
             try {
                 setStatus("yellow", "ring", "Connecting...");
                 
-                connectionClient = await connectionManager.getConnection(
-                    settings.serverId,
-                    globalConfig
-                );
-
-                // Register dummy subscription to get reconnection events
-                const enhancedCallback = createEnhancedCallback();
-                await connectionManager.subscribe(
+                // Register for events only
+                const eventCallback = createEventCallback();
+                await connectionManager.registerForEvents(
                     settings.nodeId,
                     settings.serverId,
-                    `_dummy_${settings.nodeId}`, // Dummy state ID
-                    enhancedCallback,
+                    eventCallback,
                     globalConfig
                 );
                 
                 setStatus("green", "dot", "Connected");
                 node.isInitialized = true;
-                node.log(`WebSocket connection established for output node`);
+                node.log(`Connection established for output node`);
                 
             } catch (error) {
                 const errorMsg = error.message || 'Unknown error';
                 setError(`Connection failed: ${errorMsg}`, "Connection failed");
-                node.error(`WebSocket connection failed: ${errorMsg}`);
+                node.error(`Connection failed: ${errorMsg}`);
                 
                 if (errorMsg.includes('timeout') || errorMsg.includes('refused')) {
                     setTimeout(() => {
                         if (node.context) {
-                            node.log("Retrying WebSocket connection...");
+                            node.log("Retrying connection...");
                             initializeConnection();
                         }
                     }, 5000);
@@ -132,54 +122,13 @@ module.exports = function(RED) {
             }
         }
 
-        // Set state value via WebSocket
-        async function setState(stateId, value, ack) {
-            return new Promise((resolve, reject) => {
-                if (!connectionClient || !connectionClient.connected) {
-                    reject(new Error('WebSocket not connected'));
-                    return;
-                }
-
-                const timeoutId = setTimeout(() => {
-                    reject(new Error(`Set state timeout for ${stateId}`));
-                }, 8000);
-
-                try {
-                    const stateObject = {
-                        val: value,
-                        ack: ack,
-                        from: 'system.adapter.node-red',
-                        ts: Date.now()
-                    };
-
-                    connectionClient.emit('setState', stateId, stateObject, (error, result) => {
-                        clearTimeout(timeoutId);
-                        if (error) {
-                            reject(new Error(`setState failed for ${stateId}: ${error}`));
-                        } else {
-                            resolve(result);
-                        }
-                    });
-
-                } catch (emitError) {
-                    clearTimeout(timeoutId);
-                    reject(new Error(`Emit error for ${stateId}: ${emitError.message}`));
-                }
-            });
-        }
-
         // Input message handler
         this.on('input', async function(msg, send, done) {
             try {
-                // Handle command messages
                 if (msg.topic === "status") {
                     const status = connectionManager.getConnectionStatus(settings.serverId);
                     const statusMsg = {
-                        payload: {
-                            websocket: status,
-                            nodeStatus: node.currentStatus,
-                            connected: !!connectionClient && connectionClient.connected
-                        },
+                        payload: status,
                         topic: "status",
                         timestamp: Date.now()
                     };
@@ -188,14 +137,12 @@ module.exports = function(RED) {
                     return;
                 } else if (msg.topic === "reconnect") {
                     node.log("Manual reconnection requested");
-                    connectionClient = null;
                     node.isInitialized = false;
-                    await initializeConnection();
+                    await connectionManager.resetConnection(settings.serverId, globalConfig);
                     done && done();
                     return;
                 }
 
-                // Normal operation
                 const stateId = configState || (typeof msg.topic === "string" ? msg.topic.trim() : "");
                 if (!stateId) {
                     setStatus("red", "ring", "State ID missing");
@@ -211,22 +158,13 @@ module.exports = function(RED) {
                     return;
                 }
 
-                if (!connectionClient || !connectionClient.connected) {
-                    setStatus("yellow", "ring", "Reconnecting...");
-                    await initializeConnection();
-                    
-                    if (!connectionClient || !connectionClient.connected) {
-                        throw new Error('Failed to establish WebSocket connection');
-                    }
-                }
-
                 const ack = settings.setMode === "value";
                 setStatus("blue", "dot", "Setting...");
                 
-                await setState(stateId, value, ack);
+                await connectionManager.setState(settings.serverId, stateId, value, ack);
                 
                 setStatus("green", "dot", "OK");
-                node.log(`Successfully set ${stateId} = ${value} via WebSocket (mode: ${settings.setMode})`);
+                node.log(`Successfully set ${stateId} = ${value} (mode: ${settings.setMode})`);
                 
                 done && done();
                 
@@ -237,58 +175,12 @@ module.exports = function(RED) {
             }
         });
 
-        // Status monitoring
-        function startStatusMonitoring() {
-            const statusInterval = setInterval(() => {
-                if (!node.context) return;
-                
-                try {
-                    const status = connectionManager.getConnectionStatus(settings.serverId);
-                    
-                    if (!status.connected) {
-                        if (node.currentStatus.fill !== "red") {
-                            setStatus("red", "ring", "Disconnected");
-                        }
-                        connectionClient = null;
-                    } else if (status.connected && !connectionClient) {
-                        connectionManager.getConnection(settings.serverId, globalConfig)
-                            .then(client => {
-                                connectionClient = client;
-                                if (node.currentStatus.fill !== "green") {
-                                    setStatus("green", "dot", "Connected");
-                                }
-                            })
-                            .catch(error => {
-                                node.warn(`Failed to reconnect: ${error.message}`);
-                            });
-                    }
-                } catch (error) {
-                    node.warn(`Status monitoring error: ${error.message}`);
-                }
-            }, 10000);
-
-            node.statusInterval = statusInterval;
-        }
-
         // Cleanup on node close
         node.on("close", async function(done) {
             node.log("Output node closing...");
             
-            if (node.statusInterval) {
-                clearInterval(node.statusInterval);
-                node.statusInterval = null;
-            }
-
-            // Unsubscribe dummy subscription
-            try {
-                await connectionManager.unsubscribe(
-                    settings.nodeId,
-                    settings.serverId,
-                    `_dummy_${settings.nodeId}`
-                );
-            } catch (error) {
-                node.warn(`Cleanup error: ${error.message}`);
-            }
+            // Unregister from events
+            connectionManager.unregisterFromEvents(settings.nodeId);
 
             try {
                 node.status({});
@@ -297,7 +189,6 @@ module.exports = function(RED) {
                 // Ignore status errors during cleanup
             }
             
-            connectionClient = null;
             done();
         });
 
@@ -309,7 +200,6 @@ module.exports = function(RED) {
 
         // Initialize the node
         initializeConnection();
-        startStatusMonitoring();
     }
 
     RED.nodes.registerType("iobout", iobout);
