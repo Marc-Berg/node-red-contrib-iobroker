@@ -49,7 +49,12 @@ module.exports = function(RED) {
             const callback = function() {};
 
             callback.updateStatus = function(status) {
-                console.log(`[Node ${settings.nodeId}] Status update received: ${status}`);
+                // Use Node-RED compatible timestamp format
+                const now = new Date();
+                const day = now.getDate().toString().padStart(2, '0');
+                const month = now.toLocaleDateString('en', { month: 'short' });
+                const time = now.toTimeString().slice(0, 8);
+                console.log(`${day} ${month} ${time} - [debug] [Node ${settings.nodeId}] Status update received: ${status}`);
                 switch (status) {
                     case 'connected':
                         if (!node.isInitialized) {
@@ -74,7 +79,11 @@ module.exports = function(RED) {
             };
 
             callback.onReconnect = function() {
-                console.log(`[Node ${settings.nodeId}] Reconnection event received`);
+                const now = new Date();
+                const day = now.getDate().toString().padStart(2, '0');
+                const month = now.toLocaleDateString('en', { month: 'short' });
+                const time = now.toTimeString().slice(0, 8);
+                console.log(`${day} ${month} ${time} - [debug] [Node ${settings.nodeId}] Reconnection event received`);
                 node.log("Reconnection detected by output node");
                 setStatus("green", "dot", "Reconnected");
                 node.isInitialized = true;
