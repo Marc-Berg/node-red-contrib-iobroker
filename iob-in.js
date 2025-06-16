@@ -1,3 +1,4 @@
+// Enhanced iob-in.js with proper reconnection handling
 const connectionManager = require('./lib/websocket-manager');
 
 module.exports = function(RED) {
@@ -46,6 +47,7 @@ module.exports = function(RED) {
         
         node.currentConfig = { iobhost, iobport, user, password };
         node.isInitialized = false;
+        node.isSubscribed = false; // Track subscription state
         
         // Filter function for acknowledgment status
         function shouldSendMessage(ack, filter) {
@@ -94,7 +96,7 @@ module.exports = function(RED) {
             }
         }
         
-        // Create enhanced callback for the new manager
+        // Enhanced callback with proper reconnection handling
         function createCallback() {
             const callback = onStateChange;
             
@@ -107,18 +109,25 @@ module.exports = function(RED) {
                 
                 switch (status) {
                     case 'connected':
-                        setStatus("green", "dot", "Connected");
+                        if (node.isSubscribed) {
+                            setStatus("green", "dot", "Connected");
+                        } else {
+                            setStatus("yellow", "ring", "Subscribing...");
+                        }
                         node.isInitialized = true;
                         break;
                     case 'connecting':
                         setStatus("yellow", "ring", "Connecting...");
+                        node.isSubscribed = false;
                         break;
                     case 'disconnected':
                         setStatus("red", "ring", "Disconnected");
                         node.isInitialized = false;
+                        node.isSubscribed = false;
                         break;
                     case 'reconnecting':
                         setStatus("yellow", "ring", "Reconnecting...");
+                        node.isSubscribed = false;
                         break;
                     default:
                         setStatus("grey", "ring", "Unknown");
@@ -131,14 +140,24 @@ module.exports = function(RED) {
                 const month = now.toLocaleDateString('en', { month: 'short' });
                 const time = now.toTimeString().slice(0, 8);
                 console.log(`${day} ${month} ${time} - [debug] [Node ${settings.nodeId}] Reconnection event received`);
-                node.log("Reconnection detected by node");
-                setStatus("green", "dot", "Reconnected");
-                node.isInitialized = true;
+                node.log("Reconnection detected - resubscribing");
+                
+                // Mark as not subscribed to trigger resubscription
+                node.isSubscribed = false;
+                setStatus("yellow", "ring", "Resubscribing...");
+                
+                // Resubscribe after short delay
+                setTimeout(() => {
+                    if (node.context) {
+                        initialize();
+                    }
+                }, 1000);
             };
             
             callback.onDisconnect = function() {
                 node.log("Disconnection detected by node");
                 setStatus("red", "ring", "Disconnected");
+                node.isSubscribed = false;
             };
             
             return callback;
@@ -158,17 +177,24 @@ module.exports = function(RED) {
             
             if (configChanged) {
                 node.log(`Configuration change detected: ${node.currentConfig.iobhost}:${node.currentConfig.iobport} -> ${currentGlobalConfig.iobhost}:${currentGlobalConfig.iobport}`);
+                node.isSubscribed = false; // Force resubscription
             }
             
             return configChanged;
         }
         
-        // Initialize subscription
+        // Initialize subscription with enhanced error handling
         async function initialize() {
+            // Skip if already subscribed and connected
+            if (node.isSubscribed && connectionManager.getConnectionStatus(settings.serverId).connected) {
+                node.log("Already subscribed and connected, skipping initialization");
+                return;
+            }
+            
             try {
                 setStatus("yellow", "ring", "Connecting...");
                 
-                // Always check for configuration changes
+                // Check for configuration changes
                 if (hasConfigChanged()) {
                     const newGlobalConfig = RED.nodes.getNode(config.server);
                     const oldServerId = settings.serverId;
@@ -200,6 +226,7 @@ module.exports = function(RED) {
                     globalConfig
                 );
                 
+                node.isSubscribed = true;
                 setStatus("green", "dot", "Connected");
                 node.log(`Successfully subscribed to ${stateId} via WebSocket`);
                 node.isInitialized = true;
@@ -208,11 +235,12 @@ module.exports = function(RED) {
                 const errorMsg = error.message || 'Unknown error';
                 setError(`Connection failed: ${errorMsg}`, "Connection failed");
                 node.error(`WebSocket subscription failed: ${errorMsg}`);
+                node.isSubscribed = false;
                 
                 // Retry after delay for connection errors
-                if (errorMsg.includes('timeout') || errorMsg.includes('refused')) {
+                if (errorMsg.includes('timeout') || errorMsg.includes('refused') || errorMsg.includes('authentication')) {
                     setTimeout(() => {
-                        if (node.context) {
+                        if (node.context && !node.isSubscribed) {
                             node.log("Retrying WebSocket connection...");
                             initialize();
                         }
@@ -228,12 +256,19 @@ module.exports = function(RED) {
                 const statusMsg = {
                     payload: {
                         ...status,
-                        nodeInitialized: node.isInitialized
+                        nodeInitialized: node.isInitialized,
+                        isSubscribed: node.isSubscribed,
+                        stateId: stateId
                     },
                     topic: "status",
                     timestamp: Date.now()
                 };
                 node.send(statusMsg);
+            } else if (msg.topic === "reconnect") {
+                // Manual reconnect trigger
+                node.log("Manual reconnect triggered");
+                node.isSubscribed = false;
+                initialize();
             }
         });
         
@@ -241,6 +276,7 @@ module.exports = function(RED) {
         node.on("close", async function(removed, done) {
             node.log("Node closing...");
             node.isInitialized = false;
+            node.isSubscribed = false;
             
             try {
                 await connectionManager.unsubscribe(
@@ -261,6 +297,7 @@ module.exports = function(RED) {
         node.on("error", function(error) {
             node.error(`Node error: ${error.message}`);
             setError(`Node error: ${error.message}`, "Node error");
+            node.isSubscribed = false;
         });
         
         // Initialize the node
@@ -270,7 +307,7 @@ module.exports = function(RED) {
     // Register the node type
     RED.nodes.registerType("iobin", iobin);
     
-    // Admin endpoints for the tree view
+    // Admin endpoints for the tree view (unchanged)
     RED.httpAdmin.get("/iobroker/ws/states/:serverId", async function(req, res) {
         try {
             const serverId = decodeURIComponent(req.params.serverId);
