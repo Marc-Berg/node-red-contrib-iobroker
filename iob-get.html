@@ -894,27 +894,18 @@ RED.nodes.registerType('iobget', {
 </script>
 
 <script type="text/html" data-help-name="iobget">
-    <p>High-performance ioBroker state getter via WebSocket with optimized tree view for 9000+ states.</p>
+    <p>ioBroker state getter via WebSocket.</p>
     <h3>Configuration</h3>
     <ul>
         <li><b>State:</b> The ioBroker state ID. If empty, <code>msg.topic</code> is used as the state ID.</li>
         <li><b>Output Property:</b> The message property to store the value (default: <code>payload</code>).</li>
         <li><b>Server:</b> The ioBroker server configuration.</li>
     </ul>
-    <h3>Performance Features</h3>
-    <ul>
-        <li><b>Virtual Scrolling:</b> Only renders visible elements (20-30 instead of 9000+)</li>
-        <li><b>Asynchronous Processing:</b> Non-blocking tree building with progress indication</li>
-        <li><b>Hardware Acceleration:</b> CSS transforms and will-change for smooth scrolling</li>
-        <li><b>Intelligent Caching:</b> 5-minute cache with automatic cleanup</li>
-        <li><b>Optimized Search:</b> Pre-built search index for instant results</li>
-    </ul>
     <h3>State Selection</h3>
     <ul>
         <li><b>Manual input:</b> Type the state ID directly</li>
         <li><b>Optimized tree browser:</b> Virtual scrolling tree view for large datasets</li>
         <li><b>Intelligent search:</b> Pre-indexed search for instant results</li>
-        <li><b>Performance monitoring:</b> Built-in statistics and memory monitoring</li>
     </ul>
     <h3>Output</h3>
     <ul>

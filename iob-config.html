@@ -4,9 +4,9 @@ RED.nodes.registerType('iob-config', {
     defaults: {
         name:     { value: "config1", required: true },
         iobhost:  { value: "iobroker.local", required: true },
-        iobport:  { value: 8093, required: true, validate: RED.validators.number() },
+        iobport:  { value: 8082, required: true, validate: RED.validators.number() },
         user:     { value: "" },
-        password: { value: "" }, 
+        password: { value: "" },
     },
     label: function() {
         return this.name;
@@ -25,23 +25,23 @@ RED.nodes.registerType('iob-config', {
     </div>
     <div class="form-row">
         <label for="node-config-input-iobport"><i class="fa fa-plug"></i> ioBroker Port</label>
-        <input type="number" id="node-config-input-iobport" required placeholder="e.g. 8093">
+        <input type="number" id="node-config-input-iobport" required placeholder="e.g. 8082">
     </div>
     <div class="form-row">
-        <label for="node-config-input-user"><i class="fa fa-user"></i> Benutzername</label>
+        <label for="node-config-input-user"><i class="fa fa-user"></i> Username</label>
         <input type="text" id="node-config-input-user" placeholder="Optional">
     </div>
     <div class="form-row">
-        <label for="node-config-input-password"><i class="fa fa-lock"></i> Passwort</label>
+        <label for="node-config-input-password"><i class="fa fa-lock"></i> Password</label>
         <input type="password" id="node-config-input-password" placeholder="Optional">
     </div>
 </script>
 
 <script type="text/html" data-help-name="iob-config">
-    <p>Konfiguration für die Verbindung zu ioBroker und Node-RED.</p>
+    <p>Configuration for the connection between ioBroker and Node-RED.</p>
     <ul>
-        <li><b>ioBroker Host/Port:</b> Adresse und Port deines ioBroker-Servers.</li>
-        <li><b>Benutzername/Passwort:</b> Optional. Nur erforderlich, wenn der ioBroker-Adapter Authentifizierung verlangt.</li>
+        <li><b>ioBroker Host/Port:</b> Address and port of your ioBroker server.</li>
+        <li><b>Username/Password:</b> Optional. Only required if the ioBroker adapter requires authentication.</li>
     </ul>
-    <p>Die Authentifizierungsdaten werden auch im <b>iobin</b>-Node automatisch verwendet.</p>
+    <p>The authentication credentials are automatically used by all connected nodes.</p>
 </script>

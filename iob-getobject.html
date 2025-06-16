@@ -898,27 +898,18 @@ RED.nodes.registerType('iobgetobject', {
 </script>
 
 <script type="text/html" data-help-name="iobgetobject">
-    <p>High-performance ioBroker object retrieval via WebSocket with optimized tree view for 9000+ objects.</p>
+    <p>ioBroker object retrieval via WebSocket</p>
     <h3>Configuration</h3>
     <ul>
         <li><b>Object ID:</b> The ioBroker object identifier. If empty, <code>msg.topic</code> is used as the object ID.</li>
         <li><b>Output Property:</b> The message property to store the object data (default: <code>payload</code>).</li>
         <li><b>Server:</b> The ioBroker server configuration.</li>
     </ul>
-    <h3>Performance Features</h3>
-    <ul>
-        <li><b>Virtual Scrolling:</b> Only renders visible elements (20-30 instead of 9000+)</li>
-        <li><b>Asynchronous Processing:</b> Non-blocking tree building with progress indication</li>
-        <li><b>Hardware Acceleration:</b> CSS transforms and will-change for smooth scrolling</li>
-        <li><b>Intelligent Caching:</b> 5-minute cache with automatic cleanup</li>
-        <li><b>Optimized Search:</b> Pre-built search index for instant results</li>
-    </ul>
     <h3>Object Selection</h3>
     <ul>
         <li><b>Manual input:</b> Type the object ID directly</li>
-        <li><b>Optimized tree browser:</b> Virtual scrolling tree view for large datasets</li>
+        <li><b>Tree browser:</b> Virtual scrolling tree view for large datasets</li>
         <li><b>Intelligent search:</b> Pre-indexed search for instant results</li>
-        <li><b>Performance monitoring:</b> Built-in statistics and memory monitoring</li>
     </ul>
     <h3>Output</h3>
     <ul>
@@ -941,15 +932,5 @@ RED.nodes.registerType('iobgetobject', {
         <li><b>Hierarchical Search:</b> Search preserves tree structure and shows path to matches</li>
         <li><b>Multi-word Search:</b> Search multiple terms simultaneously</li>
         <li><b>Search Highlighting:</b> Visual highlighting of matched terms in results</li>
-        <li><b>Performance Monitoring:</b> Built-in cache statistics and performance metrics</li>
-        <li><b>Auto-expansion:</b> Automatically expands paths to search matches</li>
-        <li><b>Smart Caching:</b> Intelligent cache management with automatic cleanup</li>
-    </ul>
-    <h3>Debug Features</h3>
-    <p>Access debug functions via browser console:</p>
-    <ul>
-        <li><code>window.currentOptimizedTreeController.getPerformanceStats()</code> - View performance metrics</li>
-        <li><code>window.currentOptimizedTreeController.clearCache()</code> - Clear all cached data</li>
-        <li><code>window.currentOptimizedTreeController.forceRefresh()</code> - Force refresh from server</li>
     </ul>
 </script>
