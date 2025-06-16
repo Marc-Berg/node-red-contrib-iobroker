@@ -1,0 +1,77 @@
+[
+    {
+        "id": "01a7f95cee3928e9",
+        "type": "group",
+        "z": "ed97a7cc578aa319",
+        "style": {
+            "stroke": "#999999",
+            "stroke-opacity": "1",
+            "fill": "none",
+            "fill-opacity": "1",
+            "label": true,
+            "label-position": "nw",
+            "color": "#a4a4a4"
+        },
+        "nodes": [
+            "502262a7d08d86f8",
+            "4279b093941d565d"
+        ],
+        "x": 94,
+        "y": 39,
+        "w": 352,
+        "h": 82
+    },
+    {
+        "id": "502262a7d08d86f8",
+        "type": "iobout",
+        "z": "ed97a7cc578aa319",
+        "g": "01a7f95cee3928e9",
+        "name": "",
+        "state": "",
+        "inputProperty": "payload",
+        "setMode": "value",
+        "server": "d6660470f1987331",
+        "x": 370,
+        "y": 80,
+        "wires": []
+    },
+    {
+        "id": "4279b093941d565d",
+        "type": "inject",
+        "z": "ed97a7cc578aa319",
+        "g": "01a7f95cee3928e9",
+        "name": "via topic",
+        "props": [
+            {
+                "p": "payload"
+            },
+            {
+                "p": "topic",
+                "vt": "str"
+            }
+        ],
+        "repeat": "",
+        "crontab": "",
+        "once": false,
+        "onceDelay": 0.1,
+        "topic": "0_userdata.0.test",
+        "payload": "",
+        "payloadType": "date",
+        "x": 200,
+        "y": 80,
+        "wires": [
+            [
+                "502262a7d08d86f8"
+            ]
+        ]
+    },
+    {
+        "id": "d6660470f1987331",
+        "type": "iob-config",
+        "name": "IOBROKER",
+        "iobhost": "iobroker.fritz.box",
+        "iobport": "8081",
+        "user": "",
+        "password": ""
+    }
+]

@@ -1,0 +1,69 @@
+[
+    {
+        "id": "bd3f9c798e89cd8e",
+        "type": "group",
+        "z": "84d2ed221c5222e4",
+        "style": {
+            "stroke": "#999999",
+            "stroke-opacity": "1",
+            "fill": "none",
+            "fill-opacity": "1",
+            "label": true,
+            "label-position": "nw",
+            "color": "#a4a4a4"
+        },
+        "nodes": [
+            "110cc9d9559e093b",
+            "402e3d53cdd60ae8"
+        ],
+        "x": 94,
+        "y": 79,
+        "w": 352,
+        "h": 82
+    },
+    {
+        "id": "110cc9d9559e093b",
+        "type": "debug",
+        "z": "84d2ed221c5222e4",
+        "g": "bd3f9c798e89cd8e",
+        "name": "debug 3",
+        "active": true,
+        "tosidebar": true,
+        "console": false,
+        "tostatus": false,
+        "complete": "true",
+        "targetType": "full",
+        "statusVal": "",
+        "statusType": "auto",
+        "x": 340,
+        "y": 120,
+        "wires": []
+    },
+    {
+        "id": "402e3d53cdd60ae8",
+        "type": "iobin",
+        "z": "84d2ed221c5222e4",
+        "g": "bd3f9c798e89cd8e",
+        "name": "iOB in",
+        "state": "0_userdata.0.test",
+        "outputProperty": "payload",
+        "ackFilter": "both",
+        "server": "d6660470f1987331",
+        "x": 170,
+        "y": 120,
+        "wires": [
+            [
+                "110cc9d9559e093b"
+            ]
+        ]
+    },
+    {
+        "id": "d6660470f1987331",
+        "type": "iob-config",
+        "name": "IOBROKER",
+        "iobhost": "iobroker.fritz.box",
+        "iobport": "8081",
+        "user": "",
+        "password": ""
+    }
+]
