@@ -10,6 +10,8 @@ This repository provides custom Node-RED nodes for seamless integration with ioB
 - **Automatic reconnection** and connection status monitoring
 - **Bidirectional communication** for state changes and commands
 - **Object management** for accessing ioBroker object definitions
+- **OAuth2 authentication support** for secured installations
+- **No-auth mode** for unsecured installations
 
 ## Nodes
 
@@ -72,6 +74,65 @@ Shared configuration for ioBroker server settings.
 - **Click on "Upload a .tgz file"** and select the downloaded .tgz file.
 - **Wait for the installation to complete** and restart Node-RED if prompted.
 
+## Configuration and Authentication
+
+### Authentication Methods
+
+The nodes support two authentication methods:
+
+#### 1. No Authentication (Default)
+For ioBroker installations without authentication requirements:
+- Leave **Username** and **Password** fields empty in the configuration node
+- The connection will be established without authentication
+- Works with default ioBroker installations
+
+#### 2. OAuth2 Authentication
+For secured ioBroker installations with user authentication:
+- Enter your **Username** and **Password** in the configuration node
+- The nodes will automatically handle OAuth2 token requests
+- Supports automatic token refresh and re-authentication
+- Uses the standard ioBroker authentication endpoint (`/oauth/token`)
+
+### Server Configuration
+
+1. **Create a new iob-config node:**
+   - **Name:** Give your configuration a descriptive name
+   - **ioBroker Host:** Enter the hostname or IP address (e.g., `iobroker.local` or `192.168.1.100`)
+   - **ioBroker Port:** Enter the WebSocket port (see [WebSocket Connection](#websocket-connection) section)
+   - **Username:** (Optional) Enter username for authenticated connections
+   - **Password:** (Optional) Enter password for authenticated connections
+
+2. **Authentication Setup:**
+   - **For no-auth mode:** Leave username and password empty
+   - **For OAuth2 mode:** Enter valid ioBroker credentials
+
+### Authentication Troubleshooting
+
+#### Common Authentication Issues:
+
+1. **"Invalid username or password"**
+   - Verify credentials in ioBroker admin interface
+   - Check if the user account is enabled
+   - Ensure the user has appropriate permissions
+
+2. **"OAuth endpoint not found"**
+   - Check if authentication is enabled in ioBroker
+   - Verify the correct port is being used
+   - Ensure the web adapter is properly configured
+
+3. **"Access forbidden - check user permissions"**
+   - User account exists but lacks necessary permissions
+   - Grant appropriate rights in ioBroker user management
+   - Check if user belongs to required groups
+
+#### Authentication Status Monitoring:
+
+Send a message with `msg.topic = "status"` to any node to get detailed connection information including:
+- Authentication status
+- Connection state
+- Server details
+- Token validity (for OAuth2)
+
 ## Usage
 
 1. **Drag and drop** the nodes into your flow.
@@ -100,8 +161,6 @@ All nodes feature an **interactive state browser** that makes it easy to find an
 
 The `iobgetobject` node provides access to ioBroker object definitions, which contain the structural and configuration information for all ioBroker entities. Object definitions include essential metadata such as object type classification (state, channel, device, adapter), common properties including names and roles, adapter-specific native configurations, and access control settings.
 
-This functionality enables advanced automation scenarios that require inspection of object metadata, dynamic discovery of available devices and states, configuration validation and system monitoring, and integration with external systems that need detailed ioBroker structure information.
-
 ## Connection Management
 
 The nodes use a **shared WebSocket connection manager** that provides:
@@ -110,6 +169,7 @@ The nodes use a **shared WebSocket connection manager** that provides:
 - **Automatic reconnection:** Connections are automatically restored after network interruptions
 - **Connection monitoring:** Real-time status updates for all nodes
 - **Configuration change detection:** Automatic reconnection when server settings change
+- **Authentication handling:** Automatic token refresh and re-authentication for OAuth2 connections
 
 ## Examples
 
@@ -123,29 +183,79 @@ The nodes use a **shared WebSocket connection manager** that provides:
 
 The nodes connect to ioBroker's WebSocket interface via one of three options:
 
-- **WebSocket adapter** (default port 8084)
-- **Web adapter** (default port 8082, requires "Use pure web-sockets (iobroker.ws)" to be enabled)
-- **Admin adapter** (default port 8081)
+### Port Options:
+
+1. **WebSocket adapter** (default port 8084)
+   - Dedicated WebSocket adapter
+   - Install via: `iobroker add ws`
+
+2. **Web adapter** (default port 8082)
+   - Requires "Use pure web-sockets (iobroker.ws)" to be enabled
+   - Install via: `iobroker add web`
+
+3. **Admin adapter** (default port 8081)
+   - Uses the admin interface WebSocket
+   - Usually pre-installed with ioBroker
+
+### Connection Requirements:
 
 Make sure that:
 
 1. **One of the WebSocket-capable adapters is installed and running**
 2. **The appropriate port is accessible** from your Node-RED instance
-3. **Authentication is configured** if your ioBroker installation requires it
+3. **Authentication is configured correctly** for your chosen adapter
+4. **Firewall rules allow WebSocket connections** on the chosen port
 
 ## Troubleshooting
 
-If you experience connection issues:
+### Connection Issues:
 
 1. **Check WebSocket adapters:** 
    - **WebSocket adapter (8084):** Ensure it's installed via `iobroker add ws` and running
    - **Web adapter (8082):** Ensure it's installed via `iobroker add web` and running
    - **Admin adapter (8081):** Ensure it's installed via `iobroker add admin` and running
+
 2. **Verify network connectivity:** Test if the chosen port is reachable from Node-RED
-3. **Check authentication:** Verify username/password if authentication is enabled in ioBroker
+
+3. **Check authentication configuration:**
+   - Verify username/password if authentication is enabled in ioBroker
+   - Ensure user has appropriate permissions
+   - Check if OAuth2 endpoint is accessible
+
 4. **Review logs:** Check both Node-RED debug logs and ioBroker logs for error messages
+
 5. **Use status monitoring:** Send status messages to nodes to check connection health
+
 6. **Try alternative ports:** If one port doesn't work, try the other WebSocket options
+
+### Authentication Issues:
+
+1. **"Connection refused"**
+   - Check if ioBroker is running
+   - Verify the correct port number
+   - Check firewall settings
+
+2. **"Authentication failed"**
+   - Verify username and password
+   - Check user permissions in ioBroker
+   - Ensure authentication is enabled in the adapter
+
+3. **"Token expired"**
+   - Authentication tokens are automatically refreshed
+   - Check if user account is still active
+   - Verify system time synchronization
+
+4. **"No OAuth endpoint"**
+   - Authentication may not be enabled
+   - Try using no-auth mode
+   - Check adapter configuration
+
+### Multiple Server Support:
+
+The nodes support connections to multiple ioBroker servers:
+- Create separate configuration nodes for each server
+- Each server can use different authentication methods
+- Connections are managed independently with automatic failover
 
 ## License
 
