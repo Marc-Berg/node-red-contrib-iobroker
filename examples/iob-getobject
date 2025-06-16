@@ -1,0 +1,99 @@
+[
+    {
+        "id": "f274e11e753242f4",
+        "type": "group",
+        "z": "ed97a7cc578aa319",
+        "style": {
+            "stroke": "#999999",
+            "stroke-opacity": "1",
+            "fill": "none",
+            "fill-opacity": "1",
+            "label": true,
+            "label-position": "nw",
+            "color": "#a4a4a4"
+        },
+        "nodes": [
+            "65723a4e8886c766",
+            "e48e1e2b9e9c60a6",
+            "2c197fe6b9f57a6f"
+        ],
+        "x": 14,
+        "y": 359,
+        "w": 552,
+        "h": 82
+    },
+    {
+        "id": "65723a4e8886c766",
+        "type": "iobgetobject",
+        "z": "ed97a7cc578aa319",
+        "g": "f274e11e753242f4",
+        "name": "",
+        "objectId": "",
+        "outputProperty": "payload",
+        "server": "d6660470f1987331",
+        "x": 290,
+        "y": 400,
+        "wires": [
+            [
+                "2c197fe6b9f57a6f"
+            ]
+        ]
+    },
+    {
+        "id": "e48e1e2b9e9c60a6",
+        "type": "inject",
+        "z": "ed97a7cc578aa319",
+        "g": "f274e11e753242f4",
+        "name": "via topic",
+        "props": [
+            {
+                "p": "payload"
+            },
+            {
+                "p": "topic",
+                "vt": "str"
+            }
+        ],
+        "repeat": "",
+        "crontab": "",
+        "once": false,
+        "onceDelay": 0.1,
+        "topic": "0_userdata.0.test",
+        "payload": "",
+        "payloadType": "date",
+        "x": 120,
+        "y": 400,
+        "wires": [
+            [
+                "65723a4e8886c766"
+            ]
+        ]
+    },
+    {
+        "id": "2c197fe6b9f57a6f",
+        "type": "debug",
+        "z": "ed97a7cc578aa319",
+        "g": "f274e11e753242f4",
+        "name": "debug 2",
+        "active": true,
+        "tosidebar": true,
+        "console": false,
+        "tostatus": false,
+        "complete": "true",
+        "targetType": "full",
+        "statusVal": "",
+        "statusType": "auto",
+        "x": 460,
+        "y": 400,
+        "wires": []
+    },
+    {
+        "id": "d6660470f1987331",
+        "type": "iob-config",
+        "name": "IOBROKER",
+        "iobhost": "iobroker.fritz.box",
+        "iobport": "8081",
+        "user": "",
+        "password": ""
+    }
+]
