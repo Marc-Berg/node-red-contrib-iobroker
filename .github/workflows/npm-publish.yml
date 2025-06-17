@@ -2,7 +2,7 @@ name: Node.js Package
 
 on:
   release:
-    types: [published, created]
+    types: [published]
   # Optional: Auch bei Push auf main branch testen (ohne publish)
   push:
     branches: [main]
