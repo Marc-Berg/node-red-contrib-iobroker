@@ -1,6 +1,6 @@
 {
   "name": "node-red-contrib-iobroker",
-  "version": "0.3.2",
+  "version": "0.3.3",
   "description": "Node-RED nodes for ioBroker integration via WebSocket. Provides input, output, get, and object management capabilities.",
   "keywords": [
     "node-red",
@@ -39,6 +39,12 @@
       "iobget": "iob-get.js",
       "iobgetobject": "iob-getobject.js",
       "iob-config": "iob-config.js"
-    }
+    },
+    "examples": [
+      "examples/iob-in.json",
+      "examples/iob-out.json", 
+      "examples/iob-get.json",
+      "examples/iob-getobject.json"
+    ]
   }
 }
