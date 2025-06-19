@@ -26,6 +26,8 @@ External Node-RED integration nodes for ioBroker communication. NOT an ioBroker 
 
 ⚠️ This package is designed for **external** Node-RED installations. It allows independent Node-RED instances to communicate with ioBroker. Install this package in your existing Node-RED setup to connect to ioBroker.
 
+💡 For simpler installation: In most cases, it's easier to use the ioBroker Node-RED adapter if you prefer a straightforward setup.
+
 ## Features
 
 - **Real-time WebSocket communication**
