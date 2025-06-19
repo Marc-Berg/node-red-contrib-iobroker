@@ -1,6 +1,10 @@
 # Node-RED Nodes for ioBroker Integration
 
-This repository provides custom Node-RED nodes for seamless integration with ioBroker via WebSocket communication.
+External Node-RED integration nodes for ioBroker communication. NOT an ioBroker adapter - standalone package for external Node-RED instances to connect with ioBroker via WebSocket.
+
+## Important Notice
+
+⚠️ This package is designed for **external** Node-RED installations. It allows independent Node-RED instances to communicate with ioBroker. Install this package in your existing Node-RED setup to connect to ioBroker.
 
 ## Features
 
@@ -12,6 +16,14 @@ This repository provides custom Node-RED nodes for seamless integration with ioB
 - **Object management** for accessing ioBroker object definitions
 - **OAuth2 authentication support** for secured installations
 - **No-auth mode** for unsecured installations
+  
+## Use Cases
+
+- External Node-RED instances that need to communicate with ioBroker
+- Separate automation systems running Node-RED independently
+- Distributed setups where Node-RED runs on different hardware than ioBroker
+- Development environments where you want to test Node-RED flows against ioBroker
+- Integration scenarios where Node-RED serves as a bridge between ioBroker and other systems
 
 ## Nodes
 
@@ -66,13 +78,40 @@ Shared configuration for ioBroker server settings.
 
 ## Installation
 
-### Upload .tgz
-- **Download the .tgz file** from the latest release (https://github.com/Marc-Berg/node-red-contrib-iobroker/releases) on GitHub.
-- **Open your Node-RED editor.**
-- **Go to the palette manager** (Menu → "Manage palette").
-- **Switch to the "Install" tab.**
-- **Click on "Upload a .tgz file"** and select the downloaded .tgz file.
-- **Wait for the installation to complete** and restart Node-RED if prompted.
+### Prerequisites
+- **Node-RED** must be installed and running
+- **ioBroker** system with WebSocket capability (separate from Node-RED)
+- Network connectivity between your Node-RED instance and ioBroker
+
+### Method 1: Install from Node-RED Palette Manager
+1. Open your Node-RED editor in the browser
+2. Click the menu button (☰) in the top right corner
+3. Select "Manage palette"
+4. Switch to the "Install" tab
+5. Search for `node-red-contrib-iobroker`
+6. Click "Install" next to the package
+7. Confirm the installation when prompted
+8. The nodes will be available in the palette after installation
+
+### Method 2: Install from Release File
+1. Download the .tgz file from the [latest release](https://github.com/Marc-Berg/node-red-contrib-iobroker/releases) on GitHub
+2. Open your Node-RED editor in the browser
+3. Click the menu button (☰) and select "Manage palette"
+4. Switch to the "Install" tab
+5. Click "Upload a .tgz file" and select the downloaded .tgz file
+6. Wait for the installation to complete and restart Node-RED if prompted
+
+### Method 3: Install from npm Command Line
+```bash
+npm install node-red-contrib-iobroker
+```
+
+Run this command in your Node-RED installation directory or use the global flag:
+```bash
+npm install -g node-red-contrib-iobroker
+```
+
+**Note:** After command line installation, you may need to restart Node-RED to see the new nodes in the palette.
 
 ## Configuration and Authentication
 
