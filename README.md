@@ -211,6 +211,8 @@ Send a message with `msg.topic = "status"` to any node to get detailed connectio
 
 ## State Selection
 
+![alt text](images/treeview.png)
+
 All nodes feature an **interactive state browser** that makes it easy to find and select ioBroker states:
 
 - **Manual input:** Type the state ID directly (e.g., `0_userdata.0.test`)
