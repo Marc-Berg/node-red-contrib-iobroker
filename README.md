@@ -1,6 +1,26 @@
 # Node-RED Nodes for ioBroker Integration
 
+![Version](https://img.shields.io/npm/v/node-red-contrib-iobroker)
+![License](https://img.shields.io/badge/license-MIT-blue.svg)
+![Node-RED](https://img.shields.io/badge/Node--RED-compatible-red.svg)
+![Downloads](https://img.shields.io/npm/dt/node-red-contrib-iobroker)
+
 External Node-RED integration nodes for ioBroker communication. NOT an ioBroker adapter - standalone package for external Node-RED instances to connect with ioBroker via WebSocket.
+
+## Table of Contents
+- [Features](#features)
+- [Use Cases](#use-cases)
+- [Nodes](#nodes)
+- [Installation](#installation)
+- [Configuration and Authentication](#configuration-and-authentication)
+- [Usage](#usage)
+- [State Selection](#state-selection)
+- [Object Management](#object-management)
+- [Connection Management](#connection-management)
+- [Examples](#examples)
+- [WebSocket Connection](#websocket-connection)
+- [Troubleshooting](#troubleshooting)
+- [License](#license)
 
 ## Important Notice
 
@@ -27,7 +47,7 @@ External Node-RED integration nodes for ioBroker communication. NOT an ioBroker 
 
 ## Nodes
 
-### iobin
+### iobin  ![alt text](images/iobin.png)
 **Input Node**  
 Subscribes to ioBroker state changes and forwards updates to your flow in real-time.
 
@@ -40,7 +60,7 @@ Subscribes to ioBroker state changes and forwards updates to your flow in real-t
   - **Unacknowledged:** Only updates with `ack: false`
 - **Server Configuration:** Configure the ioBroker server details in the node settings.
 
-### iobout
+### iobout  ![alt text](images/iobout.png)
 **Output Node**  
 Sends values to ioBroker states.
 
@@ -50,7 +70,7 @@ Sends values to ioBroker states.
 - **Set Mode:** Choose whether to set the value as a `value` (ack=true) or as a `command` (ack=false).
 - **Server Configuration:** Configure the ioBroker server details in the node settings.
 
-### iobget
+### iobget ![alt text](images/iobget.png)
 **Getter Node**  
 Reads the current value of an ioBroker state on demand.
 
@@ -59,7 +79,7 @@ Reads the current value of an ioBroker state on demand.
 - **Output:** The current value of the state is sent as `msg.[outputProperty]` (default: `msg.payload`).
 - **Server Configuration:** Configure the ioBroker server details in the node settings.
 
-### iobgetobject
+### iobgetobject ![alt text](images/iobgetobject.png)
 **Object Getter Node**  
 Retrieves ioBroker object definitions, including metadata and configuration information.
 
