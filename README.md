@@ -182,7 +182,6 @@ For secured ioBroker installations with user authentication:
 2. **"OAuth endpoint not found"**
    - Check if authentication is enabled in ioBroker
    - Verify the correct port is being used
-   - Ensure the web adapter is properly configured
 
 3. **"Access forbidden - check user permissions"**
    - User account exists but lacks necessary permissions
@@ -227,59 +226,30 @@ All nodes feature an **interactive state browser** that makes it easy to find an
 
 The `iobgetobject` node provides access to ioBroker object definitions, which contain the structural and configuration information for all ioBroker entities. Object definitions include essential metadata such as object type classification (state, channel, device, adapter), common properties including names and roles, adapter-specific native configurations, and access control settings.
 
-## Connection Management
-
-The nodes use a **shared WebSocket connection manager** that provides:
-
-- **Efficient resource usage:** Multiple nodes share connections to the same ioBroker server
-- **Automatic reconnection:** Connections are automatically restored after network interruptions
-- **Connection monitoring:** Real-time status updates for all nodes
-- **Configuration change detection:** Automatic reconnection when server settings change
-- **Authentication handling:** Automatic token refresh and re-authentication for OAuth2 connections
-
-## Examples
-
-- **Subscribe to state changes:** Use `iobin` to receive real-time updates from ioBroker.
-- **Send values to ioBroker:** Use `iobout` to update ioBroker states (as value or command).
-- **Read state values on demand:** Use `iobget` to query the current value of a state.
-- **Inspect object definitions:** Use `iobgetobject` to retrieve metadata and configuration information for any ioBroker object.
-- **Status monitoring:** Send `msg.topic = "status"` to any node to get connection information.
-
 ## WebSocket Connection
 
-The nodes connect to ioBroker's WebSocket interface via one of three options:
+The nodes connect to ioBroker's WebSocket interface via **one** of three options:
 
 ### Port Options:
 
 1. **WebSocket adapter** (default port 8084)
    - Dedicated WebSocket adapter
-   - Install via: `iobroker add ws`
 
 2. **Web adapter** (default port 8082)
    - Requires "Use pure web-sockets (iobroker.ws)" to be enabled
-   - Install via: `iobroker add web`
 
 3. **Admin adapter** (default port 8081)
    - Uses the admin interface WebSocket
    - Usually pre-installed with ioBroker
-
-### Connection Requirements:
-
-Make sure that:
-
-1. **One of the WebSocket-capable adapters is installed and running**
-2. **The appropriate port is accessible** from your Node-RED instance
-3. **Authentication is configured correctly** for your chosen adapter
-4. **Firewall rules allow WebSocket connections** on the chosen port
 
 ## Troubleshooting
 
 ### Connection Issues:
 
 1. **Check WebSocket adapters:** 
-   - **WebSocket adapter (8084):** Ensure it's installed via `iobroker add ws` and running
-   - **Web adapter (8082):** Ensure it's installed via `iobroker add web` and running
-   - **Admin adapter (8081):** Ensure it's installed via `iobroker add admin` and running
+   - **WebSocket adapter (8084):** Ensure it's installed and running
+   - **Web adapter (8082):** Ensure it's installed and running
+   - **Admin adapter (8081):** Ensure it's installed and running
 
 2. **Verify network connectivity:** Test if the chosen port is reachable from Node-RED
 
