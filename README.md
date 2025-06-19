@@ -90,6 +90,9 @@ Retrieves ioBroker object definitions, including metadata and configuration info
 - **Server Configuration:** Configure the ioBroker server details in the node settings.
 
 ### iob-config
+
+![alt text](images/iob-config.png)
+
 **Configuration Node**  
 Shared configuration for ioBroker server settings.
 
