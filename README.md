@@ -49,7 +49,7 @@ External Node-RED integration nodes for ioBroker communication. NOT an ioBroker 
 
 ## Nodes
 
-### iobin  ![alt text](images/iobin.png)
+### WS ioB in  ![alt text](images/iobin.png)
 **Input Node**  
 Subscribes to ioBroker state changes and forwards updates to your flow in real-time.
 
@@ -62,7 +62,7 @@ Subscribes to ioBroker state changes and forwards updates to your flow in real-t
   - **Unacknowledged:** Only updates with `ack: false`
 - **Server Configuration:** Configure the ioBroker server details in the node settings.
 
-### iobout  ![alt text](images/iobout.png)
+### WS ioB out  ![alt text](images/iobout.png)
 **Output Node**  
 Sends values to ioBroker states.
 
@@ -72,7 +72,7 @@ Sends values to ioBroker states.
 - **Set Mode:** Choose whether to set the value as a `value` (ack=true) or as a `command` (ack=false).
 - **Server Configuration:** Configure the ioBroker server details in the node settings.
 
-### iobget ![alt text](images/iobget.png)
+### WS ioB get ![alt text](images/iobget.png)
 **Getter Node**  
 Reads the current value of an ioBroker state on demand.
 
@@ -81,7 +81,7 @@ Reads the current value of an ioBroker state on demand.
 - **Output:** The current value of the state is sent as `msg.[outputProperty]` (default: `msg.payload`).
 - **Server Configuration:** Configure the ioBroker server details in the node settings.
 
-### iobgetobject ![alt text](images/iobgetobject.png)
+### WS ioB getObject ![alt text](images/iobgetobject.png)
 **Object Getter Node**  
 Retrieves ioBroker object definitions, including metadata and configuration information.
 
