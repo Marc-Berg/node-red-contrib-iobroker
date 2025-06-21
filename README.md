@@ -28,6 +28,8 @@ External Node-RED integration nodes for ioBroker communication. NOT an ioBroker 
 
 💡 For simpler installation: In most cases, it's easier to use the ioBroker Node-RED adapter if you prefer a straightforward setup.
 
+🔧 **Known Issue - Authentication Token Expiry**: There is currently a known issue with authentication and expiring tokens that can cause connection drops. **Workaround**: Use the WebSocket adapter (ws) and set the token expiry time to "0" (unlimited) in the adapter settings to avoid authentication timeouts.
+
 ## Features
 
 - **Real-time WebSocket communication**
