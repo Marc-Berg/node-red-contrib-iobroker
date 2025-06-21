@@ -10,6 +10,29 @@ RED.nodes.registerType('iob-config', {
     },
     label: function() {
         return this.name;
+    },
+    oneditprepare: function() {
+        var node = this;
+        
+        // Function to toggle the token expiry warning
+        function toggleTokenWarning() {
+            var username = $("#node-config-input-user").val().trim();
+            var warningDiv = $("#token-expiry-warning");
+            
+            if (username) {
+                warningDiv.show();
+            } else {
+                warningDiv.hide();
+            }
+        }
+        
+        // Initial check
+        toggleTokenWarning();
+        
+        // Watch for changes in the username field
+        $("#node-config-input-user").on('input keyup change', function() {
+            toggleTokenWarning();
+        });
     }
 });
 </script>
@@ -35,6 +58,19 @@ RED.nodes.registerType('iob-config', {
         <label for="node-config-input-password"><i class="fa fa-lock"></i> Password</label>
         <input type="password" id="node-config-input-password" placeholder="Optional">
     </div>
+    
+    <!-- Token Expiry Warning -->
+    <div id="token-expiry-warning" class="form-row" style="display: none; margin-top: 15px; padding: 10px; background-color: #fff3cd; border: 1px solid #ffeaa7; border-radius: 4px;">
+        <div style="color: #856404; font-size: 13px;">
+            <i class="fa fa-exclamation-triangle" style="color: #f39c12; margin-right: 5px;"></i>
+            <strong>Authentication Token Issue:</strong><br>
+            There's a known issue with expiring authentication tokens.
+            <ul style="margin: 8px 0 0 20px; padding: 0;">
+                <li>Use the WebSocket adapter and increase the token expiry time to e.g. 999.999.999 seconds</li>
+                <li>Or leave username/password empty to use no-auth mode</li>
+            </ul>
+        </div>
+    </div>
 </script>
 
 <script type="text/html" data-help-name="iob-config">
@@ -44,4 +80,7 @@ RED.nodes.registerType('iob-config', {
         <li><b>Username/Password:</b> Optional. Only required if the ioBroker adapter requires authentication.</li>
     </ul>
     <p>The authentication credentials are automatically used by all connected nodes.</p>
+    
+    <h3>Known Issues</h3>
+    <p>When using authentication, tokens may expire causing connection drops. Consider using longer token expiry times in your WebSocket adapter settings or no-auth mode for local installations.</p>
 </script>
