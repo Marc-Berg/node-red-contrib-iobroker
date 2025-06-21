@@ -109,11 +109,7 @@ module.exports = function(RED) {
                 
                 switch (status) {
                     case 'connected':
-                        if (node.isSubscribed) {
-                            setStatus("green", "dot", "Connected");
-                        } else {
-                            setStatus("yellow", "ring", "Subscribing...");
-                        }
+                        setStatus("green", "dot", "Connected");
                         node.isInitialized = true;
                         break;
                     case 'connecting':
