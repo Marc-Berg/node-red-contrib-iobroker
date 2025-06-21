@@ -66,8 +66,7 @@ RED.nodes.registerType('iob-config', {
             <strong>Authentication Token Issue:</strong><br>
             There's a known issue with expiring authentication tokens.
             <ul style="margin: 8px 0 0 20px; padding: 0;">
-                <li>Use the WebSocket adapter and increase the token expiry time to e.g. 999.999.999 seconds</li>
-                <li>Or leave username/password empty to use no-auth mode</li>
+                <li>Use session duration of at least 3600 seconds (1 hour)!</li>
             </ul>
         </div>
     </div>
