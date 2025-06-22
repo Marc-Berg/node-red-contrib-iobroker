@@ -1,14 +1,17 @@
 /*!
- * ioBroker Hierarchical TreeView - Shared Component
- * Version: 1.0.0
- * Complete implementation with SSL support and wildcard detection
+ * ioBroker Shared TreeView Component - Fixed Version
+ * Version: 1.0.1
+ * Centralizes TreeView functionality for all ioBroker nodes
  */
 
 (function(global) {
     'use strict';
     
     // Prevent multiple initialization
-    if (typeof global.ioBrokerSharedTreeView !== 'undefined') return;
+    if (typeof global.ioBrokerSharedTreeView !== 'undefined' && global.ioBrokerSharedTreeView.initialized) {
+        console.log('ioBroker TreeView already initialized');
+        return;
+    }
     
     const VIRTUAL_SCROLL_CONFIG = {
         ITEM_HEIGHT: 24,
@@ -25,7 +28,7 @@
         cacheMisses: 0
     };
     
-    // CSS Injection with versioning
+    // CSS Injection
     function injectStyles() {
         if (document.getElementById('iob-shared-styles-v1')) return;
         
@@ -132,13 +135,15 @@
             this.clear();
             const stateIds = Object.keys(states);
             
+            // Process in chunks to prevent UI blocking
             for (let i = 0; i < stateIds.length; i += VIRTUAL_SCROLL_CONFIG.CHUNK_SIZE) {
                 const chunk = stateIds.slice(i, i + VIRTUAL_SCROLL_CONFIG.CHUNK_SIZE);
                 await this.processChunk(chunk);
                 
-                const progress = Math.round((i / stateIds.length) * 100);
-                this.updateProgress?.(progress);
-                await new Promise(resolve => requestAnimationFrame(resolve));
+                // Allow UI updates
+                if (i % (VIRTUAL_SCROLL_CONFIG.CHUNK_SIZE * 5) === 0) {
+                    await new Promise(resolve => setTimeout(resolve, 0));
+                }
             }
             
             this.buildNodeHierarchy();
@@ -146,7 +151,7 @@
             this.updateFilteredNodes();
             
             console.timeEnd('TreeData.buildFromStates');
-            console.log(`Hierarchical tree built: ${this.allNodes.size} total nodes, search index: ${this.searchIndex.size} terms`);
+            console.log(`TreeData built: ${this.allNodes.size} nodes, ${this.searchIndex.size} search terms`);
         }
         
         async processChunk(stateIds) {
@@ -182,6 +187,7 @@
         }
         
         buildNodeHierarchy() {
+            // Build parent-child relationships
             for (const [nodeId, node] of this.allNodes) {
                 if (node.parent) {
                     const parentNode = this.allNodes.get(node.parent);
@@ -191,6 +197,7 @@
                 }
             }
             
+            // Sort children (folders first, then alphabetically)
             for (const [nodeId, node] of this.allNodes) {
                 node.children.sort((a, b) => {
                     const nodeA = this.allNodes.get(a);
@@ -203,6 +210,7 @@
                 });
             }
             
+            // Identify root nodes
             this.rootNodes = Array.from(this.allNodes.values())
                 .filter(node => !node.parent)
                 .sort((a, b) => a.label.localeCompare(b.label, undefined, { numeric: true }))
@@ -210,33 +218,30 @@
         }
         
         async buildSearchIndex() {
-            console.time('buildSearchIndex');
-            
             this.searchIndex.clear();
             
             for (const [nodeId, node] of this.allNodes) {
                 const searchTerms = new Set();
                 
-                const label = node.label.toLowerCase();
-                searchTerms.add(label);
+                // Add the node label
+                searchTerms.add(node.label.toLowerCase());
                 
-                const fullNodeId = nodeId.toLowerCase();
-                searchTerms.add(fullNodeId);
+                // Add the full node ID
+                searchTerms.add(nodeId.toLowerCase());
                 
+                // Add individual segments
                 const segments = nodeId.split('.');
                 segments.forEach(segment => {
                     searchTerms.add(segment.toLowerCase());
                 });
                 
+                // Add partial paths
                 for (let i = 1; i <= segments.length; i++) {
                     const partialPath = segments.slice(0, i).join('.').toLowerCase();
                     searchTerms.add(partialPath);
                 }
                 
-                if (node.fullId && node.fullId !== nodeId) {
-                    searchTerms.add(node.fullId.toLowerCase());
-                }
-                
+                // Index all terms
                 searchTerms.forEach(term => {
                     if (!this.searchIndex.has(term)) {
                         this.searchIndex.set(term, new Set());
@@ -244,25 +249,18 @@
                     this.searchIndex.get(term).add(nodeId);
                 });
             }
-            
-            console.timeEnd('buildSearchIndex');
-            console.log(`Search index built: ${this.searchIndex.size} terms for ${this.allNodes.size} nodes`);
         }
         
         performSearch(searchTerm) {
-            console.time('HierarchicalSearch');
-            
             this.currentSearchTerm = searchTerm.trim();
             this.isSearchMode = this.currentSearchTerm.length > 0;
             
+            // Reset all node states
             for (const node of this.allNodes.values()) {
                 node.visible = true;
                 node.isMatch = false;
                 node.isPathToMatch = false;
-                
-                if (!this.isSearchMode) {
-                    node.expanded = false;
-                }
+                node.expanded = this.isSearchMode ? false : node.expanded;
             }
             
             this.searchMatches.clear();
@@ -270,12 +268,13 @@
             
             if (!this.isSearchMode) {
                 this.updateFilteredNodes();
-                console.timeEnd('HierarchicalSearch');
                 return { results: [], total: this.filteredNodes.length };
             }
             
+            // Find matching nodes
             const directMatches = this.findMatchingNodes(this.currentSearchTerm);
             
+            // Mark direct matches
             directMatches.forEach(nodeId => {
                 const node = this.allNodes.get(nodeId);
                 if (node) {
@@ -284,16 +283,15 @@
                 }
             });
             
+            // Mark ancestor paths
             directMatches.forEach(nodeId => {
                 this.markAncestorPathsAsVisible(nodeId);
             });
             
+            // Filter and expand for search
             this.filterNodesForSearch();
             this.autoExpandPathsToMatches();
             this.updateFilteredNodes();
-            
-            console.timeEnd('HierarchicalSearch');
-            console.log(`Hierarchical search "${this.currentSearchTerm}" completed: ${directMatches.length} direct matches, ${this.searchPaths.size} path nodes`);
             
             return {
                 results: directMatches,
@@ -306,27 +304,15 @@
             const results = new Set();
             const lowerTerm = searchTerm.toLowerCase().trim();
             
+            // Exact matches
             if (this.searchIndex.has(lowerTerm)) {
-                const directMatches = this.searchIndex.get(lowerTerm);
-                directMatches.forEach(nodeId => results.add(nodeId));
+                this.searchIndex.get(lowerTerm).forEach(nodeId => results.add(nodeId));
             }
             
+            // Partial matches
             for (const [indexedTerm, nodeIds] of this.searchIndex) {
-                if (indexedTerm.includes(lowerTerm) && indexedTerm !== lowerTerm) {
+                if (indexedTerm.includes(lowerTerm)) {
                     nodeIds.forEach(nodeId => results.add(nodeId));
-                }
-            }
-            
-            const searchWords = searchTerm.trim().split(/\s+/).filter(word => word.length > 0);
-            if (searchWords.length > 1) {
-                for (const [nodeId, node] of this.allNodes) {
-                    const nodeText = nodeId.toLowerCase();
-                    const labelText = node.label.toLowerCase();
-                    const fullText = `${nodeText} ${labelText}`;
-                    
-                    if (searchWords.every(word => fullText.includes(word.toLowerCase()))) {
-                        results.add(nodeId);
-                    }
                 }
             }
             
@@ -336,17 +322,13 @@
         markAncestorPathsAsVisible(nodeId) {
             let currentNode = this.allNodes.get(nodeId);
             
-            while (currentNode) {
-                if (!currentNode.isMatch) {
-                    currentNode.isPathToMatch = true;
-                    this.searchPaths.add(currentNode.id);
+            while (currentNode && currentNode.parent) {
+                const parentNode = this.allNodes.get(currentNode.parent);
+                if (parentNode && !parentNode.isMatch) {
+                    parentNode.isPathToMatch = true;
+                    this.searchPaths.add(parentNode.id);
                 }
-                
-                if (currentNode.parent) {
-                    currentNode = this.allNodes.get(currentNode.parent);
-                } else {
-                    break;
-                }
+                currentNode = parentNode;
             }
         }
         
@@ -436,6 +418,7 @@
             this.container = container;
             this.data = data;
             this.selectedNodeId = null;
+            this.onItemSelected = null;
             
             this.setupDOM();
             this.setupEventListeners();
@@ -479,7 +462,7 @@
         
         renderEmptyState() {
             const message = this.data.isSearchMode 
-                ? `No items found containing "${this.data.currentSearchTerm}"`
+                ? `No items found for "${this.data.currentSearchTerm}"`
                 : 'No items to display';
                 
             this.content.innerHTML = `<div class="iob-empty-state">${message}</div>`;
@@ -518,31 +501,21 @@
             }
             
             const searchTerm = this.data.currentSearchTerm.trim();
-            const searchWords = searchTerm.split(/\s+/).filter(word => word.length > 0);
-            let result = text;
-            
-            searchWords.forEach(word => {
-                const regex = new RegExp(`(${word.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')})`, 'gi');
-                result = result.replace(regex, '<mark>$1</mark>');
-            });
-            
-            if (searchWords.length > 1) {
-                const completeTermRegex = new RegExp(`(${searchTerm.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')})`, 'gi');
-                result = result.replace(completeTermRegex, '<mark>$1</mark>');
-            }
-            
-            return result;
+            const regex = new RegExp(`(${searchTerm.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')})`, 'gi');
+            return text.replace(regex, '<mark>$1</mark>');
         }
         
         handleItemClick(element) {
             const nodeId = element.dataset.nodeId;
             
+            // Update selection
             this.container.querySelectorAll('.iob-tree-item.selected').forEach(el => {
                 el.classList.remove('selected');
             });
             element.classList.add('selected');
             this.selectedNodeId = nodeId;
             
+            // Toggle expansion
             if (this.data.toggleNodeExpansion(nodeId)) {
                 this.render();
             }
@@ -552,10 +525,9 @@
             const nodeId = element.dataset.nodeId;
             const node = this.data.allNodes.get(nodeId);
             
-            if (node && node.isLeaf && node.fullId) {
-                this.onItemSelected?.(node.fullId);
-            } else if (node && !node.isLeaf) {
-                this.onItemSelected?.(node.id);
+            if (node && this.onItemSelected) {
+                const itemId = node.isLeaf && node.fullId ? node.fullId : node.id;
+                this.onItemSelected(itemId);
             }
         }
         
@@ -566,7 +538,9 @@
         }
         
         destroy() {
-            this.container.innerHTML = '';
+            if (this.container) {
+                this.container.innerHTML = '';
+            }
         }
     }
     
@@ -597,8 +571,10 @@
         });
     }
     
-    // Wildcard detection and validation utilities
+    // Wildcard detection and validation
     function detectWildcardPattern(pattern) {
+        if (!pattern) return { isWildcard: false, hasUnsupported: false, warnings: [] };
+        
         const hasWildcardChars = pattern.includes('*');
         const hasUnsupportedChars = pattern.includes('?');
         
@@ -622,16 +598,13 @@
             issues.push('Avoid consecutive wildcards (**)');
         }
         
-        if (pattern.startsWith('*')) {
-            issues.push('Patterns starting with * may match too many states');
-        }
-        
-        if (pattern.split('*').length > 4) {
-            issues.push('Too many wildcards may impact performance');
-        }
-        
         if (pattern === '*' || pattern === '*.*') {
             issues.push('This pattern will match ALL states - use with caution!');
+        }
+        
+        const wildcardCount = (pattern.match(/\*/g) || []).length;
+        if (wildcardCount > 3) {
+            issues.push('Too many wildcards may impact performance');
         }
         
         return issues;
@@ -639,315 +612,337 @@
     
     // Main TreeView Factory
     function createTreeView(config) {
-        const {
-            nodeType,
-            inputId, 
-            serverInputId,
-            searchPlaceholder = "Search items (hierarchical filtering)...",
-            itemType = "items",
-            dataEndpoint = "/iobroker/ws/states",
-            enableWildcardDetection = false,
-            wildcardInputId = null
-        } = config;
-        
-        // Inject styles
-        injectStyles();
-        
-        const stateInput = $('#' + inputId);
-        const serverInput = $('#' + serverInputId);
-        
-        const treeContainer = $('<div class="iob-virtual-container"></div>');
-        const searchContainer = $(`
-            <div class="iob-search-container" style="display:none;">
-                <input type="text" class="iob-search-input" placeholder="${searchPlaceholder}">
-            </div>
-        `);
-        const controlButtons = $(`
-            <div class="iob-control-buttons">
-                <button type="button" class="iob-btn primary">Switch to tree selection</button>
-                <button type="button" class="iob-btn" title="Refresh ${itemType}">
-                    <i class="fa fa-refresh"></i> Refresh
-                </button>
-                <button type="button" class="iob-btn" title="Clear search">
-                    <i class="fa fa-times"></i> Clear
-                </button>
-            </div>
-        `);
-        const statusElement = $('<div class="iob-status"></div>');
-        const searchStatsElement = $('<div class="iob-search-stats"></div>');
-        
-        stateInput.after(searchStatsElement).after(statusElement).after(treeContainer).after(searchContainer).after(controlButtons);
-        
-        const toggleButton = controlButtons.find('.iob-btn.primary');
-        const refreshButton = controlButtons.find('.iob-btn:not(.primary)').first();
-        const clearButton = controlButtons.find('.iob-btn:not(.primary)').last();
-        const searchInput = searchContainer.find('.iob-search-input');
-        
-        const treeData = new HierarchicalTreeData();
-        let treeView = null;
-        let currentServerId = null;
-        let dataLoaded = false;
-        let searchTimeout = null;
-        
-        treeData.updateProgress = (progress) => {
-            if (progress >= 100) {
-                showStatus('success', `Hierarchical ${itemType} tree processing complete`);
+        try {
+            const {
+                nodeType,
+                inputId, 
+                serverInputId,
+                searchPlaceholder = "Search items...",
+                itemType = "items",
+                dataEndpoint = "/iobroker/ws/states",
+                enableWildcardDetection = false,
+                wildcardInputId = null
+            } = config;
+            
+            console.log(`Creating TreeView for ${nodeType} with wildcard detection: ${enableWildcardDetection}`);
+            
+            // Inject styles
+            injectStyles();
+            
+            // Get jQuery elements
+            const stateInput = $('#' + inputId);
+            const serverInput = $('#' + serverInputId);
+            
+            if (!stateInput.length || !serverInput.length) {
+                console.error('Required input elements not found');
+                throw new Error('Required input elements not found');
             }
-        };
-        
-        // Wildcard detection for iobin nodes
-        if (enableWildcardDetection && wildcardInputId) {
-            stateInput.on('input keyup change', function() {
-                const pattern = $(this).val();
-                const wildcardInfo = detectWildcardPattern(pattern);
-                
-                if (wildcardInfo.isWildcard) {
-                    showWildcardInfo(wildcardInfo.warnings);
+            
+            // Create UI elements
+            const treeContainer = $('<div class="iob-virtual-container"></div>');
+            const searchContainer = $(`
+                <div class="iob-search-container" style="display:none;">
+                    <input type="text" class="iob-search-input" placeholder="${searchPlaceholder}">
+                </div>
+            `);
+            const controlButtons = $(`
+                <div class="iob-control-buttons">
+                    <button type="button" class="iob-btn primary">Switch to tree selection</button>
+                    <button type="button" class="iob-btn" title="Refresh ${itemType}">
+                        <i class="fa fa-refresh"></i> Refresh
+                    </button>
+                    <button type="button" class="iob-btn" title="Clear search">
+                        <i class="fa fa-times"></i> Clear
+                    </button>
+                </div>
+            `);
+            const statusElement = $('<div class="iob-status"></div>');
+            const searchStatsElement = $('<div class="iob-search-stats"></div>');
+            
+            // Insert UI elements after input
+            stateInput.after(searchStatsElement)
+                      .after(statusElement)
+                      .after(treeContainer)
+                      .after(searchContainer)
+                      .after(controlButtons);
+            
+            // Get UI element references
+            const toggleButton = controlButtons.find('.iob-btn.primary');
+            const refreshButton = controlButtons.find('.iob-btn:not(.primary)').first();
+            const clearButton = controlButtons.find('.iob-btn:not(.primary)').last();
+            const searchInput = searchContainer.find('.iob-search-input');
+            
+            // Initialize tree data and view
+            const treeData = new HierarchicalTreeData();
+            let treeView = null;
+            let currentServerId = null;
+            let dataLoaded = false;
+            let searchTimeout = null;
+            
+            // Wildcard detection for iobin nodes
+            if (enableWildcardDetection && wildcardInputId) {
+                stateInput.on('input keyup change', function() {
+                    const pattern = $(this).val();
+                    const wildcardInfo = detectWildcardPattern(pattern);
                     
-                    // Disable initial value option for wildcards
-                    const initialValueCheckbox = $('#' + wildcardInputId);
-                    if (initialValueCheckbox.length) {
-                        initialValueCheckbox.prop('checked', false).prop('disabled', true);
-                        initialValueCheckbox.closest('.form-row').addClass('wildcard-disabled');
+                    if (wildcardInfo.isWildcard) {
+                        showWildcardInfo(wildcardInfo.warnings);
+                        
+                        // Disable initial value option for wildcards
+                        const initialValueCheckbox = $('#' + wildcardInputId);
+                        if (initialValueCheckbox.length) {
+                            initialValueCheckbox.prop('checked', false).prop('disabled', true);
+                            initialValueCheckbox.closest('.form-row').addClass('wildcard-disabled');
+                        }
+                    } else {
+                        hideWildcardInfo();
+                        
+                        // Re-enable initial value option
+                        const initialValueCheckbox = $('#' + wildcardInputId);
+                        if (initialValueCheckbox.length) {
+                            initialValueCheckbox.prop('disabled', false);
+                            initialValueCheckbox.closest('.form-row').removeClass('wildcard-disabled');
+                        }
                     }
-                } else {
-                    hideWildcardInfo();
+                });
+            }
+            
+            function showWildcardInfo(warnings) {
+                let existingInfo = $('#wildcard-info-' + nodeType);
+                if (existingInfo.length === 0) {
+                    existingInfo = $(`<div id="wildcard-info-${nodeType}"></div>`);
+                    stateInput.after(existingInfo);
+                }
+                
+                let warningText = '';
+                if (warnings.length > 0) {
+                    warningText = `
+                        <div style="color: #f39c12; font-size: 12px; margin-top: 5px;">
+                            <i class="fa fa-exclamation-triangle"></i> 
+                            ${warnings.join('; ')}
+                        </div>
+                    `;
+                }
+                
+                existingInfo.html(`
+                    <div style="background-color: #e8f4fd; border: 1px solid #bee5eb; border-radius: 4px; padding: 10px; font-size: 13px; color: #0c5460; margin-top: 5px;">
+                        <i class="fa fa-info-circle" style="color: #17a2b8; margin-right: 5px;"></i>
+                        <strong>Wildcard Mode (Auto-detected):</strong><br>
+                        <ul style="margin: 8px 0 0 20px; padding: 0;">
+                            <li><code>*</code> matches any number of characters</li>
+                            <li><code>?</code> is <strong>not supported</strong> by ioBroker</li>
+                            <li>Example: <code>system.adapter.*.alive</code></li>
+                        </ul>
+                        ${warningText}
+                    </div>
+                `).show();
+            }
+            
+            function hideWildcardInfo() {
+                $('#wildcard-info-' + nodeType).hide();
+            }
+            
+            async function loadTree(forceRefresh = false) {
+                console.log(`Loading tree for ${nodeType}, forceRefresh: ${forceRefresh}`);
+                
+                const serverNode = RED.nodes.node(serverInput.val());
+                if (!serverNode) {
+                    showError('No server selected');
+                    return;
+                }
+                
+                const serverId = getCacheKey(serverNode.iobhost, serverNode.iobport);
+                currentServerId = serverId;
+                
+                // Check cache first
+                if (!forceRefresh) {
+                    const cachedData = getCachedStates(serverId);
+                    if (cachedData) {
+                        console.log('Using cached data for', serverId);
+                        await renderTree(cachedData, true);
+                        return;
+                    }
+                }
+                
+                try {
+                    showStatus('info', `Loading ${itemType} from ioBroker...`);
+                    treeContainer.html(`<div style="padding: 20px; text-align: center;"><i class="fa fa-spinner fa-spin"></i> Loading ${itemType}...</div>`);
                     
-                    // Re-enable initial value option
-                    const initialValueCheckbox = $('#' + wildcardInputId);
-                    if (initialValueCheckbox.length) {
-                        initialValueCheckbox.prop('disabled', false);
-                        initialValueCheckbox.closest('.form-row').removeClass('wildcard-disabled');
+                    const response = await $.ajax({
+                        url: `${dataEndpoint}/${encodeURIComponent(serverId)}`,
+                        method: 'GET',
+                        timeout: 20000,
+                        dataType: 'json'
+                    });
+                    
+                    const dataCount = Object.keys(response).length;
+                    if (dataCount === 0) throw new Error(`No ${itemType} received`);
+                    
+                    setCachedStates(serverId, response);
+                    await renderTree(response, false);
+                    
+                } catch (error) {
+                    console.error(`Loading ${itemType} failed:`, error);
+                    showError(`Error: ${error.message || 'Unknown error'}`);
+                }
+            }
+            
+            async function renderTree(data, fromCache) {
+                console.log(`Rendering tree for ${nodeType}, fromCache: ${fromCache}`);
+                
+                await treeData.buildFromStates(data);
+                
+                if (treeView) {
+                    treeView.destroy();
+                }
+                
+                treeView = new HierarchicalTreeView(treeContainer[0], treeData);
+                treeView.onItemSelected = (itemId) => {
+                    stateInput.val(itemId).trigger('change');
+                    if (typeof RED !== 'undefined' && RED.notify) {
+                        RED.notify(`Selected: ${itemId}`, { type: "success", timeout: 2000 });
+                    }
+                    setTimeout(() => toggleInputMode(), 300);
+                };
+                
+                treeView.render();
+                
+                dataLoaded = true;
+                const dataCount = Object.keys(data).length;
+                const cacheStatus = fromCache ? '(cached)' : '(fresh)';
+                
+                showStatus('success', `Loaded ${dataCount} ${itemType} ${cacheStatus}`);
+            }
+            
+            // Search functionality
+            searchInput.on('input', function() {
+                clearTimeout(searchTimeout);
+                const searchTerm = $(this).val().trim();
+                
+                searchTimeout = setTimeout(() => {
+                    if (treeView && treeData) {
+                        const searchStats = treeView.updateSearch(searchTerm);
+                        
+                        if (searchTerm) {
+                            searchStatsElement.html(
+                                `Found ${searchStats.results.length} matching ${itemType} for "${searchStats.searchTerm}"`
+                            ).show();
+                        } else {
+                            searchStatsElement.html(`Showing all ${itemType}`).show();
+                            setTimeout(() => searchStatsElement.hide(), 2000);
+                        }
+                    }
+                }, 200);
+            });
+            
+            function toggleInputMode() {
+                const isManualVisible = stateInput.is(':visible');
+                stateInput.toggle(!isManualVisible);
+                treeContainer.toggle(isManualVisible);
+                searchContainer.toggle(isManualVisible);
+                
+                if (!isManualVisible) {
+                    statusElement.hide();
+                    searchStatsElement.hide();
+                }
+                
+                toggleButton.text(isManualVisible ? 'Switch to manual input' : 'Switch to tree view');
+                
+                if (isManualVisible && !dataLoaded) {
+                    loadTree();
+                }
+            }
+            
+            function showStatus(type, message) {
+                const iconMap = {
+                    success: 'fa-check-circle',
+                    info: 'fa-info-circle',
+                    error: 'fa-exclamation-triangle'
+                };
+                
+                statusElement.html(`
+                    <span class="iob-status iob-status-${type}">
+                        <i class="fa ${iconMap[type]}"></i> ${message}
+                    </span>
+                `).show();
+            }
+            
+            function showError(message) {
+                showStatus('error', message);
+                treeContainer.html(`
+                    <div style="padding: 20px; text-align: center; color: #dc3545;">
+                        <i class="fa fa-exclamation-triangle"></i> ${message}
+                        <br><small>Check server connection and try refreshing</small>
+                    </div>
+                `);
+            }
+            
+            // Event listeners
+            toggleButton.on('click', toggleInputMode);
+            
+            refreshButton.on('click', function() {
+                if (currentServerId) {
+                    stateCache.delete(currentServerId);
+                    const icon = $(this).find('i');
+                    icon.addClass('fa-spin');
+                    
+                    loadTree(true).finally(() => {
+                        setTimeout(() => icon.removeClass('fa-spin'), 500);
+                    });
+                    
+                    if (typeof RED !== 'undefined' && RED.notify) {
+                        RED.notify(`Refreshing ${itemType}...`, { type: "info", timeout: 2000 });
                     }
                 }
             });
-        }
-        
-        function showWildcardInfo(warnings) {
-            let existingInfo = $('#wildcard-info');
-            if (existingInfo.length === 0) {
-                existingInfo = $('<div id="wildcard-info"></div>');
-                stateInput.after(existingInfo);
-            }
             
-            let warningText = '';
-            if (warnings.length > 0) {
-                warningText = `
-                    <div style="color: #f39c12; font-size: 12px; margin-top: 5px;">
-                        <i class="fa fa-exclamation-triangle"></i> 
-                        ${warnings.join('; ')}
-                    </div>
-                `;
-            }
+            clearButton.on('click', function() {
+                searchInput.val('').trigger('input');
+                searchInput.focus();
+            });
             
-            existingInfo.html(`
-                <div style="background-color: #e8f4fd; border: 1px solid #bee5eb; border-radius: 4px; padding: 10px; font-size: 13px; color: #0c5460; margin-top: 5px;">
-                    <i class="fa fa-info-circle" style="color: #17a2b8; margin-right: 5px;"></i>
-                    <strong>Wildcard Mode (Auto-detected):</strong><br>
-                    <ul style="margin: 8px 0 0 20px; padding: 0;">
-                        <li><code>*</code> matches any number of characters</li>
-                        <li><code>?</code> is <strong>not supported</strong> by ioBroker</li>
-                        <li>Example: <code>system.adapter.*.alive</code></li>
-                    </ul>
-                    ${warningText}
-                </div>
-            `).show();
-        }
-        
-        function hideWildcardInfo() {
-            $('#wildcard-info').hide();
-        }
-        
-        async function loadTree(forceRefresh = false) {
-            console.time(`Hierarchical ${itemType} Tree Loading`);
-            
-            const serverNode = RED.nodes.node(serverInput.val());
-            if (!serverNode) {
-                showError('No server selected');
-                return;
-            }
-            
-            const serverId = getCacheKey(serverNode.iobhost, serverNode.iobport);
-            currentServerId = serverId;
-            
-            if (!forceRefresh) {
-                const cachedData = getCachedStates(serverId);
-                if (cachedData) {
-                    await renderTree(cachedData, true);
-                    console.timeEnd(`Hierarchical ${itemType} Tree Loading`);
-                    return;
+            serverInput.on('change', function() {
+                treeData.clear();
+                if (treeView) {
+                    treeView.destroy();
+                    treeView = null;
                 }
-            }
-            
-            try {
-                showStatus('info', `Loading ${itemType} from ioBroker...`);
-                treeContainer.html(`<div style="padding: 20px; text-align: center;"><i class="fa fa-spinner fa-spin"></i> Loading hierarchical ${itemType} tree...</div>`);
-                
-                const response = await $.ajax({
-                    url: `${dataEndpoint}/${encodeURIComponent(serverId)}`,
-                    method: 'GET',
-                    timeout: 20000,
-                    dataType: 'json'
-                });
-                
-                const dataCount = Object.keys(response).length;
-                if (dataCount === 0) throw new Error(`No ${itemType} received`);
-                
-                setCachedStates(serverId, response);
-                await renderTree(response, false);
-                
-            } catch (error) {
-                console.error(`Hierarchical ${itemType} tree loading failed:`, error);
-                showError(`Error: ${error.message || 'Unknown error'}`);
-            } finally {
-                console.timeEnd(`Hierarchical ${itemType} Tree Loading`);
-            }
-        }
-        
-        async function renderTree(data, fromCache) {
-            console.time(`Hierarchical ${itemType} Tree Rendering`);
-            
-            await treeData.buildFromStates(data);
-            
-            if (treeView) {
-                treeView.destroy();
-            }
-            
-            treeView = new HierarchicalTreeView(treeContainer[0], treeData);
-            treeView.onItemSelected = (itemId) => {
-                stateInput.val(itemId).trigger('change');
-                RED.notify(`Selected: ${itemId}`, { type: "success", timeout: 2000 });
-                setTimeout(() => toggleInputMode(), 300);
-            };
-            
-            treeView.render();
-            
-            dataLoaded = true;
-            const dataCount = Object.keys(data).length;
-            const cacheStatus = fromCache ? '(cached)' : '(fresh)';
-            
-            showStatus('success', `Loaded ${dataCount} ${itemType} ${cacheStatus} - Hierarchical search ready`);
-            
-            console.timeEnd(`Hierarchical ${itemType} Tree Rendering`);
-        }
-        
-        searchInput.on('input', function() {
-            clearTimeout(searchTimeout);
-            const searchTerm = $(this).val().trim();
-            
-            searchTimeout = setTimeout(() => {
-                if (treeView && treeData) {
-                    const searchStats = treeView.updateSearch(searchTerm);
-                    
-                    if (searchTerm) {
-                        const resultText = searchStats.results.length === 1 ? itemType.slice(0, -1) : itemType;
-                        searchStatsElement.html(
-                            `Found ${searchStats.results.length} matching ${resultText} for "${searchStats.searchTerm}"`
-                        ).show();
-                    } else {
-                        searchStatsElement.html(`Showing complete ${itemType} tree structure`).show();
-                        setTimeout(() => searchStatsElement.hide(), 2000);
-                    }
-                }
-            }, 200);
-        });
-        
-        function toggleInputMode() {
-            const isManualVisible = stateInput.is(':visible');
-            stateInput.toggle(!isManualVisible);
-            treeContainer.toggle(isManualVisible);
-            searchContainer.toggle(isManualVisible);
-            
-            if (!isManualVisible) {
-                statusElement.hide();
+                dataLoaded = false;
+                statusElement.html('');
                 searchStatsElement.hide();
-            }
+                
+                if (treeContainer.is(':visible')) {
+                    loadTree();
+                }
+            });
             
-            toggleButton.text(isManualVisible ? 'Switch to manual input' : 'Switch to hierarchical tree');
+            console.log(`TreeView setup complete for ${nodeType}`);
             
-            if (isManualVisible && !dataLoaded) {
-                loadTree();
-            }
-        }
-        
-        function showStatus(type, message) {
-            const iconMap = {
-                success: 'fa-check-circle',
-                info: 'fa-info-circle',
-                error: 'fa-exclamation-triangle'
+            return {
+                cleanup: function() {
+                    console.log(`Cleaning up TreeView for ${nodeType}`);
+                    if (treeView) treeView.destroy();
+                    clearTimeout(searchTimeout);
+                    controlButtons.remove();
+                    searchContainer.remove();
+                    treeContainer.remove();
+                    statusElement.remove();
+                    searchStatsElement.remove();
+                    stateInput.show();
+                    hideWildcardInfo();
+                    $('#wildcard-info-' + nodeType).remove();
+                }
             };
             
-            statusElement.html(`
-                <span class="iob-status iob-status-${type}">
-                    <i class="fa ${iconMap[type]}"></i> ${message}
-                </span>
-            `).show();
+        } catch (error) {
+            console.error('TreeView setup failed:', error);
+            throw error;
         }
-        
-        function showError(message) {
-            showStatus('error', message);
-            treeContainer.html(`
-                <div style="padding: 20px; text-align: center; color: #dc3545;">
-                    <i class="fa fa-exclamation-triangle"></i> ${message}
-                    <br><small>Check server connection and try refreshing</small>
-                </div>
-            `);
-        }
-        
-        toggleButton.on('click', toggleInputMode);
-        
-        refreshButton.on('click', function() {
-            if (currentServerId) {
-                stateCache.delete(currentServerId);
-                const icon = $(this).find('i');
-                icon.addClass('fa-spin');
-                
-                loadTree(true).finally(() => {
-                    setTimeout(() => icon.removeClass('fa-spin'), 500);
-                });
-                
-                RED.notify(`Refreshing hierarchical ${itemType} tree...`, { type: "info", timeout: 2000 });
-            }
-        });
-        
-        clearButton.on('click', function() {
-            searchInput.val('').trigger('input');
-            searchInput.focus();
-        });
-        
-        serverInput.on('change', function() {
-            treeData.clear();
-            if (treeView) {
-                treeView.destroy();
-                treeView = null;
-            }
-            dataLoaded = false;
-            statusElement.html('');
-            searchStatsElement.hide();
-            
-            if (treeContainer.is(':visible')) {
-                loadTree();
-            }
-        });
-        
-        return {
-            cleanup: function() {
-                if (treeView) treeView.destroy();
-                clearTimeout(searchTimeout);
-                controlButtons.remove();
-                searchContainer.remove();
-                treeContainer.remove();
-                statusElement.remove();
-                searchStatsElement.remove();
-                stateInput.show();
-                $('#wildcard-info').remove();
-            }
-        };
     }
     
     // Expose the main API
     global.ioBrokerSharedTreeView = {
-        version: '1.0.0',
+        version: '1.0.1',
         setup: createTreeView,
         
         // Legacy compatibility
@@ -960,15 +955,12 @@
         setCachedStates,
         detectWildcardPattern,
         validateWildcardPattern,
-        performanceMetrics
+        performanceMetrics,
+        
+        // Mark as initialized
+        initialized: true
     };
     
-    // Legacy name for backwards compatibility
-    global.ioBrokerOptimizedTreeView = global.ioBrokerSharedTreeView;
-    
-    // Mark as initialized
-    global.ioBrokerSharedTreeView.initialized = true;
-    
-    console.log('ioBroker Shared TreeView v1.0.0 loaded successfully');
+    console.log('ioBroker Shared TreeView v1.0.1 initialized successfully');
     
 })(window);
