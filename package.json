@@ -26,7 +26,8 @@
     "node": ">=14.0.0"
   },
   "dependencies": {
-    "ws": "^8.18.2"
+    "ws": "^8.18.2",
+    "express": "^4.18.0"
   },
   "peerDependencies": {
     "node-red": ">=2.0.0"
@@ -45,6 +46,15 @@
       "examples/iob-out.json", 
       "examples/iob-get.json",
       "examples/iob-getobject.json"
+    ],
+    "files": [
+      "*.js",
+      "*.html",
+      "lib/*.js",
+      "shared/*.js",
+      "icons/*.svg",
+      "README.md",
+      "LICENSE"
     ]
   }
 }
