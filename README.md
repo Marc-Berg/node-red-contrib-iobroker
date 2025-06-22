@@ -35,6 +35,7 @@ External Node-RED integration nodes for ioBroker communication. NOT an ioBroker 
 - **Real-time WebSocket communication**
 - **Shared connection management** - multiple nodes share WebSocket connections
 - **Interactive state browser** with search functionality
+- **Wildcard pattern support** - subscribe to multiple states with pattern matching
 - **Automatic reconnection** and connection status monitoring
 - **Bidirectional communication** for state changes and commands
 - **Object management** for accessing ioBroker object definitions
@@ -53,11 +54,13 @@ External Node-RED integration nodes for ioBroker communication. NOT an ioBroker 
 
 ### WS ioB in  ![alt text](images/iobin.png)
 **Input Node**  
-Subscribes to ioBroker state changes and forwards updates to your flow in real-time.
+Subscribes to ioBroker state changes and forwards updates to your flow in real-time. Supports both single states and wildcard patterns.
 
-- **State:** An ioBroker state can be specified using the interactive tree browser or manual input.
+- **State:** An ioBroker state can be specified using the interactive tree browser or manual input. 
+  - **Single states:** `0_userdata.0.test`
+  - **Wildcard patterns:** `system.adapter.*.alive` or `0_userdata.0.*` (automatically detected)
 - **Output:** The value of the changed state is sent as `msg.[outputProperty]` (default: `msg.payload`).  
-  The complete state object is available in `msg.state`.
+  The complete state object is available in `msg.state`. For wildcard patterns, `msg.pattern` contains the original pattern.
 - **Trigger on:** Filter state updates by acknowledgment status:
   - **Both:** All updates (default)
   - **Acknowledged:** Only updates with `ack: true`
@@ -65,6 +68,7 @@ Subscribes to ioBroker state changes and forwards updates to your flow in real-t
 - **Send initial value:** When enabled, the current state value is sent immediately after connection establishment, followed by regular change notifications.
   - Initial value messages contain an additional `msg.initial = true` property for identification
   - The same acknowledgment filter applies to initial values
+  - **Note:** Initial values are automatically disabled for wildcard patterns to prevent performance issues
 - **Server Configuration:** Configure the ioBroker server details in the node settings.
 
 ### WS ioB out  ![alt text](images/iobout.png)
@@ -209,6 +213,7 @@ Send a message with `msg.topic = "status"` to any node to get detailed connectio
    - Add authentication credentials if required.
 3. **Configure** each node as needed:
    - Use the **interactive tree browser** to select states or objects, or enter them manually.
+   - For wildcard patterns, simply enter patterns like `system.adapter.*.alive` - wildcard mode is detected automatically.
    - Set the output/input property for the value (default: `msg.payload`).
    - For `iobin`, select whether to trigger on all updates or only on acknowledged/unacknowledged changes.
    - For `iobin`, optionally enable **"Send initial value on startup"** to receive the current state value immediately after (re)connection.
@@ -222,11 +227,24 @@ Send a message with `msg.topic = "status"` to any node to get detailed connectio
 
 All nodes feature an **interactive state browser** that makes it easy to find and select ioBroker states:
 
-- **Manual input:** Type the state ID directly (e.g., `0_userdata.0.test`)
+- **Manual input:** Type the state ID directly (e.g., `0_userdata.0.test`) or wildcard patterns (e.g., `system.adapter.*.alive`)
 - **Tree browser:** Click "Switch to tree selection" to browse available states
 - **Search functionality:** Use the search box to filter states in tree view
 - **Smart caching:** State lists are cached for better performance
 - **Real-time refresh:** Update the state list with the refresh button
+- **Wildcard support:** Patterns using `*` are automatically detected and validated
+
+### Wildcard Patterns
+
+Wildcard patterns allow subscribing to multiple states at once:
+
+- **Supported wildcards:** Only `*` is supported by ioBroker (not `?`)
+- **Examples:**
+  - `system.adapter.*.alive` - all adapter alive states
+  - `0_userdata.0.*` - all states under 0_userdata.0
+  - `*.temperature` - all temperature states
+- **Auto-detection:** Wildcard mode is automatically enabled when `*` is detected in the pattern
+- **Performance:** Avoid overly broad patterns like `*` or `*.*`
 
 ## Object Management
 

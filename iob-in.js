@@ -30,10 +30,22 @@ module.exports = function(RED) {
             return setError("ioBroker host or port missing", "Host/port missing");
         }
         
-        // Validate state ID
-        const stateId = config.state?.trim();
-        if (!stateId) {
-            return setError("State ID missing", "State ID missing");
+        // Validate state ID or pattern
+        const statePattern = config.state?.trim();
+        if (!statePattern) {
+            return setError("State ID/Pattern missing", "State ID missing");
+        }
+        
+        // Determine if this is a wildcard pattern and validate consistency
+        const isWildcardPattern = statePattern.includes('*');
+        const useWildcardConfig = config.useWildcard || false;
+        
+        // Auto-correct inconsistent wildcard configuration
+        let actualWildcardMode = isWildcardPattern;
+        if (useWildcardConfig && !isWildcardPattern) {
+            // User enabled wildcard but no * in pattern - treat as single state
+            actualWildcardMode = false;
+            node.warn(`Wildcard mode was enabled but no * found in pattern '${statePattern}' - treating as single state`);
         }
         
         // Configuration with defaults
@@ -42,13 +54,15 @@ module.exports = function(RED) {
             ackFilter: config.ackFilter || "both",
             sendInitialValue: config.sendInitialValue || false,
             serverId: `${iobhost}:${iobport}`,
-            nodeId: node.id
+            nodeId: node.id,
+            useWildcard: actualWildcardMode // Use corrected wildcard mode
         };
         
         node.currentConfig = { iobhost, iobport, user, password };
         node.isInitialized = false;
-        node.isSubscribed = false; // Track subscription state
-        node.initialValueSent = false; // Track if initial value was sent
+        node.isSubscribed = false;
+        node.initialValueSent = false;
+        node.statePattern = statePattern;
         
         // Filter function for acknowledgment status
         function shouldSendMessage(ack, filter) {
@@ -67,6 +81,11 @@ module.exports = function(RED) {
                 timestamp: Date.now()
             };
             
+            // Add wildcard context if using patterns
+            if (actualWildcardMode) {
+                message.pattern = node.statePattern;
+            }
+            
             // Add initial value indicator if this is the initial value
             if (isInitialValue) {
                 message.initial = true;
@@ -76,7 +95,7 @@ module.exports = function(RED) {
             return message;
         }
         
-        // State change callback
+        // State change callback - works for both single states and wildcards
         function onStateChange(stateId, state) {
             try {
                 // Validate state data
@@ -96,67 +115,77 @@ module.exports = function(RED) {
                 
                 // Update status to show last activity
                 const timestamp = new Date().toLocaleTimeString();
-                setStatus("green", "dot", `Last: ${timestamp}`);
+                const statusText = actualWildcardMode 
+                    ? `Pattern active - Last: ${timestamp}`
+                    : `Last: ${timestamp}`;
+                setStatus("green", "dot", statusText);
+                
             } catch (error) {
                 node.error(`State change processing error: ${error.message}`);
                 setError(`Processing error: ${error.message}`, "Process error");
             }
         }
         
-        // Send initial value if configured to do so
+        // Send initial value for single state subscriptions only
         async function sendInitialValue() {
-            if (!settings.sendInitialValue || node.initialValueSent) {
+            // Skip initial values for actual wildcard patterns (not for checkbox-only wildcards)
+            if (!settings.sendInitialValue || actualWildcardMode) {
+                if (actualWildcardMode) {
+                    node.log(`Skipping initial values for wildcard pattern: ${node.statePattern}`);
+                }
+                return;
+            }
+            
+            if (node.initialValueSent) {
                 return;
             }
             
             try {
-                node.log(`Checking for cached initial value for ${stateId}`);
+                node.log(`Checking initial value for single state: ${statePattern}`);
                 
-                // First try to get cached value from connection manager
-                const cachedState = connectionManager.getCachedStateValue(settings.serverId, stateId);
+                // Try cached value first
+                const cachedState = connectionManager.getCachedStateValue(settings.serverId, statePattern);
                 
                 if (cachedState && cachedState.val !== undefined) {
-                    // Use cached value - much more efficient
                     if (shouldSendMessage(cachedState.ack, settings.ackFilter)) {
-                        const message = createMessage(stateId, cachedState, true);
+                        const message = createMessage(statePattern, cachedState, true);
                         node.send(message);
-                        node.initialValueSent = true;
                         
-                        node.log(`Initial value sent from cache: ${cachedState.val} (ack: ${cachedState.ack})`);
+                        node.log(`Initial value sent for ${statePattern}: ${cachedState.val} (ack: ${cachedState.ack})`);
                         setStatus("green", "dot", `Initial: ${cachedState.val}`);
                     } else {
                         node.log(`Initial value filtered out by ack filter (ack: ${cachedState.ack})`);
-                        node.initialValueSent = true; // Still mark as sent to avoid retries
                     }
+                    
+                    node.initialValueSent = true;
                 } else {
-                    // Fallback to live query if no cached value available
-                    node.log(`No cached value available, querying current state for ${stateId}`);
-                    const currentState = await connectionManager.getState(settings.serverId, stateId);
+                    // Fallback to live query
+                    const currentState = await connectionManager.getState(settings.serverId, statePattern);
                     
                     if (currentState && currentState.val !== undefined) {
                         if (shouldSendMessage(currentState.ack, settings.ackFilter)) {
-                            const message = createMessage(stateId, currentState, true);
+                            const message = createMessage(statePattern, currentState, true);
                             node.send(message);
-                            node.initialValueSent = true;
                             
                             node.log(`Initial value sent from live query: ${currentState.val} (ack: ${currentState.ack})`);
                             setStatus("green", "dot", `Initial: ${currentState.val}`);
                         } else {
                             node.log(`Initial value filtered out by ack filter (ack: ${currentState.ack})`);
-                            node.initialValueSent = true;
                         }
+                        
+                        node.initialValueSent = true;
                     } else {
-                        node.warn(`No initial value available for ${stateId}`);
+                        node.warn(`No initial value available for ${statePattern}`);
                         node.initialValueSent = true;
                     }
                 }
+                
             } catch (error) {
-                node.warn(`Failed to retrieve initial value for ${stateId}: ${error.message}`);
-                // Don't mark as sent, so it might be retried on reconnection
+                node.warn(`Failed to send initial value: ${error.message}`);
             }
         }
         
-        // Enhanced callback with proper reconnection handling
+        // Enhanced callback with wildcard support
         function createCallback() {
             const callback = onStateChange;
             
@@ -165,15 +194,18 @@ module.exports = function(RED) {
                 const day = now.getDate().toString().padStart(2, '0');
                 const month = now.toLocaleDateString('en', { month: 'short' });
                 const time = now.toTimeString().slice(0, 8);
-                console.log(`${day} ${month} ${time} - [debug] [Node ${settings.nodeId}] Status update received: ${status}`);
+                console.log(`${day} ${month} ${time} - [debug] [Node ${settings.nodeId}] Status update: ${status}`);
                 
                 switch (status) {
                     case 'connected':
-                        setStatus("green", "dot", "Connected");
+                        const statusText = actualWildcardMode
+                            ? `Pattern connected: ${node.statePattern}`
+                            : "Connected";
+                        setStatus("green", "dot", statusText);
                         node.isInitialized = true;
                         
-                        // Send initial value after successful connection (only if not already sent)
-                        if (settings.sendInitialValue && !node.initialValueSent) {
+                        // Send initial value after successful connection (single states only)
+                        if (settings.sendInitialValue && !actualWildcardMode) {
                             sendInitialValue().catch(error => {
                                 node.warn(`Failed to send initial value after connection: ${error.message}`);
                             });
@@ -182,18 +214,18 @@ module.exports = function(RED) {
                     case 'connecting':
                         setStatus("yellow", "ring", "Connecting...");
                         node.isSubscribed = false;
-                        node.initialValueSent = false; // Reset for new connection
+                        node.initialValueSent = false;
                         break;
                     case 'disconnected':
                         setStatus("red", "ring", "Disconnected");
                         node.isInitialized = false;
                         node.isSubscribed = false;
-                        node.initialValueSent = false; // Reset for next connection
+                        node.initialValueSent = false;
                         break;
                     case 'reconnecting':
                         setStatus("yellow", "ring", "Reconnecting...");
                         node.isSubscribed = false;
-                        node.initialValueSent = false; // Reset for reconnection
+                        node.initialValueSent = false;
                         break;
                     default:
                         setStatus("grey", "ring", "Unknown");
@@ -201,19 +233,11 @@ module.exports = function(RED) {
             };
             
             callback.onReconnect = function() {
-                const now = new Date();
-                const day = now.getDate().toString().padStart(2, '0');
-                const month = now.toLocaleDateString('en', { month: 'short' });
-                const time = now.toTimeString().slice(0, 8);
-                console.log(`${day} ${month} ${time} - [debug] [Node ${settings.nodeId}] Reconnection event received`);
                 node.log("Reconnection detected - resubscribing");
-                
-                // Mark as not subscribed to trigger resubscription
                 node.isSubscribed = false;
-                node.initialValueSent = false; // Reset for reconnection
+                node.initialValueSent = false;
                 setStatus("yellow", "ring", "Resubscribing...");
                 
-                // Resubscribe immediately
                 if (node.context) {
                     initialize();
                 }
@@ -223,7 +247,7 @@ module.exports = function(RED) {
                 node.log("Disconnection detected by node");
                 setStatus("red", "ring", "Disconnected");
                 node.isSubscribed = false;
-                node.initialValueSent = false; // Reset for next connection
+                node.initialValueSent = false;
             };
             
             return callback;
@@ -243,16 +267,15 @@ module.exports = function(RED) {
             
             if (configChanged) {
                 node.log(`Configuration change detected: ${node.currentConfig.iobhost}:${node.currentConfig.iobport} -> ${currentGlobalConfig.iobhost}:${currentGlobalConfig.iobport}`);
-                node.isSubscribed = false; // Force resubscription
-                node.initialValueSent = false; // Reset for new configuration
+                node.isSubscribed = false;
+                node.initialValueSent = false;
             }
             
             return configChanged;
         }
         
-        // Initialize subscription with enhanced error handling
+        // Initialize subscription - simplified for native wildcard support
         async function initialize() {
-            // Skip if already subscribed and connected
             if (node.isSubscribed && connectionManager.getConnectionStatus(settings.serverId).connected) {
                 node.log("Already subscribed and connected, skipping initialization");
                 return;
@@ -285,21 +308,28 @@ module.exports = function(RED) {
                 }
                 
                 const callback = createCallback();
+                
+                // Simple subscription - ioBroker handles wildcards natively
                 await connectionManager.subscribe(
                     settings.nodeId,
                     settings.serverId,
-                    stateId,
+                    statePattern, // Can be single state or wildcard pattern
                     callback,
                     globalConfig
                 );
                 
                 node.isSubscribed = true;
-                setStatus("green", "dot", "Connected");
-                node.log(`Successfully subscribed to ${stateId} via WebSocket${settings.sendInitialValue ? ' (with initial value)' : ''}`);
+                const patternInfo = actualWildcardMode 
+                    ? `wildcard pattern: ${statePattern}`
+                    : `single state: ${statePattern}`;
+                    
+                node.log(`Successfully subscribed to ${patternInfo} via WebSocket${settings.sendInitialValue && !actualWildcardMode ? ' (with initial value)' : ''}`);
+                
+                setStatus("green", "dot", actualWildcardMode ? `Pattern: ${statePattern}` : "Connected");
                 node.isInitialized = true;
                 
-                // Send initial value immediately after successful subscription
-                if (settings.sendInitialValue) {
+                // Send initial value after successful subscription (single states only)
+                if (settings.sendInitialValue && !actualWildcardMode) {
                     await sendInitialValue();
                 }
                 
@@ -308,7 +338,7 @@ module.exports = function(RED) {
                 setError(`Connection failed: ${errorMsg}`, "Connection failed");
                 node.error(`WebSocket subscription failed: ${errorMsg}`);
                 node.isSubscribed = false;
-                node.initialValueSent = false; // Reset on error
+                node.initialValueSent = false;
                 
                 // Retry after delay for connection errors
                 if (errorMsg.includes('timeout') || errorMsg.includes('refused') || errorMsg.includes('authentication')) {
@@ -333,10 +363,17 @@ module.exports = function(RED) {
                 await connectionManager.unsubscribe(
                     settings.nodeId,
                     settings.serverId,
-                    stateId
+                    statePattern
                 );
+                
                 node.status({});
-                node.log(`Successfully unsubscribed from ${stateId}`);
+                
+                const patternInfo = actualWildcardMode 
+                    ? `wildcard pattern ${statePattern}`
+                    : `single state ${statePattern}`;
+                    
+                node.log(`Successfully unsubscribed from ${patternInfo}`);
+                
             } catch (error) {
                 node.warn(`Cleanup error: ${error.message}`);
             } finally {

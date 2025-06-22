@@ -1,10 +1,27 @@
+<!-- Complete iob-in.html with Automatic Wildcard Detection -->
+
+<style>
+.wildcard-disabled {
+    opacity: 0.6;
+}
+
+.wildcard-disabled label {
+    color: #999 !important;
+}
+
+.wildcard-disabled input[type="checkbox"]:disabled {
+    opacity: 0.5;
+    cursor: not-allowed;
+}
+</style>
+
 <script type="text/javascript">
 
-// Hierarchical Search Tree
+// Hierarchical Search Tree (Complete TreeView Implementation)
 
 (function() {
-    if (typeof window.ioBrokerOptimizedTreeView !== 'undefined') return;
-    window.ioBrokerOptimizedTreeView = true;
+    if (typeof window.ioBrokerTreeView !== 'undefined') return;
+    window.ioBrokerTreeView = true;
     
     const VIRTUAL_SCROLL_CONFIG = {
         ITEM_HEIGHT: 24,
@@ -21,9 +38,9 @@
         cacheMisses: 0
     };
     
-    if (!document.getElementById('iob-optimized-styles')) {
+    if (!document.getElementById('iob-tree-styles')) {
         const style = document.createElement('style');
-        style.id = 'iob-optimized-styles';
+        style.id = 'iob-tree-styles';
         style.textContent = `
             .iob-virtual-container {
                 height: 320px;
@@ -236,7 +253,6 @@
             this.currentSearchTerm = searchTerm.trim();
             this.isSearchMode = this.currentSearchTerm.length > 0;
             
-            // Reset all node states
             for (const node of this.allNodes.values()) {
                 node.visible = true;
                 node.isMatch = false;
@@ -256,10 +272,8 @@
                 return { results: [], total: this.filteredNodes.length };
             }
             
-            // Find all matching nodes
             const directMatches = this.findMatchingNodes(this.currentSearchTerm);
             
-            // Mark direct matches
             directMatches.forEach(nodeId => {
                 const node = this.allNodes.get(nodeId);
                 if (node) {
@@ -268,17 +282,12 @@
                 }
             });
             
-            // Find all ancestor paths to matches and mark them as paths to matches
             directMatches.forEach(nodeId => {
                 this.markAncestorPathsAsVisible(nodeId);
             });
             
-            // In search mode, hide nodes that are not matches and not on paths to matches
             this.filterNodesForSearch();
-            
-            // Auto-expand nodes on paths to matches for better visibility
             this.autoExpandPathsToMatches();
-            
             this.updateFilteredNodes();
             
             console.timeEnd('HierarchicalSearch');
@@ -341,7 +350,6 @@
         
         filterNodesForSearch() {
             for (const node of this.allNodes.values()) {
-                // Show node if it's a direct match, on a path to a match, or has matching descendants
                 node.visible = node.isMatch || node.isPathToMatch || this.hasMatchingDescendants(node.id);
             }
         }
@@ -469,7 +477,7 @@
         
         renderEmptyState() {
             const message = this.data.isSearchMode 
-                ? `No branches found containing "${this.data.currentSearchTerm}"`
+                ? `No states found containing "${this.data.currentSearchTerm}"`
                 : 'No items to display';
                 
             this.content.innerHTML = `<div class="iob-empty-state">${message}</div>`;
@@ -584,7 +592,7 @@
         });
     }
     
-    window.ioBrokerOptimizedTreeView = {
+    window.ioBrokerTreeView = {
         setup: function(nodeType, stateInputId, serverInputId) {
             const stateInput = $('#' + stateInputId);
             const serverInput = $('#' + serverInputId);
@@ -710,9 +718,9 @@
                         const searchStats = treeView.updateSearch(searchTerm);
                         
                         if (searchTerm) {
-                            const branchText = searchStats.results.length === 1 ? 'branch' : 'branches';
+                            const stateText = searchStats.results.length === 1 ? 'state' : 'states';
                             searchStatsElement.html(
-                                `Found ${searchStats.results.length} matches in filtered ${branchText} for "${searchStats.searchTerm}"`
+                                `Found ${searchStats.results.length} matching ${stateText} for "${searchStats.searchTerm}"`
                             ).show();
                         } else {
                             searchStatsElement.html('Showing complete tree structure').show();
@@ -800,45 +808,6 @@
                 }
             });
             
-            window.currentOptimizedTreeController = {
-                forceRefresh: () => loadTree(true),
-                getPerformanceStats: () => performanceMetrics,
-                clearCache: () => {
-                    stateCache.clear();
-                    console.log('Cache cleared');
-                },
-                getTreeData: () => treeData,
-                getTreeView: () => treeView,
-                debugSearch: (term) => {
-                    console.log('=== HIERARCHICAL SEARCH DEBUG ===');
-                    console.log(`Search term: "${term}"`);
-                    console.log(`Search index size: ${treeData.searchIndex.size}`);
-                    console.log(`Total nodes: ${treeData.allNodes.size}`);
-
-                    const results = treeData.findMatchingNodes(term);
-                    // Show search paths
-                    const searchStats = treeData.performSearch(term);                 
-                    return searchStats;
-                },
-                testHierarchicalSearch: () => {
-                    console.log('Testing hierarchical search functionality...');
-                    const testTerms = ['test', 'system', 'adapter', '0_userdata'];
-                    testTerms.forEach(term => {
-                        const stats = window.currentOptimizedTreeController.debugSearch(term);
-                        console.log(`"${term}": ${stats.results.length} matches, ${stats.total} visible nodes`);
-                    });
-                },
-                showSearchExample: () => {
-                    console.log('=== HIERARCHICAL SEARCH EXAMPLE ===');
-                    console.log('When searching for "test":');
-                    console.log('1. Find all nodes containing "test"');
-                    console.log('2. Mark their ancestor paths as visible');
-                    console.log('3. Hide unrelated branches');
-                    console.log('4. Auto-expand paths to matches');
-                    console.log('Result: Tree structure maintained, only relevant branches shown');
-                }
-            };
-            
             return {
                 cleanup: function() {
                     if (treeView) treeView.destroy();
@@ -849,17 +818,13 @@
                     statusElement.remove();
                     searchStatsElement.remove();
                     stateInput.show();
-                    
-                    if (window.currentOptimizedTreeController) {
-                        delete window.currentOptimizedTreeController;
-                    }
                 }
             };
         }
     };
 })();
 
-// Node Registration
+// Enhanced Node Registration with Automatic Wildcard Detection
 RED.nodes.registerType('iobin', {
     category: 'ioBroker',
     color: '#a6bbcf',
@@ -869,6 +834,8 @@ RED.nodes.registerType('iobin', {
         outputProperty: { value: "payload" },
         ackFilter: { value: "both" },
         sendInitialValue: { value: false },
+        useWildcard: { value: false }, // This will be auto-set based on pattern detection
+        outputMode: { value: "individual" },
         server: { value: "", type: "iob-config" }
     },
     inputs: 0,
@@ -876,9 +843,17 @@ RED.nodes.registerType('iobin', {
     icon: "iobroker_in.svg",
     paletteLabel: "WS ioB in",
     label: function() {
-        return this.name || this.state || "iob-in";
+        if (this.name) return this.name;
+        
+        if (this.state && this.state.includes('*')) {
+            return `${this.state} (wildcard)`;
+        }
+        
+        return this.state || "iob-in";
     },
     oneditprepare: function() {
+        const node = this;
+        
         // Auto-select server configuration
         const serverInput = $('#node-input-server');
         
@@ -903,21 +878,166 @@ RED.nodes.registerType('iobin', {
             }
         }
         
-        // Initialize tree view
-        this.treeController = window.ioBrokerOptimizedTreeView.setup('iobin', 'node-input-state', 'node-input-server');
+        // Automatic wildcard pattern detection and UI updates
+        function updateWildcardMode() {
+            const stateValue = $('#node-input-state').val();
+            const hasWildcardChars = stateValue.includes('*'); // Only * is supported by ioBroker
+            const hasUnsupportedChars = stateValue.includes('?');
+            
+            // Automatic wildcard mode detection based on pattern content
+            const wildcardModeActive = hasWildcardChars;
+            
+            // Show/hide wildcard-specific options based on pattern content
+            if (wildcardModeActive) {
+                $('#wildcard-info').show();
+                updateStateInputPlaceholder(true);
+                
+                // Disable initial value option for wildcards
+                $('#node-input-sendInitialValue').prop('checked', false).prop('disabled', true);
+                $('#initial-value-container').addClass('wildcard-disabled');
+                showInitialValueWarning();
+                
+                // Show wildcard info when * is detected
+                showWildcardInfo();
+            } else {
+                $('#wildcard-info').hide();
+                updateStateInputPlaceholder(false);
+                
+                // Re-enable initial value option for single states
+                $('#node-input-sendInitialValue').prop('disabled', false);
+                $('#initial-value-container').removeClass('wildcard-disabled');
+                hideInitialValueWarning();
+            }
+            
+            // Validate pattern (show warnings for unsupported ? wildcards)
+            if (stateValue && (wildcardModeActive || hasUnsupportedChars)) {
+                validateWildcardPattern(stateValue);
+            } else {
+                $('#wildcard-validation').hide();
+            }
+        }
         
+        function updateStateInputPlaceholder(isWildcard) {
+            const stateInput = $('#node-input-state');
+            if (isWildcard) {
+                stateInput.attr('placeholder', 'e.g. 0_userdata.0.*, system.adapter.*.alive (only * supported)');
+            } else {
+                stateInput.attr('placeholder', 'e.g. 0_userdata.0.test');
+            }
+        }
+        
+        function validateWildcardPattern(pattern) {
+            const validationDiv = $('#wildcard-validation');
+            
+            if (!pattern) {
+                validationDiv.hide();
+                return;
+            }
+            
+            // Basic validation rules for ioBroker wildcards
+            const issues = [];
+            
+            // Check for unsupported wildcard characters
+            if (pattern.includes('?')) {
+                issues.push('ioBroker only supports * wildcards, not ? wildcards');
+            }
+            
+            // Check for invalid wildcard usage
+            if (pattern.includes('**')) {
+                issues.push('Avoid consecutive wildcards (**)');
+            }
+            
+            if (pattern.startsWith('*')) {
+                issues.push('Patterns starting with * may match too many states');
+            }
+            
+            if (pattern.split('*').length > 4) {
+                issues.push('Too many wildcards may impact performance');
+            }
+            
+            // Check for potentially problematic patterns
+            if (pattern === '*' || pattern === '*.*') {
+                issues.push('This pattern will match ALL states - use with caution!');
+            }
+            
+            if (issues.length > 0) {
+                validationDiv.html(`
+                    <div style="color: #f39c12; font-size: 12px; margin-top: 5px;">
+                        <i class="fa fa-exclamation-triangle"></i> 
+                        ${issues.join('; ')}
+                    </div>
+                `).show();
+            } else if (pattern.includes('*')) {
+                validationDiv.html(`
+                    <div style="color: #28a745; font-size: 12px; margin-top: 5px;">
+                        <i class="fa fa-check"></i> 
+                        Wildcard pattern looks good
+                    </div>
+                `).show();
+            } else {
+                validationDiv.hide();
+            }
+        }
+        
+        function showWildcardInfo() {
+            $('#wildcard-info').html(`
+                <div style="background-color: #e8f4fd; border: 1px solid #bee5eb; border-radius: 4px; padding: 10px; font-size: 13px; color: #0c5460;">
+                    <i class="fa fa-info-circle" style="color: #17a2b8; margin-right: 5px;"></i>
+                    <strong>Wildcard Mode (Auto-detected):</strong><br>
+                    <ul style="margin: 8px 0 0 20px; padding: 0;">
+                        <li><code>*</code> matches any number of characters</li>
+                        <li><code>?</code> is <strong>not supported</strong> by ioBroker</li>
+                        <li>Example: <code>system.adapter.*.alive</code></li>
+                        <li><strong>Note:</strong> Initial values are disabled for wildcards</li>
+                    </ul>
+                </div>
+            `).show();
+        }
+        
+        function showInitialValueWarning() {
+            $('#initial-value-warning').html(`
+                <div style="background-color: #fff3cd; border: 1px solid #ffeaa7; border-radius: 4px; padding: 8px; font-size: 12px; color: #856404; margin-top: 5px;">
+                    <i class="fa fa-exclamation-triangle" style="color: #f39c12; margin-right: 5px;"></i>
+                    Initial values are disabled for wildcard patterns to prevent performance issues.
+                </div>
+            `).show();
+        }
+        
+        function hideInitialValueWarning() {
+            $('#initial-value-warning').hide();
+        }
+        
+        // Event handlers - FIXED: Added 'change' event for treeview selections
+        $('#node-input-state').on('input keyup change', function() {
+            updateWildcardMode();
+        });
+        
+        // Initial setup
+        updateWildcardMode();
+        
+        // Initialize tree view
+        this.treeController = window.ioBrokerTreeView.setup('iobin', 'node-input-state', 'node-input-server');
     },
     oneditsave: function() {
+        // Auto-detect and save wildcard mode based on pattern (only * is supported by ioBroker)
+        const stateValue = $('#node-input-state').val();
+        const hasWildcardChars = stateValue.includes('*'); // Only * is supported
+        
+        // Automatically set useWildcard based on pattern detection
+        this.useWildcard = hasWildcardChars;
+        
+        if (hasWildcardChars) {
+            // Force disable initial values for wildcards
+            this.sendInitialValue = false;
+        }
+        
+        // Cleanup tree controller
         if (this.treeController) {
             this.treeController.cleanup();
         }
     },
     oneditresize: function() {
-        // Handle responsive design for tree view
-        if (this.treeController && window.currentOptimizedTreeController) {
-            const stats = window.currentOptimizedTreeController.getPerformanceStats();
-            console.log('Tree View Performance Stats:', stats);
-        }
+        // Handle responsive design - placeholder for future enhancements
     }
 });
 </script>
@@ -927,14 +1047,21 @@ RED.nodes.registerType('iobin', {
         <label for="node-input-name"><i class="icon-tag"></i> Name</label>
         <input type="text" id="node-input-name" placeholder="Node name (optional)">
     </div>
+    
     <div class="form-row">
-        <label for="node-input-state"><i class="icon-tag"></i> State ID</label>
+        <label for="node-input-state"><i class="icon-tag"></i> State ID / Pattern</label>
         <input type="text" id="node-input-state" placeholder="e.g. 0_userdata.0.test" required>
+        <div id="wildcard-validation" style="display: none;"></div>
     </div>
+    
+    <!-- Wildcard Information (Auto-shown when * is detected) -->
+    <div id="wildcard-info" style="display: none; margin-bottom: 15px;"></div>
+      
     <div class="form-row">
         <label for="node-input-outputProperty"><i class="icon-tag"></i> Output Property</label>
         <input type="text" id="node-input-outputProperty" placeholder="payload">
     </div>
+    
     <div class="form-row">
         <label for="node-input-ackFilter"><i class="icon-tag"></i> Trigger on</label>
         <select id="node-input-ackFilter" style="width:100%">
@@ -943,12 +1070,15 @@ RED.nodes.registerType('iobin', {
             <option value="noack">Unacknowledged only (ack=false)</option>
         </select>
     </div>
-    <div class="form-row">
+    
+    <div class="form-row" id="initial-value-container">
         <label for="node-input-sendInitialValue" style="width: auto;">
             <input type="checkbox" id="node-input-sendInitialValue" style="width: auto; margin-right: 5px;">
             <i class="icon-tag"></i> Send initial value on startup
         </label>
+        <div id="initial-value-warning" style="display: none;"></div>
     </div>
+    
     <div class="form-row">
         <label for="node-input-server"><i class="icon-tag"></i> Server</label>
         <input type="text" id="node-input-server" required>
@@ -956,23 +1086,53 @@ RED.nodes.registerType('iobin', {
 </script>
 
 <script type="text/html" data-help-name="iobin">
-    <p>ioBroker state subscription via WebSocket.</p>
+    <p>ioBroker state subscription via WebSocket with automatic Wildcard detection.</p>
+    
+    <h3>Input Modes</h3>
+    <ul>
+        <li><b>Single State:</b> Subscribe to one specific state ID</li>
+        <li><b>Wildcard Pattern:</b> Subscribe to multiple states matching a pattern (auto-detected when * is present)</li>
+    </ul>
+    
+    <h3>Wildcard Patterns</h3>
+    <ul>
+        <li><code>*</code> matches any number of characters</li>
+        <li><code>?</code> is <strong>not supported</strong> by ioBroker</li>
+        <li>Examples:
+            <ul>
+                <li><code>system.adapter.*.alive</code> - all adapter alive states</li>
+                <li><code>0_userdata.0.*</code> - all states under 0_userdata.0</li>
+                <li><code>*.temperature</code> - all temperature states</li>
+            </ul>
+        </li>
+        <li><strong>Note:</strong> Wildcard mode is automatically detected when * is present in the pattern</li>
+    </ul>
+    
     <h3>State Selection</h3>
     <ul>
-        <li><b>Manual input:</b> Type the state ID directly</li>
-        <li><b>Tree browser:</b> Virtual scrolling tree view for large datasets</li>
-        <li><b>Intelligent search:</b> Pre-indexed search for instant results</li>
+        <li><b>Manual input:</b> Type the state ID or pattern directly</li>
+        <li><b>Tree browser:</b> Browse and select from available states</li>
+        <li><b>Auto-detection:</b> Wildcard mode is enabled automatically when * is detected in the pattern</li>
     </ul>
+    
     <h3>Configuration</h3>
     <ul>
         <li><b>Trigger on:</b> Filter by acknowledgment status</li>
-        <li><b>Send initial value:</b> Emit current state value immediately after (re)connection</li>
+        <li><b>Send initial values:</b> Emit current value immediately after connection (single states only)</li>
     </ul>
+    
     <h3>Output</h3>
     <ul>
         <li>State value in <code>msg.[outputProperty]</code> when it changes</li>
         <li>Complete state object in <code>msg.state</code></li>
         <li>State ID in <code>msg.topic</code></li>
         <li>Timestamp in <code>msg.timestamp</code></li>
+        <li><b>For wildcards:</b> Original pattern in <code>msg.pattern</code></li>
+    </ul>
+    
+    <h3>Performance Notes</h3>
+    <ul>
+        <li>Avoid overly broad patterns like <code>*</code> or <code>*.*</code></li>
+        <li><b>Initial values are disabled for wildcards</b> to prevent performance issues</li>
     </ul>
 </script>
