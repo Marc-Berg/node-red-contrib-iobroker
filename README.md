@@ -95,9 +95,7 @@ Retrieves ioBroker object definitions, including metadata and configuration info
 
 ### iob-config
 
-<div style="max-width: 400px !important;">
-    <img src="images/iob-config.png" alt="iob-config" style="width: 100% !important; height: auto !important;">
-</div>
+![alt text](images/iob-config.png)
 
 **Configuration Node**  
 Shared configuration for ioBroker server settings.
@@ -216,9 +214,7 @@ Send a message with `msg.topic = "status"` to any node to get detailed connectio
 
 ## State Selection
 
-<div style="max-width: 400px !important;">
-    <img src="images/treeview.png" alt="iob-config" style="width: 100% !important; height: auto !important;">
-</div>
+![alt text](images/treeview.png)
 
 All nodes feature an **interactive state browser** that makes it easy to find and select ioBroker states:
 
