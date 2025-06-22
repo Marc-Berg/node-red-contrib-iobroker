@@ -1,4 +1,3 @@
-// Enhanced iob-in.js with proper reconnection handling
 const connectionManager = require('./lib/websocket-manager');
 
 module.exports = function(RED) {
@@ -41,6 +40,7 @@ module.exports = function(RED) {
         const settings = {
             outputProperty: config.outputProperty?.trim() || "payload",
             ackFilter: config.ackFilter || "both",
+            sendInitialValue: config.sendInitialValue || false,
             serverId: `${iobhost}:${iobport}`,
             nodeId: node.id
         };
@@ -48,6 +48,7 @@ module.exports = function(RED) {
         node.currentConfig = { iobhost, iobport, user, password };
         node.isInitialized = false;
         node.isSubscribed = false; // Track subscription state
+        node.initialValueSent = false; // Track if initial value was sent
         
         // Filter function for acknowledgment status
         function shouldSendMessage(ack, filter) {
@@ -59,12 +60,18 @@ module.exports = function(RED) {
         }
         
         // Create message from state change
-        function createMessage(stateId, state) {
+        function createMessage(stateId, state, isInitialValue = false) {
             const message = {
                 topic: stateId,
                 state: state,
                 timestamp: Date.now()
             };
+            
+            // Add initial value indicator if this is the initial value
+            if (isInitialValue) {
+                message.initial = true;
+            }
+            
             message[settings.outputProperty] = state.val;
             return message;
         }
@@ -84,7 +91,7 @@ module.exports = function(RED) {
                 }
                 
                 // Create and send message
-                const message = createMessage(stateId, state);
+                const message = createMessage(stateId, state, false);
                 node.send(message);
                 
                 // Update status to show last activity
@@ -93,6 +100,59 @@ module.exports = function(RED) {
             } catch (error) {
                 node.error(`State change processing error: ${error.message}`);
                 setError(`Processing error: ${error.message}`, "Process error");
+            }
+        }
+        
+        // Send initial value if configured to do so
+        async function sendInitialValue() {
+            if (!settings.sendInitialValue || node.initialValueSent) {
+                return;
+            }
+            
+            try {
+                node.log(`Checking for cached initial value for ${stateId}`);
+                
+                // First try to get cached value from connection manager
+                const cachedState = connectionManager.getCachedStateValue(settings.serverId, stateId);
+                
+                if (cachedState && cachedState.val !== undefined) {
+                    // Use cached value - much more efficient
+                    if (shouldSendMessage(cachedState.ack, settings.ackFilter)) {
+                        const message = createMessage(stateId, cachedState, true);
+                        node.send(message);
+                        node.initialValueSent = true;
+                        
+                        node.log(`Initial value sent from cache: ${cachedState.val} (ack: ${cachedState.ack})`);
+                        setStatus("green", "dot", `Initial: ${cachedState.val}`);
+                    } else {
+                        node.log(`Initial value filtered out by ack filter (ack: ${cachedState.ack})`);
+                        node.initialValueSent = true; // Still mark as sent to avoid retries
+                    }
+                } else {
+                    // Fallback to live query if no cached value available
+                    node.log(`No cached value available, querying current state for ${stateId}`);
+                    const currentState = await connectionManager.getState(settings.serverId, stateId);
+                    
+                    if (currentState && currentState.val !== undefined) {
+                        if (shouldSendMessage(currentState.ack, settings.ackFilter)) {
+                            const message = createMessage(stateId, currentState, true);
+                            node.send(message);
+                            node.initialValueSent = true;
+                            
+                            node.log(`Initial value sent from live query: ${currentState.val} (ack: ${currentState.ack})`);
+                            setStatus("green", "dot", `Initial: ${currentState.val}`);
+                        } else {
+                            node.log(`Initial value filtered out by ack filter (ack: ${currentState.ack})`);
+                            node.initialValueSent = true;
+                        }
+                    } else {
+                        node.warn(`No initial value available for ${stateId}`);
+                        node.initialValueSent = true;
+                    }
+                }
+            } catch (error) {
+                node.warn(`Failed to retrieve initial value for ${stateId}: ${error.message}`);
+                // Don't mark as sent, so it might be retried on reconnection
             }
         }
         
@@ -111,19 +171,29 @@ module.exports = function(RED) {
                     case 'connected':
                         setStatus("green", "dot", "Connected");
                         node.isInitialized = true;
+                        
+                        // Send initial value after successful connection (only if not already sent)
+                        if (settings.sendInitialValue && !node.initialValueSent) {
+                            sendInitialValue().catch(error => {
+                                node.warn(`Failed to send initial value after connection: ${error.message}`);
+                            });
+                        }
                         break;
                     case 'connecting':
                         setStatus("yellow", "ring", "Connecting...");
                         node.isSubscribed = false;
+                        node.initialValueSent = false; // Reset for new connection
                         break;
                     case 'disconnected':
                         setStatus("red", "ring", "Disconnected");
                         node.isInitialized = false;
                         node.isSubscribed = false;
+                        node.initialValueSent = false; // Reset for next connection
                         break;
                     case 'reconnecting':
                         setStatus("yellow", "ring", "Reconnecting...");
                         node.isSubscribed = false;
+                        node.initialValueSent = false; // Reset for reconnection
                         break;
                     default:
                         setStatus("grey", "ring", "Unknown");
@@ -140,20 +210,20 @@ module.exports = function(RED) {
                 
                 // Mark as not subscribed to trigger resubscription
                 node.isSubscribed = false;
+                node.initialValueSent = false; // Reset for reconnection
                 setStatus("yellow", "ring", "Resubscribing...");
                 
-                // Resubscribe after short delay
-                setTimeout(() => {
-                    if (node.context) {
-                        initialize();
-                    }
-                }, 1000);
+                // Resubscribe immediately
+                if (node.context) {
+                    initialize();
+                }
             };
             
             callback.onDisconnect = function() {
                 node.log("Disconnection detected by node");
                 setStatus("red", "ring", "Disconnected");
                 node.isSubscribed = false;
+                node.initialValueSent = false; // Reset for next connection
             };
             
             return callback;
@@ -174,6 +244,7 @@ module.exports = function(RED) {
             if (configChanged) {
                 node.log(`Configuration change detected: ${node.currentConfig.iobhost}:${node.currentConfig.iobport} -> ${currentGlobalConfig.iobhost}:${currentGlobalConfig.iobport}`);
                 node.isSubscribed = false; // Force resubscription
+                node.initialValueSent = false; // Reset for new configuration
             }
             
             return configChanged;
@@ -224,14 +295,20 @@ module.exports = function(RED) {
                 
                 node.isSubscribed = true;
                 setStatus("green", "dot", "Connected");
-                node.log(`Successfully subscribed to ${stateId} via WebSocket`);
+                node.log(`Successfully subscribed to ${stateId} via WebSocket${settings.sendInitialValue ? ' (with initial value)' : ''}`);
                 node.isInitialized = true;
+                
+                // Send initial value immediately after successful subscription
+                if (settings.sendInitialValue) {
+                    await sendInitialValue();
+                }
                 
             } catch (error) {
                 const errorMsg = error.message || 'Unknown error';
                 setError(`Connection failed: ${errorMsg}`, "Connection failed");
                 node.error(`WebSocket subscription failed: ${errorMsg}`);
                 node.isSubscribed = false;
+                node.initialValueSent = false; // Reset on error
                 
                 // Retry after delay for connection errors
                 if (errorMsg.includes('timeout') || errorMsg.includes('refused') || errorMsg.includes('authentication')) {
@@ -245,34 +322,12 @@ module.exports = function(RED) {
             }
         }
         
-        // Input handler (for status requests)
-        node.on("input", function(msg) {
-            if (msg.topic === "status") {
-                const status = connectionManager.getConnectionStatus(settings.serverId);
-                const statusMsg = {
-                    payload: {
-                        ...status,
-                        nodeInitialized: node.isInitialized,
-                        isSubscribed: node.isSubscribed,
-                        stateId: stateId
-                    },
-                    topic: "status",
-                    timestamp: Date.now()
-                };
-                node.send(statusMsg);
-            } else if (msg.topic === "reconnect") {
-                // Manual reconnect trigger
-                node.log("Manual reconnect triggered");
-                node.isSubscribed = false;
-                initialize();
-            }
-        });
-        
         // Cleanup on node close
         node.on("close", async function(removed, done) {
             node.log("Node closing...");
             node.isInitialized = false;
             node.isSubscribed = false;
+            node.initialValueSent = false;
             
             try {
                 await connectionManager.unsubscribe(
@@ -294,6 +349,7 @@ module.exports = function(RED) {
             node.error(`Node error: ${error.message}`);
             setError(`Node error: ${error.message}`, "Node error");
             node.isSubscribed = false;
+            node.initialValueSent = false;
         });
         
         // Initialize the node
@@ -303,7 +359,7 @@ module.exports = function(RED) {
     // Register the node type
     RED.nodes.registerType("iobin", iobin);
     
-    // Admin endpoints for the tree view (unchanged)
+    // Admin endpoints for the tree view
     RED.httpAdmin.get("/iobroker/ws/states/:serverId", async function(req, res) {
         try {
             const serverId = decodeURIComponent(req.params.serverId);

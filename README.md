@@ -62,6 +62,9 @@ Subscribes to ioBroker state changes and forwards updates to your flow in real-t
   - **Both:** All updates (default)
   - **Acknowledged:** Only updates with `ack: true`
   - **Unacknowledged:** Only updates with `ack: false`
+- **Send initial value:** When enabled, the current state value is sent immediately after connection establishment, followed by regular change notifications.
+  - Initial value messages contain an additional `msg.initial = true` property for identification
+  - The same acknowledgment filter applies to initial values
 - **Server Configuration:** Configure the ioBroker server details in the node settings.
 
 ### WS ioB out  ![alt text](images/iobout.png)
@@ -208,6 +211,7 @@ Send a message with `msg.topic = "status"` to any node to get detailed connectio
    - Use the **interactive tree browser** to select states or objects, or enter them manually.
    - Set the output/input property for the value (default: `msg.payload`).
    - For `iobin`, select whether to trigger on all updates or only on acknowledged/unacknowledged changes.
+   - For `iobin`, optionally enable **"Send initial value on startup"** to receive the current state value immediately after (re)connection.
    - For `iobout`, choose between "value" (ack=true) or "command" (ack=false) mode.
    - For `iobget` and `iobgetobject`, set the state or object ID or leave empty to use `msg.topic`.
 4. **Connect** the nodes to your flow as needed.
@@ -227,6 +231,26 @@ All nodes feature an **interactive state browser** that makes it easy to find an
 ## Object Management
 
 The `iobgetobject` node provides access to ioBroker object definitions, which contain the structural and configuration information for all ioBroker entities. Object definitions include essential metadata such as object type classification (state, channel, device, adapter), common properties including names and roles, adapter-specific native configurations, and access control settings.
+
+## Connection Management
+
+### Shared Connections
+Multiple nodes can share the same ioBroker connection for efficient resource usage:
+- **Automatic sharing:** Nodes with identical server configurations share connections
+- **Independent subscriptions:** Each node maintains its own state subscriptions
+- **Efficient reconnection:** Connection failures affect all sharing nodes but recover automatically
+
+### Status Monitoring
+Monitor connection health by sending status requests to any node (except iobin):
+```javascript
+msg.topic = "status"
+```
+
+Response includes:
+- Connection status and server details
+- Authentication information and token status
+- Connection history (connect/disconnect counts, timestamps)
+- Node-specific information (initial value status)
 
 ## WebSocket Connection
 

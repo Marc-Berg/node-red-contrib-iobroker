@@ -868,6 +868,7 @@ RED.nodes.registerType('iobin', {
         state: { value: "", required: true },
         outputProperty: { value: "payload" },
         ackFilter: { value: "both" },
+        sendInitialValue: { value: false },
         server: { value: "", type: "iob-config" }
     },
     inputs: 0,
@@ -943,6 +944,12 @@ RED.nodes.registerType('iobin', {
         </select>
     </div>
     <div class="form-row">
+        <label for="node-input-sendInitialValue" style="width: auto;">
+            <input type="checkbox" id="node-input-sendInitialValue" style="width: auto; margin-right: 5px;">
+            <i class="icon-tag"></i> Send initial value on startup
+        </label>
+    </div>
+    <div class="form-row">
         <label for="node-input-server"><i class="icon-tag"></i> Server</label>
         <input type="text" id="node-input-server" required>
     </div>
@@ -955,6 +962,11 @@ RED.nodes.registerType('iobin', {
         <li><b>Manual input:</b> Type the state ID directly</li>
         <li><b>Tree browser:</b> Virtual scrolling tree view for large datasets</li>
         <li><b>Intelligent search:</b> Pre-indexed search for instant results</li>
+    </ul>
+    <h3>Configuration</h3>
+    <ul>
+        <li><b>Trigger on:</b> Filter by acknowledgment status</li>
+        <li><b>Send initial value:</b> Emit current state value immediately after (re)connection</li>
     </ul>
     <h3>Output</h3>
     <ul>
