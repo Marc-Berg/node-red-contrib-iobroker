@@ -791,7 +791,6 @@
                 }
             });
             
-            // Debug controller for hierarchical search
             window.currentOptimizedTreeController = {
                 forceRefresh: () => loadTree(true),
                 getPerformanceStats: () => performanceMetrics,
@@ -864,7 +863,7 @@ RED.nodes.registerType('iobget', {
             }
         }
         
-        // Initialize optimized tree view
+        // Initialize tree view
         this.treeController = window.ioBrokerOptimizedTreeView.setup('iobget', 'node-input-state', 'node-input-server');
     },
 
@@ -904,7 +903,7 @@ RED.nodes.registerType('iobget', {
     <h3>State Selection</h3>
     <ul>
         <li><b>Manual input:</b> Type the state ID directly</li>
-        <li><b>Optimized tree browser:</b> Virtual scrolling tree view for large datasets</li>
+        <li><b>Tree browser:</b> Virtual scrolling tree view for large datasets</li>
         <li><b>Intelligent search:</b> Pre-indexed search for instant results</li>
     </ul>
     <h3>Output</h3>

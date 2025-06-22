@@ -7,6 +7,7 @@ RED.nodes.registerType('iob-config', {
         iobport:  { value: 8082, required: true, validate: RED.validators.number() },
         user:     { value: "" },
         password: { value: "" },
+        usessl:   { value: false }
     },
     label: function() {
         return this.name;
@@ -26,12 +27,30 @@ RED.nodes.registerType('iob-config', {
             }
         }
         
-        // Initial check
+        // Function to show SSL info based on current settings
+        function updateSSLInfo() {
+            var useSSL = $("#node-config-input-usessl").prop('checked');
+            var sslInfoDiv = $("#ssl-info");
+            
+            if (useSSL) {
+                sslInfoDiv.show();
+            } else {
+                sslInfoDiv.hide();
+            }
+        }
+        
+        // Initial checks
         toggleTokenWarning();
+        updateSSLInfo();
         
         // Watch for changes in the username field
         $("#node-config-input-user").on('input keyup change', function() {
             toggleTokenWarning();
+        });
+        
+        // Watch for changes in SSL checkbox
+        $("#node-config-input-usessl").on('change', function() {
+            updateSSLInfo();
         });
     }
 });
@@ -51,12 +70,32 @@ RED.nodes.registerType('iob-config', {
         <input type="number" id="node-config-input-iobport" required placeholder="e.g. 8082">
     </div>
     <div class="form-row">
+        <label for="node-config-input-usessl" style="width: auto;">
+            <input type="checkbox" id="node-config-input-usessl" style="width: auto; margin-right: 5px;">
+            <i class="fa fa-lock"></i> Use SSL/TLS (HTTPS/WSS)
+        </label>
+    </div>
+    <div class="form-row">
         <label for="node-config-input-user"><i class="fa fa-user"></i> Username</label>
         <input type="text" id="node-config-input-user" placeholder="Optional">
     </div>
     <div class="form-row">
         <label for="node-config-input-password"><i class="fa fa-lock"></i> Password</label>
         <input type="password" id="node-config-input-password" placeholder="Optional">
+    </div>
+    
+    <!-- SSL Information -->
+    <div id="ssl-info" class="form-row" style="display: none; margin-top: 15px; padding: 10px; background-color: #e8f4fd; border: 1px solid #bee5eb; border-radius: 4px;">
+        <div style="color: #0c5460; font-size: 13px;">
+            <i class="fa fa-shield" style="color: #17a2b8; margin-right: 5px;"></i>
+            <strong>SSL/TLS Mode:</strong><br>
+            Encrypted communication will be used for both WebSocket and HTTP connections.
+            <ul style="margin: 8px 0 0 20px; padding: 0;">
+                <li>WebSocket will use WSS protocol</li>
+                <li>OAuth authentication will use HTTPS</li>
+                <li>Self-signed certificates are accepted</li>
+            </ul>
+        </div>
     </div>
     
     <!-- Token Expiry Warning -->
@@ -76,10 +115,16 @@ RED.nodes.registerType('iob-config', {
     <p>Configuration for the connection between ioBroker and Node-RED.</p>
     <ul>
         <li><b>ioBroker Host/Port:</b> Address and port of your ioBroker server.</li>
+        <li><b>Use SSL/TLS:</b> Enable encrypted communication (HTTPS/WSS).</li>
         <li><b>Username/Password:</b> Optional. Only required if the ioBroker adapter requires authentication.</li>
     </ul>
     <p>The authentication credentials are automatically used by all connected nodes.</p>
     
-    <h3>Known Issues</h3>
-    <p>When using authentication, tokens may expire causing connection drops. Consider using longer token expiry times in your WebSocket adapter settings or no-auth mode for local installations.</p>
+    <h3>SSL/TLS Support</h3>
+    <p>When SSL/TLS is enabled:</p>
+    <ul>
+        <li>WebSocket connections use WSS (WebSocket Secure)</li>
+        <li>OAuth authentication uses HTTPS</li>
+        <li>Self-signed certificates are accepted</li>
+    </ul>
 </script>

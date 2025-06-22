@@ -791,7 +791,6 @@
                 }
             });
             
-            // Debug controller for hierarchical search
             window.currentOptimizedTreeController = {
                 forceRefresh: () => loadTree(true),
                 getPerformanceStats: () => performanceMetrics,
@@ -865,7 +864,7 @@ RED.nodes.registerType('iobout', {
             }
         }
         
-        // Initialize optimized tree view
+        // Initialize tree view
         this.treeController = window.ioBrokerOptimizedTreeView.setup('iobout', 'node-input-state', 'node-input-server');
     },
 

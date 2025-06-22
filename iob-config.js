@@ -5,6 +5,7 @@ module.exports = function(RED) {
         this.iobport = n.iobport;
         this.user = n.user;
         this.password = n.password;
+        this.usessl = n.usessl || false;
     }
     RED.nodes.registerType("iob-config", ioBConfig);
 };

@@ -242,7 +242,6 @@
                 node.isMatch = false;
                 node.isPathToMatch = false;
                 
-                // If clearing search (no search term), collapse all nodes to clean state
                 if (!this.isSearchMode) {
                     node.expanded = false;
                 }
@@ -801,7 +800,6 @@
                 }
             });
             
-            // Debug controller for hierarchical search
             window.currentOptimizedTreeController = {
                 forceRefresh: () => loadTree(true),
                 getPerformanceStats: () => performanceMetrics,
@@ -904,20 +902,9 @@ RED.nodes.registerType('iobin', {
             }
         }
         
-        // Initialize optimized tree view
+        // Initialize tree view
         this.treeController = window.ioBrokerOptimizedTreeView.setup('iobin', 'node-input-state', 'node-input-server');
         
-        // Performance monitoring notification
-        setTimeout(() => {
-            console.log('ioBroker Optimized Tree View initialized');
-            console.log('Performance improvements:');
-            console.log('- Virtual scrolling for 9000+ states');
-            console.log('- Asynchronous chunked processing');
-            console.log('- Intersection Observer for lazy loading');
-            console.log('- Optimized search with pre-built indexing');
-            console.log('- Hardware-accelerated rendering');
-            console.log('- RequestAnimationFrame-based updates');
-        }, 1000);
     },
     oneditsave: function() {
         if (this.treeController) {
