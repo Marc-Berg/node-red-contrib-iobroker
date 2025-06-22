@@ -32,15 +32,6 @@
   "peerDependencies": {
     "node-red": ">=2.0.0"
   },
-  "main": "index.js",
-  "scripts": {
-    "test": "echo \"Error: no test specified\" && exit 1",
-    "lint": "eslint *.js lib/*.js",
-    "dev": "node-red",
-    "build": "echo \"No build step required\"",
-    "validate": "node scripts/validate-shared-resources.js"
-  },
-
   "node-red": {
     "version": ">=2.0.0",
     "nodes": {

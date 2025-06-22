@@ -1,5 +1,5 @@
 /*!
- * ioBroker Shared TreeView Component - Fixed Version
+ * ioBroker Shared TreeView Component
  * Version: 1.0.1
  * Centralizes TreeView functionality for all ioBroker nodes
  */
