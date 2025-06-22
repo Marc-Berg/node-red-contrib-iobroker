@@ -11,7 +11,7 @@ module.exports = function(RED) {
             return setError("No server configuration selected", "No server config");
         }
 
-        const { iobhost, iobport, user, password } = globalConfig;
+        const { iobhost, iobport, user, password, usessl } = globalConfig;
         if (!iobhost || !iobport) {
             return setError("ioBroker host or port missing", "Host/port missing");
         }
@@ -23,7 +23,7 @@ module.exports = function(RED) {
             nodeId: node.id
         };
 
-        node.currentConfig = { iobhost, iobport, user, password };
+        node.currentConfig = { iobhost, iobport, user, password, usessl };
         node.currentStatus = { fill: "", shape: "", text: "" };
         node.isInitialized = false;
 
@@ -103,7 +103,8 @@ module.exports = function(RED) {
                 node.currentConfig.iobhost !== currentGlobalConfig.iobhost ||
                 node.currentConfig.iobport !== currentGlobalConfig.iobport ||
                 node.currentConfig.user !== currentGlobalConfig.user ||
-                node.currentConfig.password !== currentGlobalConfig.password
+                node.currentConfig.password !== currentGlobalConfig.password ||
+                node.currentConfig.usessl !== currentGlobalConfig.usessl
             );
             
             if (configChanged) {
@@ -128,7 +129,8 @@ module.exports = function(RED) {
                         iobhost: newGlobalConfig.iobhost,
                         iobport: newGlobalConfig.iobport,
                         user: newGlobalConfig.user,
-                        password: newGlobalConfig.password
+                        password: newGlobalConfig.password,
+                        usessl: newGlobalConfig.usessl
                     };
                     
                     const newServerId = `${newGlobalConfig.iobhost}:${newGlobalConfig.iobport}`;
@@ -141,13 +143,13 @@ module.exports = function(RED) {
                     }
                 }
 
-                // Register for events only
+                // Register for events only - using existing API pattern
                 const eventCallback = createEventCallback();
                 await connectionManager.registerForEvents(
                     settings.nodeId,
                     settings.serverId,
                     eventCallback,
-                    globalConfig
+                    globalConfig  // Pass the full config object
                 );
                 
                 setStatus("green", "dot", "Connected");

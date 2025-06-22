@@ -26,11 +26,21 @@
     "node": ">=14.0.0"
   },
   "dependencies": {
-    "ws": "^8.18.2"
+    "ws": "^8.18.2",
+    "express": "^4.18.0"
   },
   "peerDependencies": {
     "node-red": ">=2.0.0"
   },
+  "main": "index.js",
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1",
+    "lint": "eslint *.js lib/*.js",
+    "dev": "node-red",
+    "build": "echo \"No build step required\"",
+    "validate": "node scripts/validate-shared-resources.js"
+  },
+
   "node-red": {
     "version": ">=2.0.0",
     "nodes": {
@@ -45,6 +55,15 @@
       "examples/iob-out.json", 
       "examples/iob-get.json",
       "examples/iob-getobject.json"
+    ],
+    "files": [
+      "*.js",
+      "*.html",
+      "lib/*.js",
+      "shared/*.js",
+      "icons/*.svg",
+      "README.md",
+      "LICENSE"
     ]
   }
 }
