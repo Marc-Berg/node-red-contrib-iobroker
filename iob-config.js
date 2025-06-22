@@ -50,7 +50,6 @@ function setupAPIEndpoints(RED) {
     try {
         const connectionManager = require('./lib/websocket-manager');
         
-        // States endpoint for TreeView component
         RED.httpAdmin.get('/iobroker/ws/states/:serverId', async (req, res) => {
             try {
                 const serverId = decodeURIComponent(req.params.serverId);
@@ -68,7 +67,6 @@ function setupAPIEndpoints(RED) {
             }
         });
         
-        // Connection status endpoint
         RED.httpAdmin.get('/iobroker/ws/status/:serverId', (req, res) => {
             try {
                 const serverId = decodeURIComponent(req.params.serverId);
@@ -99,7 +97,6 @@ function setupAPIEndpoints(RED) {
 }
 
 module.exports = function(RED) {
-    // Setup static resources and API endpoints
     const staticResult = setupStaticResources(RED);
     const apiResult = setupAPIEndpoints(RED);
     
@@ -115,7 +112,6 @@ module.exports = function(RED) {
         this.password = n.password;
         this.usessl = n.usessl || false;
         
-        // Log configuration creation for debugging
         const sslInfo = this.usessl ? ' (SSL enabled)' : '';
         const authInfo = this.user ? ' (with authentication)' : '';
         RED.log.debug(`ioBroker config created: ${this.iobhost}:${this.iobport}${sslInfo}${authInfo}`);

@@ -5,7 +5,6 @@ module.exports = function(RED) {
         RED.nodes.createNode(this, config);
         const node = this;
         
-        // Helper functions
         function setError(message, statusText) {
             node.error(message);
             setStatus("red", "ring", statusText);
@@ -19,7 +18,6 @@ module.exports = function(RED) {
             }
         }
         
-        // Get server configuration
         const globalConfig = RED.nodes.getNode(config.server);
         if (!globalConfig) {
             return setError("No server configuration selected", "No server config");
@@ -30,32 +28,27 @@ module.exports = function(RED) {
             return setError("ioBroker host or port missing", "Host/port missing");
         }
         
-        // Validate state ID or pattern
         const statePattern = config.state?.trim();
         if (!statePattern) {
             return setError("State ID/Pattern missing", "State ID missing");
         }
         
-        // Determine if this is a wildcard pattern and validate consistency
         const isWildcardPattern = statePattern.includes('*');
         const useWildcardConfig = config.useWildcard || false;
         
-        // Auto-correct inconsistent wildcard configuration
         let actualWildcardMode = isWildcardPattern;
         if (useWildcardConfig && !isWildcardPattern) {
-            // User enabled wildcard but no * in pattern - treat as single state
             actualWildcardMode = false;
             node.warn(`Wildcard mode was enabled but no * found in pattern '${statePattern}' - treating as single state`);
         }
         
-        // Configuration with defaults
         const settings = {
             outputProperty: config.outputProperty?.trim() || "payload",
             ackFilter: config.ackFilter || "both",
             sendInitialValue: config.sendInitialValue || false,
             serverId: `${iobhost}:${iobport}`,
             nodeId: node.id,
-            useWildcard: actualWildcardMode // Use corrected wildcard mode
+            useWildcard: actualWildcardMode
         };
         
         node.currentConfig = { iobhost, iobport, user, password, usessl };
@@ -64,16 +57,14 @@ module.exports = function(RED) {
         node.initialValueSent = false;
         node.statePattern = statePattern;
         
-        // Filter function for acknowledgment status
         function shouldSendMessage(ack, filter) {
             switch (filter) {
                 case "ack": return ack === true;
                 case "noack": return ack === false;
-                default: return true; // "both"
+                default: return true;
             }
         }
         
-        // Create message from state change
         function createMessage(stateId, state, isInitialValue = false) {
             const message = {
                 topic: stateId,
@@ -81,12 +72,10 @@ module.exports = function(RED) {
                 timestamp: Date.now()
             };
             
-            // Add wildcard context if using patterns
             if (actualWildcardMode) {
                 message.pattern = node.statePattern;
             }
             
-            // Add initial value indicator if this is the initial value
             if (isInitialValue) {
                 message.initial = true;
             }
@@ -95,25 +84,20 @@ module.exports = function(RED) {
             return message;
         }
         
-        // State change callback - works for both single states and wildcards
         function onStateChange(stateId, state) {
             try {
-                // Validate state data
                 if (!state || state.val === undefined) {
                     node.warn(`Invalid state data received for ${stateId}`);
                     return;
                 }
                 
-                // Filter by acknowledgment status
                 if (!shouldSendMessage(state.ack, settings.ackFilter)) {
                     return;
                 }
                 
-                // Create and send message
                 const message = createMessage(stateId, state, false);
                 node.send(message);
                 
-                // Update status to show last activity
                 const timestamp = new Date().toLocaleTimeString();
                 const statusText = actualWildcardMode 
                     ? `Pattern active - Last: ${timestamp}`
@@ -126,17 +110,10 @@ module.exports = function(RED) {
             }
         }
         
-        // Enhanced callback with wildcard support
         function createCallback() {
             const callback = onStateChange;
             
             callback.updateStatus = function(status) {
-                const now = new Date();
-                const day = now.getDate().toString().padStart(2, '0');
-                const month = now.toLocaleDateString('en', { month: 'short' });
-                const time = now.toTimeString().slice(0, 8);
-                console.log(`${day} ${month} ${time} - [debug] [Node ${settings.nodeId}] Status update: ${status}`);
-                
                 switch (status) {
                     case 'connected':
                         const statusText = actualWildcardMode
@@ -187,7 +164,6 @@ module.exports = function(RED) {
             return callback;
         }
         
-        // Check if configuration has changed
         function hasConfigChanged() {
             const currentGlobalConfig = RED.nodes.getNode(config.server);
             if (!currentGlobalConfig) return false;
@@ -201,7 +177,7 @@ module.exports = function(RED) {
             );
             
             if (configChanged) {
-                node.log(`Configuration change detected: ${node.currentConfig.iobhost}:${node.currentConfig.iobport} -> ${currentGlobalConfig.iobhost}:${currentGlobalConfig.iobport}`);
+                node.log(`Configuration change detected`);
                 node.isSubscribed = false;
                 node.initialValueSent = false;
             }
@@ -209,7 +185,6 @@ module.exports = function(RED) {
             return configChanged;
         }
         
-        // Initialize subscription - simplified for native wildcard support
         async function initialize() {
             if (node.isSubscribed && connectionManager.getConnectionStatus(settings.serverId).connected) {
                 node.log("Already subscribed and connected, skipping initialization");
@@ -219,12 +194,10 @@ module.exports = function(RED) {
             try {
                 setStatus("yellow", "ring", "Connecting...");
                 
-                // Check for configuration changes
                 if (hasConfigChanged()) {
                     const newGlobalConfig = RED.nodes.getNode(config.server);
                     const oldServerId = settings.serverId;
                     
-                    // Update internal configuration
                     node.currentConfig = {
                         iobhost: newGlobalConfig.iobhost,
                         iobport: newGlobalConfig.iobport,
@@ -236,7 +209,6 @@ module.exports = function(RED) {
                     const newServerId = `${newGlobalConfig.iobhost}:${newGlobalConfig.iobport}`;
                     settings.serverId = newServerId;
                     
-                    // Force connection reset for configuration changes
                     if (oldServerId !== newServerId) {
                         node.log(`Server changed from ${oldServerId} to ${newServerId}, forcing connection reset`);
                         await connectionManager.forceServerSwitch(oldServerId, newServerId, newGlobalConfig);
@@ -245,13 +217,12 @@ module.exports = function(RED) {
                 
                 const callback = createCallback();
                 
-                // Simple subscription - ioBroker handles wildcards natively
                 await connectionManager.subscribe(
                     settings.nodeId,
                     settings.serverId,
-                    statePattern, // Can be single state or wildcard pattern
+                    statePattern,
                     callback,
-                    globalConfig  // Pass the full config object
+                    globalConfig
                 );
                 
                 node.isSubscribed = true;
@@ -271,7 +242,6 @@ module.exports = function(RED) {
                 node.isSubscribed = false;
                 node.initialValueSent = false;
                 
-                // Retry after delay for connection errors
                 if (errorMsg.includes('timeout') || errorMsg.includes('refused') || errorMsg.includes('authentication')) {
                     setTimeout(() => {
                         if (node.context && !node.isSubscribed) {
@@ -283,7 +253,6 @@ module.exports = function(RED) {
             }
         }
         
-        // Cleanup on node close
         node.on("close", async function(removed, done) {
             node.log("Node closing...");
             node.isInitialized = false;
@@ -312,7 +281,6 @@ module.exports = function(RED) {
             }
         });
         
-        // Error handling
         node.on("error", function(error) {
             node.error(`Node error: ${error.message}`);
             setError(`Node error: ${error.message}`, "Node error");
@@ -320,10 +288,8 @@ module.exports = function(RED) {
             node.initialValueSent = false;
         });
         
-        // Initialize the node
         initialize();
     }
     
-    // Register the node type
     RED.nodes.registerType("iobin", iobin);
 };

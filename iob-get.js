@@ -5,7 +5,6 @@ module.exports = function(RED) {
         RED.nodes.createNode(this, config);
         const node = this;
 
-        // Get server configuration
         const globalConfig = RED.nodes.getNode(config.server);
         if (!globalConfig) {
             return setError("No server configuration selected", "No server config");
@@ -16,7 +15,6 @@ module.exports = function(RED) {
             return setError("ioBroker host or port missing", "Host/port missing");
         }
 
-        // Configuration with defaults
         const settings = {
             outputProperty: config.outputProperty?.trim() || "payload",
             serverId: `${iobhost}:${iobport}`,
@@ -24,10 +22,8 @@ module.exports = function(RED) {
         };
 
         node.currentConfig = { iobhost, iobport, user, password, usessl };
-        node.currentStatus = { fill: "", shape: "", text: "" };
         node.isInitialized = false;
 
-        // Helper functions
         function setError(message, statusText) {
             node.error(message);
             setStatus("red", "ring", statusText);
@@ -35,32 +31,20 @@ module.exports = function(RED) {
 
         function setStatus(fill, shape, text) {
             try {
-                const statusObj = { fill, shape, text };
-                node.status(statusObj);
-                node.currentStatus = statusObj;
+                node.status({ fill, shape, text });
             } catch (error) {
                 node.warn(`Status update error: ${error.message}`);
             }
         }
 
-        // Create callback for event notifications
         function createEventCallback() {
             const callback = function() {};
 
             callback.updateStatus = function(status) {
-                const now = new Date();
-                const day = now.getDate().toString().padStart(2, '0');
-                const month = now.toLocaleDateString('en', { month: 'short' });
-                const time = now.toTimeString().slice(0, 8);
-                console.log(`${day} ${month} ${time} - [debug] [Node ${settings.nodeId}] Status update received: ${status}`);
                 switch (status) {
                     case 'connected':
-                        if (!node.isInitialized) {
-                            setStatus("green", "dot", "Connected");
-                            node.isInitialized = true;
-                        } else {
-                            setStatus("green", "dot", "Connected");
-                        }
+                        setStatus("green", "dot", "Connected");
+                        node.isInitialized = true;
                         break;
                     case 'connecting':
                         setStatus("yellow", "ring", "Connecting...");
@@ -76,11 +60,6 @@ module.exports = function(RED) {
             };
 
             callback.onReconnect = function() {
-                const now = new Date();
-                const day = now.getDate().toString().padStart(2, '0');
-                const month = now.toLocaleDateString('en', { month: 'short' });
-                const time = now.toTimeString().slice(0, 8);
-                console.log(`${day} ${month} ${time} - [debug] [Node ${settings.nodeId}] Reconnection event received`);
                 node.log("Reconnection detected by get node");
                 setStatus("green", "dot", "Reconnected");
                 node.isInitialized = true;
@@ -94,7 +73,6 @@ module.exports = function(RED) {
             return callback;
         }
 
-        // Check if configuration has changed
         function hasConfigChanged() {
             const currentGlobalConfig = RED.nodes.getNode(config.server);
             if (!currentGlobalConfig) return false;
@@ -108,23 +86,20 @@ module.exports = function(RED) {
             );
             
             if (configChanged) {
-                node.log(`Configuration change detected: ${node.currentConfig.iobhost}:${node.currentConfig.iobport} -> ${currentGlobalConfig.iobhost}:${currentGlobalConfig.iobport}`);
+                node.log(`Configuration change detected`);
             }
             
             return configChanged;
         }
 
-        // Initialize connection
         async function initializeConnection() {
             try {
                 setStatus("yellow", "ring", "Connecting...");
                 
-                // Always check for configuration changes
                 if (hasConfigChanged()) {
                     const newGlobalConfig = RED.nodes.getNode(config.server);
                     const oldServerId = settings.serverId;
                     
-                    // Update internal configuration
                     node.currentConfig = {
                         iobhost: newGlobalConfig.iobhost,
                         iobport: newGlobalConfig.iobport,
@@ -136,20 +111,18 @@ module.exports = function(RED) {
                     const newServerId = `${newGlobalConfig.iobhost}:${newGlobalConfig.iobport}`;
                     settings.serverId = newServerId;
                     
-                    // Force connection reset for configuration changes
                     if (oldServerId !== newServerId) {
                         node.log(`Server changed from ${oldServerId} to ${newServerId}, forcing connection reset`);
                         await connectionManager.forceServerSwitch(oldServerId, newServerId, newGlobalConfig);
                     }
                 }
 
-                // Register for events only - using existing API pattern
                 const eventCallback = createEventCallback();
                 await connectionManager.registerForEvents(
                     settings.nodeId,
                     settings.serverId,
                     eventCallback,
-                    globalConfig  // Pass the full config object
+                    globalConfig
                 );
                 
                 setStatus("green", "dot", "Connected");
@@ -172,7 +145,6 @@ module.exports = function(RED) {
             }
         }
 
-        // Input handler
         node.on('input', async function(msg, send, done) {
             try {
                 if (msg.topic === "status") {
@@ -216,30 +188,23 @@ module.exports = function(RED) {
             }
         });
 
-        // Cleanup on node close
         node.on("close", async function(removed, done) {
             node.log("Get node closing...");
             
-            // Unregister from events
             connectionManager.unregisterFromEvents(settings.nodeId);
 
             try {
                 node.status({});
-                node.currentStatus = { fill: "", shape: "", text: "" };
-            } catch (statusError) {
-                // Ignore status errors during cleanup
-            }
+            } catch (statusError) {}
 
             done();
         });
 
-        // Error handling
         node.on("error", function(error) {
             node.error(`Node error: ${error.message}`);
             setError(`Node error: ${error.message}`, "Node error");
         });
 
-        // Initialize the node
         initializeConnection();
     }
 

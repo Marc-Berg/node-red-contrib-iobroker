@@ -1,5 +1,4 @@
 <script type="text/javascript">
-// Shared TreeView loader with robust error handling
 function loadSharedTreeView() {
     return new Promise((resolve, reject) => {
         if (window.ioBrokerSharedTreeView && window.ioBrokerSharedTreeView.initialized) {
@@ -13,7 +12,6 @@ function loadSharedTreeView() {
         
         script.onload = () => {
             if (window.ioBrokerSharedTreeView && window.ioBrokerSharedTreeView.initialized) {
-                console.log('TreeView component loaded successfully');
                 resolve();
             } else {
                 reject(new Error('TreeView component failed to initialize'));
@@ -21,7 +19,6 @@ function loadSharedTreeView() {
         };
         
         script.onerror = () => {
-            console.error('TreeView component script not found');
             reject(new Error('TreeView component script not found'));
         };
         
@@ -49,7 +46,6 @@ RED.nodes.registerType('iobget', {
     oneditprepare: function() {
         const serverInput = $('#node-input-server');
         
-        // Auto-select server configuration
         if (!this.server || this.server === '') {
             const configNodes = [];
             RED.nodes.eachConfig(function(config) {
@@ -71,7 +67,6 @@ RED.nodes.registerType('iobget', {
             }
         }
         
-        // Load and initialize TreeView component
         loadSharedTreeView().then(() => {
             this.treeController = window.ioBrokerSharedTreeView.setup({
                 nodeType: 'iobget',
@@ -83,11 +78,8 @@ RED.nodes.registerType('iobget', {
                 enableWildcardDetection: false
             });
         }).catch(error => {
-            console.error('Failed to load TreeView component:', error);
-            
-            // Show fallback message
             const fallbackMessage = $(`
-                <div style="margin-top: 5px; padding: 8px; background-color: #fff3cd; border: 1px solid #ffeaa7; border-radius: 4px; font-size: 12px; color: #856404;">
+                <div style="margin-top: 5px; padding: 8px; background-color: #fff3cd; border-radius: 4px; font-size: 12px; color: #856404;">
                     <i class="fa fa-exclamation-triangle"></i> TreeView component not available. Manual input only.
                 </div>
             `);

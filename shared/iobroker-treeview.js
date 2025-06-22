@@ -1,15 +1,7 @@
-/*!
- * ioBroker Shared TreeView Component
- * Version: 1.0.1
- * Centralizes TreeView functionality for all ioBroker nodes
- */
-
 (function(global) {
     'use strict';
     
-    // Prevent multiple initialization
     if (typeof global.ioBrokerSharedTreeView !== 'undefined' && global.ioBrokerSharedTreeView.initialized) {
-        console.log('ioBroker TreeView already initialized');
         return;
     }
     
@@ -21,14 +13,7 @@
     };
     
     const stateCache = new Map();
-    const performanceMetrics = {
-        renderTime: 0,
-        searchTime: 0,
-        cacheHits: 0,
-        cacheMisses: 0
-    };
     
-    // CSS Injection
     function injectStyles() {
         if (document.getElementById('iob-shared-styles-v1')) return;
         
@@ -102,7 +87,6 @@
             .iob-search-stats { font-size: 11px; color: #6c757d; margin-top: 4px; font-style: italic; }
             .iob-empty-state { padding: 40px 20px; text-align: center; color: #666; font-style: italic; background: #f8f9fa; border-radius: 4px; margin: 20px; }
             
-            /* Wildcard specific styles */
             .wildcard-disabled {
                 opacity: 0.6;
             }
@@ -130,17 +114,13 @@
         }
         
         async buildFromStates(states) {
-            console.time('TreeData.buildFromStates');
-            
             this.clear();
             const stateIds = Object.keys(states);
             
-            // Process in chunks to prevent UI blocking
             for (let i = 0; i < stateIds.length; i += VIRTUAL_SCROLL_CONFIG.CHUNK_SIZE) {
                 const chunk = stateIds.slice(i, i + VIRTUAL_SCROLL_CONFIG.CHUNK_SIZE);
                 await this.processChunk(chunk);
                 
-                // Allow UI updates
                 if (i % (VIRTUAL_SCROLL_CONFIG.CHUNK_SIZE * 5) === 0) {
                     await new Promise(resolve => setTimeout(resolve, 0));
                 }
@@ -149,9 +129,6 @@
             this.buildNodeHierarchy();
             await this.buildSearchIndex();
             this.updateFilteredNodes();
-            
-            console.timeEnd('TreeData.buildFromStates');
-            console.log(`TreeData built: ${this.allNodes.size} nodes, ${this.searchIndex.size} search terms`);
         }
         
         async processChunk(stateIds) {
@@ -187,7 +164,6 @@
         }
         
         buildNodeHierarchy() {
-            // Build parent-child relationships
             for (const [nodeId, node] of this.allNodes) {
                 if (node.parent) {
                     const parentNode = this.allNodes.get(node.parent);
@@ -197,7 +173,6 @@
                 }
             }
             
-            // Sort children (folders first, then alphabetically)
             for (const [nodeId, node] of this.allNodes) {
                 node.children.sort((a, b) => {
                     const nodeA = this.allNodes.get(a);
@@ -210,7 +185,6 @@
                 });
             }
             
-            // Identify root nodes
             this.rootNodes = Array.from(this.allNodes.values())
                 .filter(node => !node.parent)
                 .sort((a, b) => a.label.localeCompare(b.label, undefined, { numeric: true }))
@@ -223,25 +197,19 @@
             for (const [nodeId, node] of this.allNodes) {
                 const searchTerms = new Set();
                 
-                // Add the node label
                 searchTerms.add(node.label.toLowerCase());
-                
-                // Add the full node ID
                 searchTerms.add(nodeId.toLowerCase());
                 
-                // Add individual segments
                 const segments = nodeId.split('.');
                 segments.forEach(segment => {
                     searchTerms.add(segment.toLowerCase());
                 });
                 
-                // Add partial paths
                 for (let i = 1; i <= segments.length; i++) {
                     const partialPath = segments.slice(0, i).join('.').toLowerCase();
                     searchTerms.add(partialPath);
                 }
                 
-                // Index all terms
                 searchTerms.forEach(term => {
                     if (!this.searchIndex.has(term)) {
                         this.searchIndex.set(term, new Set());
@@ -255,7 +223,6 @@
             this.currentSearchTerm = searchTerm.trim();
             this.isSearchMode = this.currentSearchTerm.length > 0;
             
-            // Reset all node states
             for (const node of this.allNodes.values()) {
                 node.visible = true;
                 node.isMatch = false;
@@ -271,10 +238,8 @@
                 return { results: [], total: this.filteredNodes.length };
             }
             
-            // Find matching nodes
             const directMatches = this.findMatchingNodes(this.currentSearchTerm);
             
-            // Mark direct matches
             directMatches.forEach(nodeId => {
                 const node = this.allNodes.get(nodeId);
                 if (node) {
@@ -283,12 +248,10 @@
                 }
             });
             
-            // Mark ancestor paths
             directMatches.forEach(nodeId => {
                 this.markAncestorPathsAsVisible(nodeId);
             });
             
-            // Filter and expand for search
             this.filterNodesForSearch();
             this.autoExpandPathsToMatches();
             this.updateFilteredNodes();
@@ -304,12 +267,10 @@
             const results = new Set();
             const lowerTerm = searchTerm.toLowerCase().trim();
             
-            // Exact matches
             if (this.searchIndex.has(lowerTerm)) {
                 this.searchIndex.get(lowerTerm).forEach(nodeId => results.add(nodeId));
             }
             
-            // Partial matches
             for (const [indexedTerm, nodeIds] of this.searchIndex) {
                 if (indexedTerm.includes(lowerTerm)) {
                     nodeIds.forEach(nodeId => results.add(nodeId));
@@ -508,14 +469,12 @@
         handleItemClick(element) {
             const nodeId = element.dataset.nodeId;
             
-            // Update selection
             this.container.querySelectorAll('.iob-tree-item.selected').forEach(el => {
                 el.classList.remove('selected');
             });
             element.classList.add('selected');
             this.selectedNodeId = nodeId;
             
-            // Toggle expansion
             if (this.data.toggleNodeExpansion(nodeId)) {
                 this.render();
             }
@@ -544,7 +503,6 @@
         }
     }
     
-    // Utility functions
     function getCacheKey(serverHost, serverPort) {
         return `${serverHost}:${serverPort}`;
     }
@@ -557,10 +515,8 @@
     function getCachedStates(serverId) {
         const cacheEntry = stateCache.get(serverId);
         if (isCacheValid(cacheEntry)) {
-            performanceMetrics.cacheHits++;
             return cacheEntry.data;
         }
-        performanceMetrics.cacheMisses++;
         return null;
     }
     
@@ -571,7 +527,6 @@
         });
     }
     
-    // Wildcard detection and validation
     function detectWildcardPattern(pattern) {
         if (!pattern) return { isWildcard: false, hasUnsupported: false, warnings: [] };
         
@@ -610,7 +565,6 @@
         return issues;
     }
     
-    // Main TreeView Factory
     function createTreeView(config) {
         try {
             const {
@@ -624,21 +578,15 @@
                 wildcardInputId = null
             } = config;
             
-            console.log(`Creating TreeView for ${nodeType} with wildcard detection: ${enableWildcardDetection}`);
-            
-            // Inject styles
             injectStyles();
             
-            // Get jQuery elements
             const stateInput = $('#' + inputId);
             const serverInput = $('#' + serverInputId);
             
             if (!stateInput.length || !serverInput.length) {
-                console.error('Required input elements not found');
                 throw new Error('Required input elements not found');
             }
             
-            // Create UI elements
             const treeContainer = $('<div class="iob-virtual-container"></div>');
             const searchContainer = $(`
                 <div class="iob-search-container" style="display:none;">
@@ -659,27 +607,23 @@
             const statusElement = $('<div class="iob-status"></div>');
             const searchStatsElement = $('<div class="iob-search-stats"></div>');
             
-            // Insert UI elements after input
             stateInput.after(searchStatsElement)
                       .after(statusElement)
                       .after(treeContainer)
                       .after(searchContainer)
                       .after(controlButtons);
             
-            // Get UI element references
             const toggleButton = controlButtons.find('.iob-btn.primary');
             const refreshButton = controlButtons.find('.iob-btn:not(.primary)').first();
             const clearButton = controlButtons.find('.iob-btn:not(.primary)').last();
             const searchInput = searchContainer.find('.iob-search-input');
             
-            // Initialize tree data and view
             const treeData = new HierarchicalTreeData();
             let treeView = null;
             let currentServerId = null;
             let dataLoaded = false;
             let searchTimeout = null;
             
-            // Wildcard detection for iobin nodes
             if (enableWildcardDetection && wildcardInputId) {
                 stateInput.on('input keyup change', function() {
                     const pattern = $(this).val();
@@ -688,7 +632,6 @@
                     if (wildcardInfo.isWildcard) {
                         showWildcardInfo(wildcardInfo.warnings);
                         
-                        // Disable initial value option for wildcards
                         const initialValueCheckbox = $('#' + wildcardInputId);
                         if (initialValueCheckbox.length) {
                             initialValueCheckbox.prop('checked', false).prop('disabled', true);
@@ -697,7 +640,6 @@
                     } else {
                         hideWildcardInfo();
                         
-                        // Re-enable initial value option
                         const initialValueCheckbox = $('#' + wildcardInputId);
                         if (initialValueCheckbox.length) {
                             initialValueCheckbox.prop('disabled', false);
@@ -743,8 +685,6 @@
             }
             
             async function loadTree(forceRefresh = false) {
-                console.log(`Loading tree for ${nodeType}, forceRefresh: ${forceRefresh}`);
-                
                 const serverNode = RED.nodes.node(serverInput.val());
                 if (!serverNode) {
                     showError('No server selected');
@@ -754,11 +694,9 @@
                 const serverId = getCacheKey(serverNode.iobhost, serverNode.iobport);
                 currentServerId = serverId;
                 
-                // Check cache first
                 if (!forceRefresh) {
                     const cachedData = getCachedStates(serverId);
                     if (cachedData) {
-                        console.log('Using cached data for', serverId);
                         await renderTree(cachedData, true);
                         return;
                     }
@@ -782,14 +720,11 @@
                     await renderTree(response, false);
                     
                 } catch (error) {
-                    console.error(`Loading ${itemType} failed:`, error);
                     showError(`Error: ${error.message || 'Unknown error'}`);
                 }
             }
             
             async function renderTree(data, fromCache) {
-                console.log(`Rendering tree for ${nodeType}, fromCache: ${fromCache}`);
-                
                 await treeData.buildFromStates(data);
                 
                 if (treeView) {
@@ -814,7 +749,6 @@
                 showStatus('success', `Loaded ${dataCount} ${itemType} ${cacheStatus}`);
             }
             
-            // Search functionality
             searchInput.on('input', function() {
                 clearTimeout(searchTimeout);
                 const searchTerm = $(this).val().trim();
@@ -877,7 +811,6 @@
                 `);
             }
             
-            // Event listeners
             toggleButton.on('click', toggleInputMode);
             
             refreshButton.on('click', function() {
@@ -916,11 +849,8 @@
                 }
             });
             
-            console.log(`TreeView setup complete for ${nodeType}`);
-            
             return {
                 cleanup: function() {
-                    console.log(`Cleaning up TreeView for ${nodeType}`);
                     if (treeView) treeView.destroy();
                     clearTimeout(searchTimeout);
                     controlButtons.remove();
@@ -935,32 +865,24 @@
             };
             
         } catch (error) {
-            console.error('TreeView setup failed:', error);
             throw error;
         }
     }
     
-    // Expose the main API
     global.ioBrokerSharedTreeView = {
         version: '1.0.1',
         setup: createTreeView,
         
-        // Legacy compatibility
         HierarchicalTreeData,
         HierarchicalTreeView,
         
-        // Utilities
         getCacheKey,
         getCachedStates,
         setCachedStates,
         detectWildcardPattern,
         validateWildcardPattern,
-        performanceMetrics,
         
-        // Mark as initialized
         initialized: true
     };
-    
-    console.log('ioBroker Shared TreeView v1.0.1 initialized successfully');
     
 })(window);
