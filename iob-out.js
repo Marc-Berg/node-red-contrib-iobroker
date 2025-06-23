@@ -50,19 +50,10 @@ module.exports = function(RED) {
             const callback = function() {};
 
             callback.updateStatus = function(status) {
-                const now = new Date();
-                const day = now.getDate().toString().padStart(2, '0');
-                const month = now.toLocaleDateString('en', { month: 'short' });
-                const time = now.toTimeString().slice(0, 8);
-                console.log(`${day} ${month} ${time} - [debug] [Node ${settings.nodeId}] Status update received: ${status}`);
                 switch (status) {
                     case 'connected':
-                        if (!node.isInitialized) {
-                            setStatus("green", "dot", "Connected");
-                            node.isInitialized = true;
-                        } else {
-                            setStatus("green", "dot", "Connected");
-                        }
+                        setStatus("green", "dot", "Connected");
+                        node.isInitialized = true;
                         break;
                     case 'connecting':
                         setStatus("yellow", "ring", "Connecting...");
@@ -74,15 +65,21 @@ module.exports = function(RED) {
                     case 'reconnecting':
                         setStatus("yellow", "ring", "Reconnecting...");
                         break;
+                    case 'retrying':
+                        setStatus("yellow", "ring", "Retrying...");
+                        break;
+                    case 'retrying_production':
+                        setStatus("yellow", "ring", "Retrying (prod)...");
+                        break;
+                    case 'failed_permanently':
+                        setStatus("red", "ring", "Auth failed");
+                        break;
+                    default:
+                        setStatus("grey", "ring", status);
                 }
             };
 
             callback.onReconnect = function() {
-                const now = new Date();
-                const day = now.getDate().toString().padStart(2, '0');
-                const month = now.toLocaleDateString('en', { month: 'short' });
-                const time = now.toTimeString().slice(0, 8);
-                console.log(`${day} ${month} ${time} - [debug] [Node ${settings.nodeId}] Reconnection event received`);
                 node.log("Reconnection detected by output node");
                 setStatus("green", "dot", "Reconnected");
                 node.isInitialized = true;
@@ -163,14 +160,8 @@ module.exports = function(RED) {
                 setError(`Connection failed: ${errorMsg}`, "Connection failed");
                 node.error(`Connection failed: ${errorMsg}`);
                 
-                if (errorMsg.includes('timeout') || errorMsg.includes('refused')) {
-                    setTimeout(() => {
-                        if (node.context) {
-                            node.log("Retrying connection...");
-                            initializeConnection();
-                        }
-                    }, 5000);
-                }
+                // The new architecture will handle retries automatically via recovery callbacks
+                // No manual retry logic needed here
             }
         }
 

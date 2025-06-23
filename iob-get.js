@@ -56,6 +56,17 @@ module.exports = function(RED) {
                     case 'reconnecting':
                         setStatus("yellow", "ring", "Reconnecting...");
                         break;
+                    case 'retrying':
+                        setStatus("yellow", "ring", "Retrying...");
+                        break;
+                    case 'retrying_production':
+                        setStatus("yellow", "ring", "Retrying (prod)...");
+                        break;
+                    case 'failed_permanently':
+                        setStatus("red", "ring", "Auth failed");
+                        break;
+                    default:
+                        setStatus("grey", "ring", status);
                 }
             };
 
@@ -134,14 +145,8 @@ module.exports = function(RED) {
                 setError(`Connection failed: ${errorMsg}`, "Connection failed");
                 node.error(`Connection failed: ${errorMsg}`);
                 
-                if (errorMsg.includes('timeout') || errorMsg.includes('refused')) {
-                    setTimeout(() => {
-                        if (node.context) {
-                            node.log("Retrying connection...");
-                            initializeConnection();
-                        }
-                    }, 5000);
-                }
+                // The new architecture will handle retries automatically via recovery callbacks
+                // No manual retry logic needed here
             }
         }
 
