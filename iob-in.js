@@ -110,6 +110,66 @@ module.exports = function(RED) {
             }
         }
         
+        // Send initial value for single state subscriptions only
+        async function sendInitialValue() {
+            // Skip initial values for actual wildcard patterns (not for checkbox-only wildcards)
+            if (!settings.sendInitialValue || actualWildcardMode) {
+                if (actualWildcardMode) {
+                    node.log(`Skipping initial values for wildcard pattern: ${node.statePattern}`);
+                }
+                return;
+            }
+            
+            if (node.initialValueSent) {
+                return;
+            }
+            
+            try {
+                node.log(`Checking initial value for single state: ${statePattern}`);
+                
+                // Try cached value first
+                const cachedState = connectionManager.getCachedStateValue(settings.serverId, statePattern);
+                
+                if (cachedState && cachedState.val !== undefined) {
+                    if (shouldSendMessage(cachedState.ack, settings.ackFilter)) {
+                        const message = createMessage(statePattern, cachedState, true);
+                        node.send(message);
+                        
+                        node.log(`Initial value sent for ${statePattern}: ${cachedState.val} (ack: ${cachedState.ack})`);
+                        setStatus("green", "dot", `Initial: ${cachedState.val}`);
+                    } else {
+                        node.log(`Initial value filtered out by ack filter (ack: ${cachedState.ack})`);
+                    }
+                    
+                    node.initialValueSent = true;
+                } else {
+                    // Fallback to live query
+                    const currentState = await connectionManager.getState(settings.serverId, statePattern);
+                    
+                    if (currentState && currentState.val !== undefined) {
+                        if (shouldSendMessage(currentState.ack, settings.ackFilter)) {
+                            const message = createMessage(statePattern, currentState, true);
+                            node.send(message);
+                            
+                            node.log(`Initial value sent from live query: ${currentState.val} (ack: ${currentState.ack})`);
+                            setStatus("green", "dot", `Initial: ${currentState.val}`);
+                        } else {
+                            node.log(`Initial value filtered out by ack filter (ack: ${currentState.ack})`);
+                        }
+                        
+                        node.initialValueSent = true;
+                    } else {
+                        node.warn(`No initial value available for ${statePattern}`);
+                        node.initialValueSent = true;
+                    }
+                }
+                
+            } catch (error) {
+                node.warn(`Failed to send initial value: ${error.message}`);
+            }
+        }
+        
+        // Enhanced callback with wildcard support
         function createCallback() {
             const callback = onStateChange;
             
@@ -121,6 +181,13 @@ module.exports = function(RED) {
                             : "Connected";
                         setStatus("green", "dot", statusText);
                         node.isInitialized = true;
+                        
+                        // Send initial value after successful connection (single states only)
+                        if (settings.sendInitialValue && !actualWildcardMode) {
+                            sendInitialValue().catch(error => {
+                                node.warn(`Failed to send initial value after connection: ${error.message}`);
+                            });
+                        }
                         break;
                     case 'connecting':
                         setStatus("yellow", "ring", "Connecting...");
@@ -234,6 +301,11 @@ module.exports = function(RED) {
                 
                 setStatus("green", "dot", actualWildcardMode ? `Pattern: ${statePattern}` : "Connected");
                 node.isInitialized = true;
+                
+                // Send initial value after successful subscription (single states only)
+                if (settings.sendInitialValue && !actualWildcardMode) {
+                    await sendInitialValue();
+                }
                 
             } catch (error) {
                 const errorMsg = error.message || 'Unknown error';
