@@ -57,6 +57,9 @@ module.exports = function(RED) {
         node.initialValueSent = false;
         node.statePattern = statePattern;
         
+        // NEW: Simple flag to track if this is a fresh node (deploy) vs reconnection
+        node.isDeployedConnection = true; // Set to true on node creation (deploy)
+        
         function shouldSendMessage(ack, filter) {
             switch (filter) {
                 case "ack": return ack === true;
@@ -112,7 +115,7 @@ module.exports = function(RED) {
         
         // Send initial value for single state subscriptions only
         async function sendInitialValue() {
-            // Skip initial values for actual wildcard patterns (not for checkbox-only wildcards)
+            // Skip initial values for actual wildcard patterns
             if (!settings.sendInitialValue || actualWildcardMode) {
                 if (actualWildcardMode) {
                     node.log(`Skipping initial values for wildcard pattern: ${node.statePattern}`);
@@ -120,7 +123,9 @@ module.exports = function(RED) {
                 return;
             }
             
-            if (node.initialValueSent) {
+            // NEW: Only send if not already sent AND this is a deployed connection (not reconnection)
+            if (node.initialValueSent || !node.isDeployedConnection) {
+                node.log(`Skipping initial value - ${node.initialValueSent ? 'already sent' : 'this is a reconnection'}`);
                 return;
             }
             
@@ -164,6 +169,9 @@ module.exports = function(RED) {
                     }
                 }
                 
+                // NEW: Mark as no longer a deployed connection after first successful initial value
+                node.isDeployedConnection = false;
+                
             } catch (error) {
                 node.warn(`Failed to send initial value: ${error.message}`);
             }
@@ -192,18 +200,15 @@ module.exports = function(RED) {
                     case 'connecting':
                         setStatus("yellow", "ring", "Connecting...");
                         node.isSubscribed = false;
-                        node.initialValueSent = false;
                         break;
                     case 'disconnected':
                         setStatus("red", "ring", "Disconnected");
                         node.isInitialized = false;
                         node.isSubscribed = false;
-                        node.initialValueSent = false;
                         break;
                     case 'reconnecting':
                         setStatus("yellow", "ring", "Reconnecting...");
                         node.isSubscribed = false;
-                        node.initialValueSent = false;
                         break;
                     default:
                         setStatus("grey", "ring", "Unknown");
@@ -213,7 +218,6 @@ module.exports = function(RED) {
             callback.onReconnect = function() {
                 node.log("Reconnection detected - resubscribing");
                 node.isSubscribed = false;
-                node.initialValueSent = false;
                 setStatus("yellow", "ring", "Resubscribing...");
                 
                 if (node.context) {
@@ -225,7 +229,6 @@ module.exports = function(RED) {
                 node.log("Disconnection detected by node");
                 setStatus("red", "ring", "Disconnected");
                 node.isSubscribed = false;
-                node.initialValueSent = false;
             };
             
             return callback;
@@ -246,6 +249,8 @@ module.exports = function(RED) {
             if (configChanged) {
                 node.log(`Configuration change detected`);
                 node.isSubscribed = false;
+                // NEW: Config change counts as new deployment
+                node.isDeployedConnection = true;
                 node.initialValueSent = false;
             }
             
@@ -302,17 +307,11 @@ module.exports = function(RED) {
                 setStatus("green", "dot", actualWildcardMode ? `Pattern: ${statePattern}` : "Connected");
                 node.isInitialized = true;
                 
-                // Send initial value after successful subscription (single states only)
-                if (settings.sendInitialValue && !actualWildcardMode) {
-                    await sendInitialValue();
-                }
-                
             } catch (error) {
                 const errorMsg = error.message || 'Unknown error';
                 setError(`Connection failed: ${errorMsg}`, "Connection failed");
                 node.error(`WebSocket subscription failed: ${errorMsg}`);
                 node.isSubscribed = false;
-                node.initialValueSent = false;
                 
                 if (errorMsg.includes('timeout') || errorMsg.includes('refused') || errorMsg.includes('authentication')) {
                     setTimeout(() => {
