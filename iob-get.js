@@ -42,9 +42,12 @@ module.exports = function(RED) {
 
             callback.updateStatus = function(status) {
                 switch (status) {
-                    case 'connected':
-                        setStatus("green", "dot", "Connected");
+                    case 'ready':
+                        setStatus("green", "dot", "Ready");
                         node.isInitialized = true;
+                        break;
+                    case 'connected':
+                        setStatus("green", "ring", "Connected");
                         break;
                     case 'connecting':
                         setStatus("yellow", "ring", "Connecting...");
@@ -72,7 +75,7 @@ module.exports = function(RED) {
 
             callback.onReconnect = function() {
                 node.log("Reconnection detected by get node");
-                setStatus("green", "dot", "Reconnected");
+                setStatus("green", "dot", "Ready");
                 node.isInitialized = true;
             };
 
@@ -136,7 +139,7 @@ module.exports = function(RED) {
                     globalConfig
                 );
                 
-                setStatus("green", "dot", "Connected");
+                setStatus("green", "dot", "Ready");
                 node.isInitialized = true;
                 node.log(`Connection established for get node`);
                 
@@ -182,7 +185,7 @@ module.exports = function(RED) {
                 msg.state = state;
                 msg.timestamp = Date.now();
                 
-                setStatus("green", "dot", "OK");
+                setStatus("green", "dot", "Ready");
                 send(msg);
                 done && done();
                 

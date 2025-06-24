@@ -57,10 +57,6 @@ module.exports = function(RED) {
         node.isInitialized = false;
         node.isSubscribed = false;
         node.statePattern = statePattern;
-        node.initialValueSent = false;
-        node.lastReconnectTime = 0;
-        node.initialValueRetries = 0;
-        node.maxInitialValueRetries = 3;
         
         function shouldSendMessage(ack, filter) {
             switch (filter) {
@@ -115,62 +111,6 @@ module.exports = function(RED) {
             }
         }
         
-        async function requestInitialValueWithRetry() {
-            if (actualWildcardMode) {
-                node.log("Skipping initial value for wildcard pattern");
-                return;
-            }
-            
-            // Prevent duplicate initial values during parallel reconnects
-            const now = Date.now();
-            if (node.initialValueSent && (now - node.lastReconnectTime) < 2000) {
-                node.log(`Skipping duplicate initial value request (last sent ${now - node.lastReconnectTime}ms ago)`);
-                return;
-            }
-            
-            const maxRetries = node.maxInitialValueRetries;
-            
-            for (let attempt = 1; attempt <= maxRetries; attempt++) {
-                try {
-                    // Check if connection is really available
-                    const status = connectionManager.getConnectionStatus(settings.serverId);
-                    if (!status.connected) {
-                        if (attempt < maxRetries) {
-                            node.log(`Initial value attempt ${attempt}/${maxRetries}: Connection not ready, waiting 1000ms`);
-                            await new Promise(resolve => setTimeout(resolve, 1000));
-                            continue;
-                        } else {
-                            node.warn(`Initial value failed after ${maxRetries} attempts: No connection available`);
-                            return;
-                        }
-                    }
-                    
-                    await connectionManager.sendInitialValueForNode(
-                        settings.serverId, 
-                        statePattern, 
-                        settings.nodeId,
-                        true
-                    );
-                    
-                    node.log(`Initial value requested for ${statePattern} (attempt ${attempt}/${maxRetries})`);
-                    node.initialValueSent = true;
-                    node.lastReconnectTime = now;
-                    node.initialValueRetries = 0;
-                    return;
-                    
-                } catch (error) {
-                    if (attempt < maxRetries) {
-                        const delay = attempt * 500; // Increasing delay: 500ms, 1000ms, 1500ms
-                        node.log(`Initial value attempt ${attempt}/${maxRetries} failed: ${error.message}, retrying in ${delay}ms`);
-                        await new Promise(resolve => setTimeout(resolve, delay));
-                    } else {
-                        node.warn(`Failed to get initial value for ${statePattern} after ${maxRetries} attempts: ${error.message}`);
-                        node.initialValueRetries++;
-                    }
-                }
-            }
-        }
-        
         function createCallback() {
             const callback = onStateChange;
             
@@ -179,12 +119,18 @@ module.exports = function(RED) {
             
             callback.updateStatus = function(status) {
                 switch (status) {
-                    case 'connected':
+                    case 'ready':
                         const statusText = actualWildcardMode
-                            ? `Pattern connected: ${node.statePattern}`
-                            : "Connected";
+                            ? `Pattern ready: ${node.statePattern}`
+                            : "Ready";
                         setStatus("green", "dot", statusText);
                         node.isInitialized = true;
+                        break;
+                    case 'connected':
+                        const connectedText = actualWildcardMode
+                            ? `Pattern connected: ${node.statePattern}`
+                            : "Connected";
+                        setStatus("green", "ring", connectedText);
                         break;
                     case 'connecting':
                         setStatus("yellow", "ring", "Connecting...");
@@ -194,25 +140,28 @@ module.exports = function(RED) {
                         setStatus("red", "ring", "Disconnected");
                         node.isInitialized = false;
                         node.isSubscribed = false;
-                        // Reset initial value flags on real disconnect
-                        node.initialValueSent = false;
-                        node.initialValueRetries = 0;
                         break;
                     case 'reconnecting':
                         setStatus("yellow", "ring", "Reconnecting...");
                         node.isSubscribed = false;
                         break;
+                    case 'retrying':
+                        setStatus("yellow", "ring", "Retrying...");
+                        break;
+                    case 'retrying_production':
+                        setStatus("yellow", "ring", "Retrying (prod)...");
+                        break;
+                    case 'failed_permanently':
+                        setStatus("red", "ring", "Auth failed");
+                        break;
                     default:
-                        setStatus("grey", "ring", "Unknown");
+                        setStatus("grey", "ring", status);
                 }
             };
             
             callback.onReconnect = function() {
                 node.log("Reconnection detected - resubscribing");
                 node.isSubscribed = false;
-                // Reset initial value flag for real reconnection
-                node.initialValueSent = false;
-                node.initialValueRetries = 0;
                 setStatus("yellow", "ring", "Resubscribing...");
                 
                 if (node.context) {
@@ -224,22 +173,11 @@ module.exports = function(RED) {
                 node.log("Disconnection detected by node");
                 setStatus("red", "ring", "Disconnected");
                 node.isSubscribed = false;
-                // Reset initial value flag on disconnect
-                node.initialValueSent = false;
-                node.initialValueRetries = 0;
             };
             
             callback.onSubscribed = function() {
-                node.log("Subscription successful, scheduling initial value request");
-                
-                if (settings.sendInitialValue && !actualWildcardMode) {
-                    // Schedule initial value request with a small delay to ensure connection is fully ready
-                    setTimeout(() => {
-                        requestInitialValueWithRetry().catch(error => {
-                            node.warn(`Initial value request failed: ${error.message}`);
-                        });
-                    }, 250); // Small delay to ensure connection is fully established
-                }
+                node.log("Subscription successful - client will handle initial values automatically");
+                node.isSubscribed = true;
             };
             
             return callback;
@@ -260,8 +198,6 @@ module.exports = function(RED) {
             if (configChanged) {
                 node.log(`Configuration change detected`);
                 node.isSubscribed = false;
-                node.initialValueSent = false;
-                node.initialValueRetries = 0;
             }
             
             return configChanged;
@@ -316,7 +252,7 @@ module.exports = function(RED) {
                     
                 node.log(`Successfully subscribed to ${patternInfo} via WebSocket${settings.sendInitialValue && !actualWildcardMode ? ' (with initial value)' : ''}`);
                 
-                setStatus("green", "dot", actualWildcardMode ? `Pattern: ${statePattern}` : "Connected");
+                setStatus("green", "dot", actualWildcardMode ? `Pattern: ${statePattern}` : "Ready");
                 node.isInitialized = true;
                 
             } catch (error) {
@@ -340,8 +276,6 @@ module.exports = function(RED) {
                 }
                 
                 node.isSubscribed = false;
-                node.initialValueSent = false;
-                node.initialValueRetries = 0;
             }
         }
         
@@ -349,8 +283,6 @@ module.exports = function(RED) {
             node.log("Node closing...");
             node.isInitialized = false;
             node.isSubscribed = false;
-            node.initialValueSent = false;
-            node.initialValueRetries = 0;
             
             try {
                 await connectionManager.unsubscribe(
@@ -378,8 +310,6 @@ module.exports = function(RED) {
             node.error(`Node error: ${error.message}`);
             setError(`Node error: ${error.message}`, "Node error");
             node.isSubscribed = false;
-            node.initialValueSent = false;
-            node.initialValueRetries = 0;
         });
         
         initialize();

@@ -26,7 +26,6 @@ module.exports = function(RED) {
 
         const configState = config.state?.trim();
         node.currentConfig = { iobhost, iobport, user, password, usessl };
-        node.currentStatus = { fill: "", shape: "", text: "" };
         node.isInitialized = false;
 
         // Helper functions
@@ -37,9 +36,7 @@ module.exports = function(RED) {
 
         function setStatus(fill, shape, text) {
             try {
-                const statusObj = { fill, shape, text };
-                node.status(statusObj);
-                node.currentStatus = statusObj;
+                node.status({ fill, shape, text });
             } catch (error) {
                 node.warn(`Status update error: ${error.message}`);
             }
@@ -51,9 +48,12 @@ module.exports = function(RED) {
 
             callback.updateStatus = function(status) {
                 switch (status) {
-                    case 'connected':
-                        setStatus("green", "dot", "Connected");
+                    case 'ready':
+                        setStatus("green", "dot", "Ready");
                         node.isInitialized = true;
+                        break;
+                    case 'connected':
+                        setStatus("green", "ring", "Connected");
                         break;
                     case 'connecting':
                         setStatus("yellow", "ring", "Connecting...");
@@ -148,10 +148,10 @@ module.exports = function(RED) {
                     settings.nodeId,
                     settings.serverId,
                     eventCallback,
-                    globalConfig  // Pass the full config object
+                    globalConfig
                 );
                 
-                setStatus("green", "dot", "Connected");
+                setStatus("green", "dot", "Ready");
                 node.isInitialized = true;
                 node.log(`Connection established for output node`);
                 
@@ -200,7 +200,7 @@ module.exports = function(RED) {
                 
                 await connectionManager.setState(settings.serverId, stateId, value, ack);
                 
-                setStatus("green", "dot", "OK");
+                setStatus("green", "dot", "Ready");
                 node.log(`Successfully set ${stateId} = ${value} (mode: ${settings.setMode})`);
                 
                 done && done();
@@ -221,7 +221,6 @@ module.exports = function(RED) {
 
             try {
                 node.status({});
-                node.currentStatus = { fill: "", shape: "", text: "" };
             } catch (statusError) {
                 // Ignore status errors during cleanup
             }
