@@ -733,6 +733,10 @@
             const useSelectedButton = treeActions.find('.iob-btn.success');
             const cancelButton = treeActions.find('.iob-btn:not(.success)');
             
+            // Initially hide refresh and clear buttons since tree is not active
+            refreshButton.hide();
+            clearButton.hide();
+            
             // Get the label element for the state input
             const stateInputLabel = $(`label[for="${inputId}"]`);
             let originalLabelText = stateInputLabel.text();
@@ -1036,6 +1040,10 @@
                 searchContainer.toggle(isManualVisible);
                 treeActions.toggle(isManualVisible);
                 
+                // Show/hide refresh and clear buttons only when tree is active
+                refreshButton.toggle(isManualVisible);
+                clearButton.toggle(isManualVisible);
+                
                 if (!isManualVisible) {
                     statusElement.hide();
                     searchStatsElement.hide();
@@ -1196,7 +1204,7 @@
     }
     
     global.ioBrokerSharedTreeView = {
-        version: '1.4.0',
+        version: '1.4.1',
         setup: createTreeView,
         
         HierarchicalTreeData,
