@@ -23,13 +23,17 @@ function setupStaticResources(RED) {
         }
         
         RED.httpAdmin.use('/iobroker/shared', express.static(sharedPath, {
-            maxAge: '1h',
-            etag: true,
-            lastModified: true,
+            maxAge: 0, // No caching for TreeView JavaScript
+            etag: false,
+            lastModified: false,
             setHeaders: (res, filePath) => {
                 if (filePath.endsWith('.js')) {
                     res.setHeader('Content-Type', 'application/javascript; charset=utf-8');
                     res.setHeader('X-Content-Type-Options', 'nosniff');
+                    // Aggressive no-cache headers for JavaScript files
+                    res.setHeader('Cache-Control', 'no-cache, no-store, must-revalidate');
+                    res.setHeader('Pragma', 'no-cache');
+                    res.setHeader('Expires', '0');
                 }
             }
         }));

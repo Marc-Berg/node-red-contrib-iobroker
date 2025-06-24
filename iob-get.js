@@ -42,9 +42,12 @@ module.exports = function(RED) {
 
             callback.updateStatus = function(status) {
                 switch (status) {
-                    case 'connected':
-                        setStatus("green", "dot", "Connected");
+                    case 'ready':
+                        setStatus("green", "dot", "Ready");
                         node.isInitialized = true;
+                        break;
+                    case 'connected':
+                        setStatus("green", "ring", "Connected");
                         break;
                     case 'connecting':
                         setStatus("yellow", "ring", "Connecting...");
@@ -56,12 +59,23 @@ module.exports = function(RED) {
                     case 'reconnecting':
                         setStatus("yellow", "ring", "Reconnecting...");
                         break;
+                    case 'retrying':
+                        setStatus("yellow", "ring", "Retrying...");
+                        break;
+                    case 'retrying_production':
+                        setStatus("yellow", "ring", "Retrying (prod)...");
+                        break;
+                    case 'failed_permanently':
+                        setStatus("red", "ring", "Auth failed");
+                        break;
+                    default:
+                        setStatus("grey", "ring", status);
                 }
             };
 
             callback.onReconnect = function() {
                 node.log("Reconnection detected by get node");
-                setStatus("green", "dot", "Reconnected");
+                setStatus("green", "dot", "Ready");
                 node.isInitialized = true;
             };
 
@@ -125,7 +139,7 @@ module.exports = function(RED) {
                     globalConfig
                 );
                 
-                setStatus("green", "dot", "Connected");
+                setStatus("green", "dot", "Ready");
                 node.isInitialized = true;
                 node.log(`Connection established for get node`);
                 
@@ -134,14 +148,8 @@ module.exports = function(RED) {
                 setError(`Connection failed: ${errorMsg}`, "Connection failed");
                 node.error(`Connection failed: ${errorMsg}`);
                 
-                if (errorMsg.includes('timeout') || errorMsg.includes('refused')) {
-                    setTimeout(() => {
-                        if (node.context) {
-                            node.log("Retrying connection...");
-                            initializeConnection();
-                        }
-                    }, 5000);
-                }
+                // The new architecture will handle retries automatically via recovery callbacks
+                // No manual retry logic needed here
             }
         }
 
@@ -177,7 +185,7 @@ module.exports = function(RED) {
                 msg.state = state;
                 msg.timestamp = Date.now();
                 
-                setStatus("green", "dot", "OK");
+                setStatus("green", "dot", "Ready");
                 send(msg);
                 done && done();
                 
