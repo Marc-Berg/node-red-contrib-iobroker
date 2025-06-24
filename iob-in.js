@@ -59,6 +59,8 @@ module.exports = function(RED) {
         node.statePattern = statePattern;
         node.initialValueSent = false;
         node.lastReconnectTime = 0;
+        node.initialValueRetries = 0;
+        node.maxInitialValueRetries = 3;
         
         function shouldSendMessage(ack, filter) {
             switch (filter) {
@@ -113,7 +115,7 @@ module.exports = function(RED) {
             }
         }
         
-        async function requestInitialValue() {
+        async function requestInitialValueWithRetry() {
             if (actualWildcardMode) {
                 node.log("Skipping initial value for wildcard pattern");
                 return;
@@ -126,18 +128,46 @@ module.exports = function(RED) {
                 return;
             }
             
-            try {
-                await connectionManager.sendInitialValueForNode(
-                    settings.serverId, 
-                    statePattern, 
-                    settings.nodeId,
-                    true
-                );
-                node.log(`Initial value requested for ${statePattern} (sendInitialValue active)`);
-                node.initialValueSent = true;
-                node.lastReconnectTime = now;
-            } catch (error) {
-                node.warn(`Failed to get initial value for ${statePattern}: ${error.message}`);
+            const maxRetries = node.maxInitialValueRetries;
+            
+            for (let attempt = 1; attempt <= maxRetries; attempt++) {
+                try {
+                    // Check if connection is really available
+                    const status = connectionManager.getConnectionStatus(settings.serverId);
+                    if (!status.connected) {
+                        if (attempt < maxRetries) {
+                            node.log(`Initial value attempt ${attempt}/${maxRetries}: Connection not ready, waiting 1000ms`);
+                            await new Promise(resolve => setTimeout(resolve, 1000));
+                            continue;
+                        } else {
+                            node.warn(`Initial value failed after ${maxRetries} attempts: No connection available`);
+                            return;
+                        }
+                    }
+                    
+                    await connectionManager.sendInitialValueForNode(
+                        settings.serverId, 
+                        statePattern, 
+                        settings.nodeId,
+                        true
+                    );
+                    
+                    node.log(`Initial value requested for ${statePattern} (attempt ${attempt}/${maxRetries})`);
+                    node.initialValueSent = true;
+                    node.lastReconnectTime = now;
+                    node.initialValueRetries = 0;
+                    return;
+                    
+                } catch (error) {
+                    if (attempt < maxRetries) {
+                        const delay = attempt * 500; // Increasing delay: 500ms, 1000ms, 1500ms
+                        node.log(`Initial value attempt ${attempt}/${maxRetries} failed: ${error.message}, retrying in ${delay}ms`);
+                        await new Promise(resolve => setTimeout(resolve, delay));
+                    } else {
+                        node.warn(`Failed to get initial value for ${statePattern} after ${maxRetries} attempts: ${error.message}`);
+                        node.initialValueRetries++;
+                    }
+                }
             }
         }
         
@@ -166,6 +196,7 @@ module.exports = function(RED) {
                         node.isSubscribed = false;
                         // Reset initial value flags on real disconnect
                         node.initialValueSent = false;
+                        node.initialValueRetries = 0;
                         break;
                     case 'reconnecting':
                         setStatus("yellow", "ring", "Reconnecting...");
@@ -181,6 +212,7 @@ module.exports = function(RED) {
                 node.isSubscribed = false;
                 // Reset initial value flag for real reconnection
                 node.initialValueSent = false;
+                node.initialValueRetries = 0;
                 setStatus("yellow", "ring", "Resubscribing...");
                 
                 if (node.context) {
@@ -194,13 +226,19 @@ module.exports = function(RED) {
                 node.isSubscribed = false;
                 // Reset initial value flag on disconnect
                 node.initialValueSent = false;
+                node.initialValueRetries = 0;
             };
             
             callback.onSubscribed = function() {
-                node.log("Subscription successful, checking for initial value request");
+                node.log("Subscription successful, scheduling initial value request");
                 
                 if (settings.sendInitialValue && !actualWildcardMode) {
-                    requestInitialValue();
+                    // Schedule initial value request with a small delay to ensure connection is fully ready
+                    setTimeout(() => {
+                        requestInitialValueWithRetry().catch(error => {
+                            node.warn(`Initial value request failed: ${error.message}`);
+                        });
+                    }, 250); // Small delay to ensure connection is fully established
                 }
             };
             
@@ -222,6 +260,8 @@ module.exports = function(RED) {
             if (configChanged) {
                 node.log(`Configuration change detected`);
                 node.isSubscribed = false;
+                node.initialValueSent = false;
+                node.initialValueRetries = 0;
             }
             
             return configChanged;
@@ -301,6 +341,7 @@ module.exports = function(RED) {
                 
                 node.isSubscribed = false;
                 node.initialValueSent = false;
+                node.initialValueRetries = 0;
             }
         }
         
@@ -309,6 +350,7 @@ module.exports = function(RED) {
             node.isInitialized = false;
             node.isSubscribed = false;
             node.initialValueSent = false;
+            node.initialValueRetries = 0;
             
             try {
                 await connectionManager.unsubscribe(
@@ -337,6 +379,7 @@ module.exports = function(RED) {
             setError(`Node error: ${error.message}`, "Node error");
             node.isSubscribed = false;
             node.initialValueSent = false;
+            node.initialValueRetries = 0;
         });
         
         initialize();
