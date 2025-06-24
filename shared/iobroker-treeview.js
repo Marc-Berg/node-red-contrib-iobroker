@@ -54,6 +54,7 @@
             
             .iob-tree-item:hover { background-color: #e8f4f8; }
             .iob-tree-item.selected { background-color: #d4edda; border-left: 3px solid #28a745; }
+            .iob-tree-item.selected.folder { background-color: #fff3cd; border-left: 3px solid #ffc107; }
             .iob-tree-item.folder { font-weight: 500; }
             .iob-tree-item.search-match { background-color: #fff3cd; border-left: 2px solid #ffc107; }
             .iob-tree-item.search-match:hover { background-color: #ffeaa7; }
@@ -73,6 +74,46 @@
             }
             .iob-search-input:focus { outline: none; border-color: #4CAF50; box-shadow: 0 0 0 2px rgba(76, 175, 80, 0.2); }
             
+            .iob-selected-state-info {
+                display: inline-block;
+                margin-left: 8px;
+                padding: 2px 8px;
+                background-color: #d1ecf1;
+                border: 1px solid #bee5eb;
+                border-radius: 3px;
+                font-size: 12px;
+                color: #0c5460;
+                font-family: 'Monaco', 'Menlo', 'Ubuntu Mono', monospace;
+                font-weight: normal;
+                max-width: 300px;
+                overflow: hidden;
+                text-overflow: ellipsis;
+                white-space: nowrap;
+                vertical-align: middle;
+                line-height: 1.2;
+            }
+            
+            .iob-selected-state-info.folder {
+                background-color: #fff3cd;
+                border-color: #ffeaa7;
+                color: #856404;
+            }
+            
+            .iob-state-label-container {
+                display: inline-block;
+                vertical-align: middle;
+                white-space: nowrap;
+            }
+            
+            .iob-tree-actions {
+                display: flex;
+                gap: 8px;
+                margin-top: 8px;
+                padding-top: 8px;
+                border-top: 1px solid #dee2e6;
+                justify-content: flex-end;
+            }
+            
             .iob-status { padding: 6px 10px; border-radius: 3px; font-size: 12px; font-weight: 500; margin-top: 5px; display: inline-block; }
             .iob-status-success { background-color: #d4edda; color: #155724; border: 1px solid #c3e6cb; }
             .iob-status-info { background-color: #d1ecf1; color: #0c5460; border: 1px solid #bee5eb; }
@@ -83,6 +124,9 @@
             .iob-btn:hover { background: #f8f9fa; border-color: #adb5bd; }
             .iob-btn.primary { background: #007bff; color: white; border-color: #007bff; }
             .iob-btn.primary:hover { background: #0056b3; border-color: #0056b3; }
+            .iob-btn.success { background: #28a745; color: white; border-color: #28a745; }
+            .iob-btn.success:hover { background: #1e7e34; border-color: #1e7e34; }
+            .iob-btn.success:disabled { background: #6c757d; border-color: #6c757d; cursor: not-allowed; opacity: 0.6; }
             .iob-btn.refreshing { background: #28a745; color: white; border-color: #28a745; }
             
             .iob-search-stats { font-size: 11px; color: #6c757d; margin-top: 4px; font-style: italic; }
@@ -390,6 +434,7 @@
             this.data = data;
             this.selectedNodeId = null;
             this.onItemSelected = null;
+            this.onSelectionChanged = null;
             
             this.setupDOM();
             this.setupEventListeners();
@@ -479,12 +524,20 @@
         handleItemClick(element) {
             const nodeId = element.dataset.nodeId;
             
+            // Update visual selection
             this.container.querySelectorAll('.iob-tree-item.selected').forEach(el => {
                 el.classList.remove('selected');
             });
             element.classList.add('selected');
             this.selectedNodeId = nodeId;
             
+            // Notify selection change
+            if (this.onSelectionChanged) {
+                const node = this.data.allNodes.get(nodeId);
+                this.onSelectionChanged(node);
+            }
+            
+            // Handle expansion/collapse for folders
             if (this.data.toggleNodeExpansion(nodeId)) {
                 this.render();
             }
@@ -494,9 +547,16 @@
             const nodeId = element.dataset.nodeId;
             const node = this.data.allNodes.get(nodeId);
             
-            if (node && this.onItemSelected) {
-                const itemId = node.isLeaf && node.fullId ? node.fullId : node.id;
-                this.onItemSelected(itemId);
+            if (node) {
+                if (node.isLeaf && this.onItemSelected) {
+                    // Only allow double-click selection for leaf nodes (states)
+                    const itemId = node.fullId || node.id;
+                    this.onItemSelected(itemId);
+                } else if (!node.isLeaf) {
+                    // For folders, just toggle expansion on double-click
+                    this.data.toggleNodeExpansion(nodeId);
+                    this.render();
+                }
             }
         }
         
@@ -504,6 +564,18 @@
             const searchResults = this.data.performSearch(searchTerm);
             this.render();
             return searchResults;
+        }
+        
+        getSelectedNode() {
+            return this.selectedNodeId ? this.data.allNodes.get(this.selectedNodeId) : null;
+        }
+        
+        setSelectedNode(nodeId) {
+            this.selectedNodeId = nodeId;
+            const node = this.data.allNodes.get(nodeId);
+            if (node && this.onSelectionChanged) {
+                this.onSelectionChanged(node);
+            }
         }
         
         destroy() {
@@ -620,6 +692,19 @@
                     <input type="text" class="iob-search-input" placeholder="${searchPlaceholder}">
                 </div>
             `);
+            
+            // Action buttons for tree view
+            const treeActions = $(`
+                <div class="iob-tree-actions" style="display:none;">
+                    <button type="button" class="iob-btn success" disabled>
+                        <i class="fa fa-check"></i> Use State
+                    </button>
+                    <button type="button" class="iob-btn">
+                        <i class="fa fa-times"></i> Cancel
+                    </button>
+                </div>
+            `);
+            
             const controlButtons = $(`
                 <div class="iob-control-buttons">
                     <button type="button" class="iob-btn primary">Switch to tree selection</button>
@@ -636,6 +721,7 @@
             
             stateInput.after(searchStatsElement)
                       .after(statusElement)
+                      .after(treeActions)
                       .after(treeContainer)
                       .after(searchContainer)
                       .after(controlButtons);
@@ -644,12 +730,19 @@
             const refreshButton = controlButtons.find('.iob-btn:not(.primary)').first();
             const clearButton = controlButtons.find('.iob-btn:not(.primary)').last();
             const searchInput = searchContainer.find('.iob-search-input');
+            const useSelectedButton = treeActions.find('.iob-btn.success');
+            const cancelButton = treeActions.find('.iob-btn:not(.success)');
+            
+            // Get the label element for the state input
+            const stateInputLabel = $(`label[for="${inputId}"]`);
+            let originalLabelText = stateInputLabel.text();
             
             const treeData = new HierarchicalTreeData();
             let treeView = null;
             let currentServerId = null;
             let dataLoaded = false;
             let searchTimeout = null;
+            let selectedStateId = null;
             
             if (enableWildcardDetection && wildcardInputId) {
                 stateInput.on('input keyup change', function() {
@@ -709,6 +802,115 @@
             
             function hideWildcardInfo() {
                 $('#wildcard-info-' + nodeType).hide();
+            }
+            
+            function updateCurrentSelection(node) {
+                if (node && node.isLeaf) {
+                    selectedStateId = node.fullId || node.id;
+                    updateStateLabel(selectedStateId, false);
+                    useSelectedButton.prop('disabled', false);
+                } else if (node && !node.isLeaf) {
+                    selectedStateId = node.id;
+                    updateStateLabel(selectedStateId + ' (folder - not selectable)', true);
+                    useSelectedButton.prop('disabled', true); // Folders cannot be used
+                } else {
+                    selectedStateId = null;
+                    updateStateLabel(null, false);
+                    useSelectedButton.prop('disabled', true);
+                }
+            }
+            
+            function updateStateLabel(selectedValue, isFolder = false) {
+                if (selectedValue && stateInputLabel.length) {
+                    // Remove any existing selection info
+                    stateInputLabel.find('.iob-selected-state-info').remove();
+                    
+                    // Create container if it doesn't exist
+                    if (!stateInputLabel.hasClass('iob-state-label-container')) {
+                        stateInputLabel.addClass('iob-state-label-container');
+                    }
+                    
+                    // Add new selection info as inline element with appropriate class
+                    const folderClass = isFolder ? ' folder' : '';
+                    const selectionInfo = $(`<span class="iob-selected-state-info${folderClass}" title="${selectedValue}">${selectedValue}</span>`);
+                    stateInputLabel.append(selectionInfo);
+                } else if (stateInputLabel.length) {
+                    // Remove selection info
+                    stateInputLabel.find('.iob-selected-state-info').remove();
+                    stateInputLabel.removeClass('iob-state-label-container');
+                }
+            }
+            
+            function findAndSelectExistingState(stateId) {
+                if (!stateId || !treeData) return false;
+                
+                // Check if the exact state exists
+                const exactNode = treeData.allNodes.get(stateId);
+                if (exactNode) {
+                    // Expand path to this node
+                    expandPathToNode(stateId);
+                    
+                    // Set as selected
+                    if (treeView) {
+                        treeView.setSelectedNode(stateId);
+                    }
+                    
+                    console.log(`[TreeView] Found and selected existing ${exactNode.isLeaf ? 'state' : 'folder'}: ${stateId}`);
+                    return true;
+                }
+                
+                // If exact match not found, try to find the closest parent
+                const segments = stateId.split('.');
+                for (let i = segments.length - 1; i > 0; i--) {
+                    const partialPath = segments.slice(0, i).join('.');
+                    const partialNode = treeData.allNodes.get(partialPath);
+                    if (partialNode) {
+                        // Expand path to the closest parent
+                        expandPathToNode(partialPath);
+                        
+                        // Set partial path as selected to show user where we are
+                        if (treeView) {
+                            treeView.setSelectedNode(partialPath);
+                        }
+                        
+                        console.log(`[TreeView] State not found, selected closest parent: ${partialPath}`);
+                        return true;
+                    }
+                }
+                
+                console.log(`[TreeView] State not found in tree: ${stateId}`);
+                return false;
+            }
+            
+            function expandPathToNode(nodeId) {
+                if (!nodeId || !treeData) return;
+                
+                let currentNodeId = nodeId;
+                const pathToExpand = [];
+                
+                // Collect all parent nodes that need to be expanded
+                while (currentNodeId) {
+                    const node = treeData.allNodes.get(currentNodeId);
+                    if (!node) break;
+                    
+                    if (node.parent) {
+                        pathToExpand.unshift(node.parent);
+                    }
+                    currentNodeId = node.parent;
+                }
+                
+                // Expand all parent nodes
+                pathToExpand.forEach(parentId => {
+                    const parentNode = treeData.allNodes.get(parentId);
+                    if (parentNode && !parentNode.isLeaf) {
+                        parentNode.expanded = true;
+                    }
+                });
+                
+                // Update filtered nodes to reflect expansions
+                treeData.updateFilteredNodes();
+                
+                console.log(`[TreeView] Expanded path to: ${nodeId} (${pathToExpand.length} parents)`);
             }
             
             async function loadTree(forceRefresh = false) {
@@ -777,6 +979,13 @@
                 }
                 
                 treeView = new HierarchicalTreeView(treeContainer[0], treeData);
+                
+                // Handle selection changes (single click)
+                treeView.onSelectionChanged = (node) => {
+                    updateCurrentSelection(node);
+                };
+                
+                // Handle double click (immediate selection)
                 treeView.onItemSelected = (itemId) => {
                     stateInput.val(itemId).trigger('change');
                     if (typeof RED !== 'undefined' && RED.notify) {
@@ -784,6 +993,12 @@
                     }
                     setTimeout(() => toggleInputMode(), 300);
                 };
+                
+                // Find and select existing state from input field
+                const existingStateId = stateInput.val().trim();
+                if (existingStateId) {
+                    findAndSelectExistingState(existingStateId);
+                }
                 
                 treeView.render();
                 
@@ -819,10 +1034,23 @@
                 stateInput.toggle(!isManualVisible);
                 treeContainer.toggle(isManualVisible);
                 searchContainer.toggle(isManualVisible);
+                treeActions.toggle(isManualVisible);
                 
                 if (!isManualVisible) {
                     statusElement.hide();
                     searchStatsElement.hide();
+                    updateCurrentSelection(null); // Clear selection and label
+                } else {
+                    // When switching to tree view, try to find and select existing state
+                    const existingStateId = stateInput.val().trim();
+                    if (existingStateId && dataLoaded && treeData) {
+                        setTimeout(() => {
+                            findAndSelectExistingState(existingStateId);
+                            if (treeView) {
+                                treeView.render(); // Re-render to show selection
+                            }
+                        }, 100);
+                    }
                 }
                 
                 toggleButton.text(isManualVisible ? 'Switch to manual input' : 'Switch to tree view');
@@ -856,13 +1084,38 @@
                 `);
             }
             
+            // Event handlers
             toggleButton.on('click', toggleInputMode);
+            
+            useSelectedButton.on('click', function() {
+                if (selectedStateId && treeView) {
+                    const selectedNode = treeView.getSelectedNode();
+                    // Only allow using leaf nodes (states), not folders
+                    if (selectedNode && selectedNode.isLeaf) {
+                        const stateToUse = selectedNode.fullId || selectedNode.id;
+                        stateInput.val(stateToUse).trigger('change');
+                        if (typeof RED !== 'undefined' && RED.notify) {
+                            RED.notify(`Selected: ${stateToUse}`, { type: "success", timeout: 2000 });
+                        }
+                        toggleInputMode();
+                    } else {
+                        if (typeof RED !== 'undefined' && RED.notify) {
+                            RED.notify('Folders cannot be selected as states', { type: "warning", timeout: 2000 });
+                        }
+                    }
+                }
+            });
+            
+            cancelButton.on('click', function() {
+                toggleInputMode();
+            });
             
             refreshButton.on('click', function() {
                 if (currentServerId) {
                     // Clear search field
                     searchInput.val('').trigger('input');
                     searchStatsElement.hide();
+                    updateCurrentSelection(null);
                     
                     // Force clear local cache
                     clearCache(currentServerId);
@@ -894,6 +1147,7 @@
                 if (treeData && treeView) {
                     treeData.collapseAllNodes();
                     treeView.render();
+                    updateCurrentSelection(null);
                     
                     if (typeof RED !== 'undefined' && RED.notify) {
                         RED.notify('Search cleared and tree collapsed', { type: "info", timeout: 2000 });
@@ -912,8 +1166,9 @@
                 dataLoaded = false;
                 statusElement.html('');
                 searchStatsElement.hide();
+                updateCurrentSelection(null);
                 
-                if (treeContainer.is(':visible')) {
+                if (currentServerId) {
                     loadTree();
                 }
             });
@@ -925,8 +1180,10 @@
                     controlButtons.remove();
                     searchContainer.remove();
                     treeContainer.remove();
+                    treeActions.remove();
                     statusElement.remove();
                     searchStatsElement.remove();
+                    updateStateLabel(null); // Reset label and remove container class
                     stateInput.show();
                     hideWildcardInfo();
                     $('#wildcard-info-' + nodeType).remove();
@@ -939,7 +1196,7 @@
     }
     
     global.ioBrokerSharedTreeView = {
-        version: '1.0.3',
+        version: '1.4.0',
         setup: createTreeView,
         
         HierarchicalTreeData,
