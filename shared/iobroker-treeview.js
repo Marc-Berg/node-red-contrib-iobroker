@@ -83,6 +83,7 @@
             .iob-btn:hover { background: #f8f9fa; border-color: #adb5bd; }
             .iob-btn.primary { background: #007bff; color: white; border-color: #007bff; }
             .iob-btn.primary:hover { background: #0056b3; border-color: #0056b3; }
+            .iob-btn.refreshing { background: #28a745; color: white; border-color: #28a745; }
             
             .iob-search-stats { font-size: 11px; color: #6c757d; margin-top: 4px; font-style: italic; }
             .iob-empty-state { padding: 40px 20px; text-align: center; color: #666; font-style: italic; background: #f8f9fa; border-radius: 4px; margin: 20px; }
@@ -527,6 +528,23 @@
         });
     }
     
+    function clearCache(serverId = null) {
+        if (serverId) {
+            stateCache.delete(serverId);
+            console.log(`[TreeView] Cache cleared for ${serverId}`);
+        } else {
+            stateCache.clear();
+            console.log(`[TreeView] All caches cleared`);
+        }
+    }
+    
+    function forceRefreshCache() {
+        const currentTime = Date.now();
+        const cacheBreaker = `cb=${currentTime}`;
+        console.log(`[TreeView] Force refresh with cache breaker: ${cacheBreaker}`);
+        return cacheBreaker;
+    }
+    
     function detectWildcardPattern(pattern) {
         if (!pattern) return { isWildcard: false, hasUnsupported: false, warnings: [] };
         
@@ -596,7 +614,7 @@
             const controlButtons = $(`
                 <div class="iob-control-buttons">
                     <button type="button" class="iob-btn primary">Switch to tree selection</button>
-                    <button type="button" class="iob-btn" title="Refresh ${itemType}">
+                    <button type="button" class="iob-btn" title="Refresh ${itemType} (bypasses all caches)">
                         <i class="fa fa-refresh"></i> Refresh
                     </button>
                     <button type="button" class="iob-btn" title="Clear search">
@@ -702,15 +720,33 @@
                     }
                 }
                 
+                // Clear cache on force refresh
+                if (forceRefresh) {
+                    clearCache(serverId);
+                }
+
                 try {
                     showStatus('info', `Loading ${itemType} from ioBroker...`);
                     treeContainer.html(`<div style="padding: 20px; text-align: center;"><i class="fa fa-spinner fa-spin"></i> Loading ${itemType}...</div>`);
                     
+                    // Build URL with cache busting for force refresh
+                    let url = `${dataEndpoint}/${encodeURIComponent(serverId)}`;
+                    if (forceRefresh) {
+                        const cacheBreaker = forceRefreshCache();
+                        url += `?${cacheBreaker}`;
+                    }
+                    
                     const response = await $.ajax({
-                        url: `${dataEndpoint}/${encodeURIComponent(serverId)}`,
+                        url: url,
                         method: 'GET',
                         timeout: 20000,
-                        dataType: 'json'
+                        dataType: 'json',
+                        cache: false, // Disable jQuery caching
+                        headers: {
+                            'Cache-Control': 'no-cache, no-store, must-revalidate',
+                            'Pragma': 'no-cache',
+                            'Expires': '0'
+                        }
                     });
                     
                     const dataCount = Object.keys(response).length;
@@ -815,16 +851,25 @@
             
             refreshButton.on('click', function() {
                 if (currentServerId) {
-                    stateCache.delete(currentServerId);
+                    // Force clear local cache
+                    clearCache(currentServerId);
+                    
                     const icon = $(this).find('i');
+                    const buttonText = $(this);
+                    const originalText = buttonText.text();
+                    
                     icon.addClass('fa-spin');
+                    buttonText.text(' Refreshing...').addClass('refreshing');
                     
                     loadTree(true).finally(() => {
-                        setTimeout(() => icon.removeClass('fa-spin'), 500);
+                        setTimeout(() => {
+                            icon.removeClass('fa-spin');
+                            buttonText.text(originalText).removeClass('refreshing');
+                        }, 1000);
                     });
                     
                     if (typeof RED !== 'undefined' && RED.notify) {
-                        RED.notify(`Refreshing ${itemType}...`, { type: "info", timeout: 2000 });
+                        RED.notify(`Force refreshing ${itemType} (bypassing all caches)...`, { type: "warning", timeout: 3000 });
                     }
                 }
             });
@@ -870,7 +915,7 @@
     }
     
     global.ioBrokerSharedTreeView = {
-        version: '1.0.1',
+        version: '1.0.3',
         setup: createTreeView,
         
         HierarchicalTreeData,
@@ -879,6 +924,8 @@
         getCacheKey,
         getCachedStates,
         setCachedStates,
+        clearCache,
+        forceRefreshCache,
         detectWildcardPattern,
         validateWildcardPattern,
         
