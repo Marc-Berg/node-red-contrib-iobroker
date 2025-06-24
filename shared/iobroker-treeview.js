@@ -331,6 +331,15 @@
             });
         }
         
+        collapseAllNodes() {
+            for (const node of this.allNodes.values()) {
+                if (!node.isLeaf) {
+                    node.expanded = false;
+                }
+            }
+            this.updateFilteredNodes();
+        }
+        
         addNodeToFilteredList(nodeId) {
             const node = this.allNodes.get(nodeId);
             if (!node || !node.visible) return;
@@ -851,6 +860,10 @@
             
             refreshButton.on('click', function() {
                 if (currentServerId) {
+                    // Clear search field
+                    searchInput.val('').trigger('input');
+                    searchStatsElement.hide();
+                    
                     // Force clear local cache
                     clearCache(currentServerId);
                     
@@ -876,6 +889,17 @@
             
             clearButton.on('click', function() {
                 searchInput.val('').trigger('input');
+                
+                // Collapse all nodes in the tree
+                if (treeData && treeView) {
+                    treeData.collapseAllNodes();
+                    treeView.render();
+                    
+                    if (typeof RED !== 'undefined' && RED.notify) {
+                        RED.notify('Search cleared and tree collapsed', { type: "info", timeout: 2000 });
+                    }
+                }
+                
                 searchInput.focus();
             });
             
