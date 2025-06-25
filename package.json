@@ -37,7 +37,6 @@
   "nodes": {
       "iobin": "iob-in.js",
       "iobout": "iob-out.js",
-      "ioboutenhanced": "iob-out-enhanced.js",
       "iobget": "iob-get.js",
       "iobgetobject": "iob-getobject.js",
       "iob-config": "iob-config.js"
