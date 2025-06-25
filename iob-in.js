@@ -1,4 +1,4 @@
- const connectionManager = require('./lib/manager/websocket-manager');
+const connectionManager = require('./lib/manager/websocket-manager');
 
 module.exports = function(RED) {
     function iobin(config) {
@@ -34,23 +34,16 @@ module.exports = function(RED) {
             return setError("State ID/Pattern missing", "State ID missing");
         }
         
-        // Validate wildcard pattern
+        // Simplified wildcard detection
         const isWildcardPattern = statePattern.includes('*');
-        const useWildcardConfig = config.useWildcard || false;
-        
-        let actualWildcardMode = isWildcardPattern;
-        if (useWildcardConfig && !isWildcardPattern) {
-            actualWildcardMode = false;
-            node.warn(`Wildcard mode was enabled but no * found in pattern '${statePattern}' - treating as single state`);
-        }
         
         const settings = {
             outputProperty: config.outputProperty?.trim() || "payload",
             ackFilter: config.ackFilter || "both",
-            sendInitialValue: config.sendInitialValue || false,
+            sendInitialValue: config.sendInitialValue && !isWildcardPattern, // Disable for wildcards
             serverId: `${iobhost}:${iobport}`,
             nodeId: node.id,
-            useWildcard: actualWildcardMode
+            useWildcard: isWildcardPattern
         };
         
         node.currentConfig = { iobhost, iobport, user, password, usessl };
@@ -73,7 +66,7 @@ module.exports = function(RED) {
                 timestamp: Date.now()
             };
             
-            if (actualWildcardMode) {
+            if (isWildcardPattern) {
                 message.pattern = node.statePattern;
             }
             
@@ -100,7 +93,7 @@ module.exports = function(RED) {
                 node.send(message);
                 
                 const timestamp = new Date().toLocaleTimeString(undefined, { hour12: false })
-                const statusText = actualWildcardMode 
+                const statusText = isWildcardPattern 
                     ? `Pattern active - Last: ${timestamp}`
                     : `Last: ${timestamp}`;
                 setStatus("green", "dot", statusText);
@@ -114,20 +107,37 @@ module.exports = function(RED) {
         function createCallback() {
             const callback = onStateChange;
             
-            // Tell WebSocketManager if this node wants initial values
-            callback.wantsInitialValue = settings.sendInitialValue && !actualWildcardMode;
+            // Simple flag to indicate if this node wants initial values
+            callback.wantsInitialValue = settings.sendInitialValue;
+            
+            // Handle initial value separately (called by the simplified system)
+            callback.onInitialValue = function(stateId, state) {
+                try {
+                    if (!shouldSendMessage(state.ack, settings.ackFilter)) {
+                        return;
+                    }
+                    
+                    const message = createMessage(stateId, state, true);
+                    node.send(message);
+                    
+                    node.log(`Initial value sent for ${stateId}: ${state.val}`);
+                    
+                } catch (error) {
+                    node.error(`Initial value processing error: ${error.message}`);
+                }
+            };
             
             callback.updateStatus = function(status) {
                 switch (status) {
                     case 'ready':
-                        const statusText = actualWildcardMode
+                        const statusText = isWildcardPattern
                             ? `Pattern ready: ${node.statePattern}`
                             : "Ready";
                         setStatus("green", "dot", statusText);
                         node.isInitialized = true;
                         break;
                     case 'connected':
-                        const connectedText = actualWildcardMode
+                        const connectedText = isWildcardPattern
                             ? `Pattern connected: ${node.statePattern}`
                             : "Connected";
                         setStatus("green", "ring", connectedText);
@@ -163,10 +173,6 @@ module.exports = function(RED) {
                 node.log("Reconnection detected - resubscribing");
                 node.isSubscribed = false;
                 setStatus("yellow", "ring", "Resubscribing...");
-                
-                if (node.context) {
-                    initialize();
-                }
             };
             
             callback.onDisconnect = function() {
@@ -176,7 +182,7 @@ module.exports = function(RED) {
             };
             
             callback.onSubscribed = function() {
-                node.log("Subscription successful - client will handle initial values automatically");
+                node.log("Subscription successful");
                 node.isSubscribed = true;
             };
             
@@ -246,13 +252,13 @@ module.exports = function(RED) {
                 
                 node.isSubscribed = true;
                 
-                const patternInfo = actualWildcardMode 
+                const patternInfo = isWildcardPattern 
                     ? `wildcard pattern: ${statePattern}`
                     : `single state: ${statePattern}`;
                     
-                node.log(`Successfully subscribed to ${patternInfo} via WebSocket${settings.sendInitialValue && !actualWildcardMode ? ' (with initial value)' : ''}`);
+                node.log(`Successfully subscribed to ${patternInfo} via WebSocket${settings.sendInitialValue ? ' (with initial value)' : ''}`);
                 
-                setStatus("green", "dot", actualWildcardMode ? `Pattern: ${statePattern}` : "Ready");
+                setStatus("green", "dot", isWildcardPattern ? `Pattern: ${statePattern}` : "Ready");
                 node.isInitialized = true;
                 
             } catch (error) {
@@ -293,7 +299,7 @@ module.exports = function(RED) {
                 
                 node.status({});
                 
-                const patternInfo = actualWildcardMode 
+                const patternInfo = isWildcardPattern 
                     ? `wildcard pattern ${statePattern}`
                     : `single state ${statePattern}`;
                     

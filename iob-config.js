@@ -52,7 +52,7 @@ function setupAPIEndpoints(RED) {
     if (apiEndpointsSetup) return true;
     
     try {
-         const connectionManager = require('./lib/manager/websocket-manager');
+        const connectionManager = require('./lib/manager/websocket-manager');
         
         RED.httpAdmin.get('/iobroker/ws/states/:serverId', async (req, res) => {
             try {
@@ -107,6 +107,8 @@ module.exports = function(RED) {
     if (staticResult && apiResult) {
         console.log('[ioBroker] TreeView components initialized successfully');
     }
+    
+    // REMOVED: No more RED reference passing for events - not needed with simple solution
     
     function ioBConfig(n) {
         RED.nodes.createNode(this, n);
