@@ -1,4 +1,4 @@
-const connectionManager = require('./lib/websocket-manager');
+ const connectionManager = require('./lib/manager/websocket-manager');
 
 module.exports = function(RED) {
     function iobin(config) {
@@ -99,7 +99,7 @@ module.exports = function(RED) {
                 const message = createMessage(stateId, state, false);
                 node.send(message);
                 
-                const timestamp = new Date().toLocaleTimeString();
+                const timestamp = new Date().toLocaleTimeString(undefined, { hour12: false })
                 const statusText = actualWildcardMode 
                     ? `Pattern active - Last: ${timestamp}`
                     : `Last: ${timestamp}`;
