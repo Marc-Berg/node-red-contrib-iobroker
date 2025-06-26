@@ -52,7 +52,7 @@ function setupAPIEndpoints(RED) {
     if (apiEndpointsSetup) return true;
     
     try {
-         const connectionManager = require('./lib/manager/websocket-manager');
+        const connectionManager = require('./lib/manager/websocket-manager');
         
         RED.httpAdmin.get('/iobroker/ws/states/:serverId', async (req, res) => {
             try {
