@@ -39,6 +39,7 @@ External Node-RED integration nodes for ioBroker communication. NOT an ioBroker 
 - **Automatic reconnection** and connection status monitoring
 - **Bidirectional communication** for state changes and commands
 - **Object management** for accessing ioBroker object definitions
+- **Automatic object creation** - create missing ioBroker objects on-the-fly
 - **OAuth2 authentication support** for secured installations
 - **No-auth mode** for unsecured installations
   
@@ -73,12 +74,24 @@ Subscribes to ioBroker state changes and forwards updates to your flow in real-t
 
 ### WS ioB out  ![alt text](images/iobout.png)
 **Output Node**  
-Sends values to ioBroker states.
+Sends values to ioBroker states with optional automatic object creation.
 
 - **State:** Specify the target ioBroker state using the tree browser or manual input.  
   If left empty, `msg.topic` is used as the state ID.
 - **Input:** Any message with a value in `msg.[inputProperty]` (default: `msg.payload`) will update the specified state.
 - **Set Mode:** Choose whether to set the value as a `value` (ack=true) or as a `command` (ack=false).
+- **Auto-Create Objects:** When enabled, missing ioBroker objects will be created automatically before setting values.
+  - **Static Configuration:** Configure object properties (name, role, type, unit, etc.) directly in the node settings
+  - **Dynamic Configuration:** Override properties using message properties:
+    - `msg.stateName` - Object name/description
+    - `msg.stateRole` - Object role (e.g., "state", "value", "sensor")
+    - `msg.payloadType` - Data type ("boolean", "number", "string", "object", "array", "file", "mixed")
+    - `msg.stateReadonly` - Read-only flag (true/false, default: writable)
+    - `msg.stateUnit` - Unit of measurement (e.g., "°C", "%", "kWh")
+    - `msg.stateMin` - Minimum value
+    - `msg.stateMax` - Maximum value
+  - **Auto-Detection:** Payload type is automatically detected if not specified
+  - **Object Structure:** Creates complete ioBroker object definitions with proper metadata
 - **Server Configuration:** Configure the ioBroker server details in the node settings.
 
 ### WS ioB get ![alt text](images/iobget.png)
@@ -218,6 +231,7 @@ Send a message with `msg.topic = "status"` to any node to get detailed connectio
    - For `iobin`, select whether to trigger on all updates or only on acknowledged/unacknowledged changes.
    - For `iobin`, optionally enable **"Send initial value on startup"** to receive the current state value immediately after (re)connection.
    - For `iobout`, choose between "value" (ack=true) or "command" (ack=false) mode.
+   - For `iobout`, optionally enable **"Auto create objects"** to automatically create missing ioBroker objects.
    - For `iobget` and `iobgetobject`, set the state or object ID or leave empty to use `msg.topic`.
 4. **Connect** the nodes to your flow as needed.
 
@@ -249,6 +263,24 @@ Wildcard patterns allow subscribing to multiple states at once:
 ## Object Management
 
 The `iobgetobject` node provides access to ioBroker object definitions, which contain the structural and configuration information for all ioBroker entities. Object definitions include essential metadata such as object type classification (state, channel, device, adapter), common properties including names and roles, adapter-specific native configurations, and access control settings.
+
+The `iobout` node can automatically create missing objects when the **Auto-Create Objects** feature is enabled. This allows Node-RED flows to dynamically create new ioBroker states without manual configuration in the ioBroker admin interface.
+
+### Object Auto-Creation Process
+
+1. **Check Existence:** The node first checks if the target object already exists
+2. **Create if Missing:** If the object doesn't exist and auto-create is enabled:
+   - Creates a complete ioBroker object definition
+   - Sets appropriate metadata (name, role, type, read/write permissions)
+   - Applies configured or detected properties (unit, min/max values, etc.)
+3. **Set Value:** Proceeds to set the state value as normal
+
+### Object Configuration Methods
+
+- **Static Configuration:** Set object properties directly in the node configuration
+- **Dynamic Configuration:** Override properties via message properties (`msg.stateName`, `msg.stateRole`, etc.)
+- **Auto-Detection:** Automatically detect data types from payload values
+- **Intelligent Defaults:** Use sensible defaults for missing properties
 
 ## Connection Management
 
@@ -329,6 +361,18 @@ The nodes connect to ioBroker's WebSocket interface via **one** of three options
    - Authentication may not be enabled
    - Try using no-auth mode
    - Check adapter configuration
+
+### Object Creation Issues:
+
+1. **"Object creation failed"**
+   - Check if user has object creation permissions in ioBroker
+   - Verify the state ID format is valid
+   - Ensure the ioBroker system has sufficient resources
+
+2. **"Invalid object properties"**
+   - Check configured object properties (type, role, etc.)
+   - Verify min/max values are valid numbers
+   - Ensure unit strings are properly formatted
 
 ### Multiple Server Support:
 
