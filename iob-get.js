@@ -1,4 +1,4 @@
- const connectionManager = require('./lib/manager/websocket-manager');
+const connectionManager = require('./lib/manager/websocket-manager');
 
 module.exports = function(RED) {
     function iobget(config) {
@@ -46,9 +46,6 @@ module.exports = function(RED) {
                         setStatus("green", "dot", "Ready");
                         node.isInitialized = true;
                         break;
-                    case 'connected':
-                        setStatus("green", "ring", "Connected");
-                        break;
                     case 'connecting':
                         setStatus("yellow", "ring", "Connecting...");
                         break;
@@ -56,14 +53,8 @@ module.exports = function(RED) {
                         setStatus("red", "ring", "Disconnected");
                         node.isInitialized = false;
                         break;
-                    case 'reconnecting':
-                        setStatus("yellow", "ring", "Reconnecting...");
-                        break;
                     case 'retrying':
                         setStatus("yellow", "ring", "Retrying...");
-                        break;
-                    case 'retrying_production':
-                        setStatus("yellow", "ring", "Retrying (prod)...");
                         break;
                     case 'failed_permanently':
                         setStatus("red", "ring", "Auth failed");
@@ -139,17 +130,22 @@ module.exports = function(RED) {
                     globalConfig
                 );
                 
-                setStatus("green", "dot", "Ready");
-                node.isInitialized = true;
-                node.log(`Connection established for get node`);
+                // Only set ready status if connection is actually ready
+                const status = connectionManager.getConnectionStatus(settings.serverId);
+                if (status.ready) {
+                    setStatus("green", "dot", "Ready");
+                    node.isInitialized = true;
+                    node.log(`Connection established for get node`);
+                } else {
+                    // Node is registered, will get status updates when connection is ready
+                    setStatus("yellow", "ring", "Waiting for connection...");
+                    node.log(`Get node registered - waiting for connection to be ready`);
+                }
                 
             } catch (error) {
                 const errorMsg = error.message || 'Unknown error';
-                setError(`Connection failed: ${errorMsg}`, "Connection failed");
-                node.error(`Connection failed: ${errorMsg}`);
-                
-                // The new architecture will handle retries automatically via recovery callbacks
-                // No manual retry logic needed here
+                setStatus("red", "ring", "Registration failed");
+                node.error(`Node registration failed: ${errorMsg}`);
             }
         }
 

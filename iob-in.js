@@ -124,6 +124,7 @@ module.exports = function(RED) {
                 }
             };
             
+            // Status update callback - called by the centralized manager
             callback.updateStatus = function(status) {
                 switch (status) {
                     case 'ready':
@@ -132,12 +133,6 @@ module.exports = function(RED) {
                             : "Ready";
                         setStatus("green", "dot", statusText);
                         node.isInitialized = true;
-                        break;
-                    case 'connected':
-                        const connectedText = isWildcardPattern
-                            ? `Pattern connected: ${node.statePattern}`
-                            : "Connected";
-                        setStatus("green", "ring", connectedText);
                         break;
                     case 'connecting':
                         setStatus("yellow", "ring", "Connecting...");
@@ -148,15 +143,8 @@ module.exports = function(RED) {
                         node.isInitialized = false;
                         node.isSubscribed = false;
                         break;
-                    case 'reconnecting':
-                        setStatus("yellow", "ring", "Reconnecting...");
-                        node.isSubscribed = false;
-                        break;
                     case 'retrying':
                         setStatus("yellow", "ring", "Retrying...");
-                        break;
-                    case 'retrying_production':
-                        setStatus("yellow", "ring", "Retrying (prod)...");
                         break;
                     case 'failed_permanently':
                         setStatus("red", "ring", "Auth failed");
@@ -207,8 +195,9 @@ module.exports = function(RED) {
         }
         
         async function initialize() {
+            // Check if we're already subscribed and connection is ready
             const status = connectionManager.getConnectionStatus(settings.serverId);
-            if (node.isSubscribed && status.connected) {
+            if (node.isSubscribed && status.connected && status.ready) {
                 node.log("Already subscribed and connected, skipping initialization");
                 return;
             }
@@ -216,6 +205,7 @@ module.exports = function(RED) {
             try {
                 setStatus("yellow", "ring", "Connecting...");
                 
+                // Handle configuration changes
                 if (hasConfigChanged()) {
                     const newGlobalConfig = RED.nodes.getNode(config.server);
                     const oldServerId = settings.serverId;
@@ -239,6 +229,7 @@ module.exports = function(RED) {
                 
                 const callback = createCallback();
                 
+                // The manager will handle all connection logic centrally
                 await connectionManager.subscribe(
                     settings.nodeId,
                     settings.serverId,
@@ -261,21 +252,16 @@ module.exports = function(RED) {
             } catch (error) {
                 const errorMsg = error.message || 'Unknown error';
                 
-                if (errorMsg.includes('timeout') || errorMsg.includes('refused') || 
-                    errorMsg.includes('ECONNRESET') || errorMsg.includes('ENOTFOUND') ||
-                    errorMsg.includes('EHOSTUNREACH') || errorMsg.includes('socket hang up')) {
-                    
-                    setStatus("yellow", "ring", "Waiting for server...");
-                    node.log(`Initial connection failed, connection recovery enabled: ${errorMsg}`);
-                    
-                } else if (errorMsg.includes('authentication') || errorMsg.includes('Authentication failed')) {
-                    
-                    setError(`Authentication failed: ${errorMsg}`, "Auth failed");
-                    
+                // The centralized manager handles retry logic, so we just log the error
+                node.log(`Connection attempt failed: ${errorMsg} - Manager will handle recovery`);
+                
+                // Set appropriate status based on error type
+                if (errorMsg.includes('not possible in state')) {
+                    // Connection is in a state where retry isn't possible (e.g., auth failed)
+                    setStatus("red", "ring", "Connection failed");
                 } else {
-                    
-                    setStatus("yellow", "ring", "Connection recovery active");
-                    node.log(`Connection failed, recovery enabled: ${errorMsg}`);
+                    // Other errors - manager will handle recovery
+                    setStatus("yellow", "ring", "Waiting for connection");
                 }
                 
                 node.isSubscribed = false;
@@ -315,6 +301,7 @@ module.exports = function(RED) {
             node.isSubscribed = false;
         });
         
+        // Initialize the node
         initialize();
     }
     
