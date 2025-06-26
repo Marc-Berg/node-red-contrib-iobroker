@@ -34,7 +34,6 @@ module.exports = function(RED) {
             return setError("State ID/Pattern missing", "State ID missing");
         }
         
-        // Simplified wildcard detection
         const isWildcardPattern = statePattern.includes('*');
         
         const settings = {
@@ -107,10 +106,8 @@ module.exports = function(RED) {
         function createCallback() {
             const callback = onStateChange;
             
-            // Simple flag to indicate if this node wants initial values
             callback.wantsInitialValue = settings.sendInitialValue;
             
-            // Handle initial value separately (called by the simplified system)
             callback.onInitialValue = function(stateId, state) {
                 try {
                     if (!shouldSendMessage(state.ack, settings.ackFilter)) {

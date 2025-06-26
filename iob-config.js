@@ -108,8 +108,6 @@ module.exports = function(RED) {
         console.log('[ioBroker] TreeView components initialized successfully');
     }
     
-    // REMOVED: No more RED reference passing for events - not needed with simple solution
-    
     function ioBConfig(n) {
         RED.nodes.createNode(this, n);
         this.iobhost = n.iobhost;
