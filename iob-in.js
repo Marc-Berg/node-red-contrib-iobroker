@@ -40,7 +40,7 @@ module.exports = function(RED) {
             outputProperty: config.outputProperty?.trim() || "payload",
             ackFilter: config.ackFilter || "both",
             sendInitialValue: config.sendInitialValue && !isWildcardPattern, // Disable for wildcards
-            serverId: `${iobhost}:${iobport}`,
+            serverId: connectionManager.getServerId(globalConfig),
             nodeId: node.id,
             useWildcard: isWildcardPattern
         };

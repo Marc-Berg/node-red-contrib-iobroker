@@ -21,7 +21,7 @@ module.exports = function(RED) {
             inputProperty: config.inputProperty?.trim() || "payload",
             setMode: config.setMode || "value",
             autoCreate: config.autoCreate || false,
-            serverId: `${iobhost}:${iobport}`,
+            serverId: connectionManager.getServerId(globalConfig),
             nodeId: node.id,
             // Object creation settings
             stateName: config.stateName?.trim() || "",
