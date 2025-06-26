@@ -19,7 +19,7 @@ module.exports = function(RED) {
         // Configuration with defaults
         const settings = {
             outputProperty: config.outputProperty?.trim() || "payload",
-            serverId: `${iobhost}:${iobport}`,
+            serverId: connectionManager.getServerId(globalConfig),
             nodeId: node.id
         };
 
