@@ -37,12 +37,14 @@
   "nodes": {
       "iobin": "iob-in.js",
       "iobout": "iob-out.js",
+      "iobinobject": "iob-inobject.js",
       "iobget": "iob-get.js",
       "iobgetobject": "iob-getobject.js",
       "iob-config": "iob-config.js"
     },
     "examples": [
       "examples/iob-in.json",
+      "examples/iob-inobject.json",
       "examples/iob-out.json", 
       "examples/iob-get.json",
       "examples/iob-getobject.json"

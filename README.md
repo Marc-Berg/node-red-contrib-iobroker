@@ -42,6 +42,7 @@ External Node-RED integration nodes for ioBroker communication. NOT an ioBroker 
 - **Automatic reconnection** and connection status monitoring
 - **Bidirectional communication** for state changes and commands
 - **Object management** for accessing ioBroker object definitions
+- **Object subscriptions** for monitoring structure and configuration changes
 - **Automatic object creation** - create missing ioBroker objects on-the-fly
 - **OAuth2 authentication support** for secured installations
 - **No-auth mode** for unsecured installations
@@ -73,6 +74,19 @@ Subscribes to ioBroker state changes and forwards updates to your flow in real-t
   - Initial value messages contain an additional `msg.initial = true` property for identification
   - The same acknowledgment filter applies to initial values
   - **Note:** Initial values are automatically disabled for wildcard patterns to prevent performance issues
+- **Server Configuration:** Configure the ioBroker server details in the node settings.
+
+### WS ioB inObj  ![alt text](images/iobinobject.png)
+**Object Input Node**  
+Subscribes to ioBroker object changes and monitors structure and configuration modifications in real-time.
+
+- **Object Pattern:** ioBroker object ID or wildcard pattern (e.g., `system.adapter.*`)
+- **Output:** Object definition is sent as `msg.[outputProperty]` (default: `msg.payload`).  
+  Complete object is available in `msg.object`, operation in `msg.operation` (update/delete).
+- **Use Cases:**
+  - **Adapter Monitoring:** `system.adapter.*` for adapter installations/updates
+  - **Configuration Tracking:** `system.adapter.admin.*` for admin settings
+  - **User Data:** `0_userdata.0.*` for user-created objects
 - **Server Configuration:** Configure the ioBroker server details in the node settings.
 
 ### WS ioB out  ![alt text](images/iobout.png)
@@ -233,6 +247,7 @@ Send a message with `msg.topic = "status"` to any node to get detailed connectio
    - Set the output/input property for the value (default: `msg.payload`).
    - For `iobin`, select whether to trigger on all updates or only on acknowledged/unacknowledged changes.
    - For `iobin`, optionally enable **"Send initial value on startup"** to receive the current state value immediately after (re)connection.
+   - For `iobinobject`, use wildcard patterns like `system.adapter.*` for adapter monitoring.
    - For `iobout`, choose between "value" (ack=true) or "command" (ack=false) mode.
    - For `iobout`, optionally enable **"Auto create objects"** to automatically create missing ioBroker objects.
    - For `iobget` and `iobgetobject`, set the state or object ID or leave empty to use `msg.topic`.
@@ -266,6 +281,11 @@ Wildcard patterns allow subscribing to multiple states at once:
 ## Object Management
 
 The `iobgetobject` node provides access to ioBroker object definitions, which contain the structural and configuration information for all ioBroker entities. Object definitions include essential metadata such as object type classification (state, channel, device, adapter), common properties including names and roles, adapter-specific native configurations, and access control settings.
+
+The `iobinobject` node enables subscribing to object changes for:
+- **Adapter Monitoring:** Monitor adapter installations and updates (`system.adapter.*`)
+- **Configuration Tracking:** Track setting changes (`system.adapter.admin.*`)
+- **System Structure Changes:** Detect new devices and objects (`0_userdata.0.*`)
 
 The `iobout` node can automatically create missing objects when the **Auto-Create Objects** feature is enabled. This allows Node-RED flows to dynamically create new ioBroker states without manual configuration in the ioBroker admin interface.
 
