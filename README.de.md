@@ -31,20 +31,20 @@ Externe Node-RED Integrations-Nodes für ioBroker Kommunikation. KEIN ioBroker A
 
 💡 Für eine einfachere Installation: In den meisten Fällen ist es einfacher, den ioBroker Node-RED Adapter zu verwenden, wenn Sie eine unkomplizierte Einrichtung bevorzugen.
 
-🔧 **Bekanntes Problem - Authentifizierungs-Token Ablauf**: Es gibt derzeit ein bekanntes Problem mit der Authentifizierung und ablaufenden Tokens, das zu Verbindungsabbrüchen führen kann. **Verwenden Sie KEINE Anmelde-Session-Dauern kürzer als 3600 Sekunden** (1 Stunde) in Ihren ioBroker Adapter-Einstellungen!
+🔧 **Bekanntes Problem - Token Ablauf**: Es gibt derzeit ein bekanntes Problem mit der Authentifizierung und ablaufenden Tokens, das zu Verbindungsabbrüchen führen kann. **Verwenden Sie KEINE Anmelde-Session-Dauern kürzer als 3600 Sekunden** (1 Stunde) in Ihren ioBroker Adapter-Einstellungen!
 
 ## Funktionen
 
 - **Echtzeit-WebSocket-Kommunikation**
 - **Geteiltes Verbindungsmanagement** - mehrere Nodes teilen sich WebSocket-Verbindungen
 - **Interaktiver State-Browser** mit Suchfunktion
-- **Wildcard-Pattern-Unterstützung** - Abonnierung mehrerer States mit Mustervergleich
+- **Wildcard-Pattern-Unterstützung** - Abonnierung mehrerer States mit Wildcards
 - **Automatische Wiederverbindung** und Verbindungsstatus-Überwachung
 - **Bidirektionale Kommunikation** für State-Änderungen und Befehle
 - **Objekt-Management** für den Zugriff auf ioBroker Objektdefinitionen
 - **Automatische Objekterstellung** - fehlende ioBroker Objekte automatisch erstellen
-- **OAuth2-Authentifizierung** für gesicherte Installationen
-- **No-Auth-Modus** für ungesicherte Installationen
+- **OAuth2-Authentifizierung** für Installationen mit Authentifizierung
+- **No-Auth-Modus** ungesicherte Installationen ohne Authentifizierung
 
 ## Anwendungsfälle
 
@@ -60,7 +60,7 @@ Externe Node-RED Integrations-Nodes für ioBroker Kommunikation. KEIN ioBroker A
 **Input Node**  
 Abonniert ioBroker State-Änderungen und leitet Updates in Echtzeit an Ihren Flow weiter. Unterstützt sowohl einzelne States als auch Wildcard-Pattern.
 
-- **State:** Ein ioBroker State kann über den interaktiven Tree-Browser oder manuelle Eingabe spezifiziert werden.
+- **State:** Ein ioBroker State kann über den interaktiven Tree-Browser oder manuelle Eingabe festgelegt werden.
   - **Einzelne States:** `0_userdata.0.test`
   - **Wildcard-Pattern:** `system.adapter.*.alive` oder `0_userdata.0.*` (automatisch erkannt)
 - **Output:** Der Wert des geänderten States wird als `msg.[outputProperty]` gesendet (Standard: `msg.payload`).  
@@ -70,8 +70,7 @@ Abonniert ioBroker State-Änderungen und leitet Updates in Echtzeit an Ihren Flo
   - **Acknowledged:** Nur Updates mit `ack: true`
   - **Unacknowledged:** Nur Updates mit `ack: false`
 - **Send initial value:** Wenn aktiviert, wird der aktuelle State-Wert sofort nach Verbindungsaufbau gesendet, gefolgt von regulären Änderungsbenachrichtigungen.
-  - Initial-Value-Nachrichten enthalten eine zusätzliche `msg.initial = true` Eigenschaft zur Identifikation
-  - Der gleiche Bestätigungsfilter gilt für Initial-Values
+  - Der "Ack" - Filter gilt auch für Initial-Values!
   - **Hinweis:** Initial-Values werden automatisch für Wildcard-Pattern deaktiviert, um Performance-Probleme zu vermeiden
 - **Server-Konfiguration:** Konfigurieren Sie die ioBroker Server-Details in den Node-Einstellungen.
 
@@ -79,13 +78,13 @@ Abonniert ioBroker State-Änderungen und leitet Updates in Echtzeit an Ihren Flo
 **Output Node**  
 Sendet Werte an ioBroker States mit optionaler automatischer Objekterstellung.
 
-- **State:** Spezifizieren Sie den Ziel-ioBroker State über den Tree-Browser oder manuelle Eingabe.  
+- **State:** Legen Sie den Ziel-ioBroker State über den Tree-Browser oder manuelle Eingabe fest.  
   Wenn leer gelassen, wird `msg.topic` als State-ID verwendet.
-- **Input:** Jede Nachricht mit einem Wert in `msg.[inputProperty]` (Standard: `msg.payload`) aktualisiert den spezifizierten State.
+- **Input:** Jede Nachricht mit einem Wert in `msg.[inputProperty]` (Standard: `msg.payload`) aktualisiert den festgelegten State.
 - **Set Mode:** Wählen Sie, ob der Wert als `value` (ack=true) oder als `command` (ack=false) gesetzt werden soll.
 - **Auto-Create Objects:** Wenn aktiviert, werden fehlende ioBroker Objekte automatisch vor dem Setzen von Werten erstellt.
   - **Statische Konfiguration:** Konfigurieren Sie Objekteigenschaften (Name, Rolle, Typ, Einheit, etc.) direkt in den Node-Einstellungen
-  - **Dynamische Konfiguration:** Überschreiben Sie Eigenschaften mit Nachrichten-Eigenschaften:
+  - **Dynamische Konfiguration:** Überschreiben von Eigenschaften mit Nachrichten-Attributen:
     - `msg.stateName` - Objektname/-beschreibung
     - `msg.stateRole` - Objektrolle (z.B. "state", "value", "sensor")
     - `msg.payloadType` - Datentyp ("boolean", "number", "string", "object", "array", "file", "mixed")
@@ -93,15 +92,15 @@ Sendet Werte an ioBroker States mit optionaler automatischer Objekterstellung.
     - `msg.stateUnit` - Maßeinheit (z.B. "°C", "%", "kWh")
     - `msg.stateMin` - Minimalwert
     - `msg.stateMax` - Maximalwert
-  - **Auto-Erkennung:** Payload-Typ wird automatisch erkannt, wenn nicht spezifiziert
+  - **Auto-Erkennung:** Payload-Typ wird automatisch erkannt, wenn nicht festgelegt
   - **Objektstruktur:** Erstellt vollständige ioBroker Objektdefinitionen mit entsprechenden Metadaten
-- **Server-Konfiguration:** Konfigurieren Sie die ioBroker Server-Details in den Node-Einstellungen.
+- **Server-Konfiguration:** Konfigurieren Sie die ioBroker Server-Daten in den Node-Einstellungen.
 
 ### WS ioB get ![alt text](images/iobget.png)
 **Getter Node**  
 Liest den aktuellen Wert eines ioBroker States auf Anfrage.
 
-- **State:** Spezifizieren Sie den zu lesenden ioBroker State über den Tree-Browser oder manuelle Eingabe.  
+- **State:** Legen Sie den Ziel-ioBroker State über den Tree-Browser oder manuelle Eingabe fest.  
   Wenn leer gelassen, wird `msg.topic` als State-ID verwendet.
 - **Output:** Der aktuelle Wert des States wird als `msg.[outputProperty]` gesendet (Standard: `msg.payload`).
 - **Server-Konfiguration:** Konfigurieren Sie die ioBroker Server-Details in den Node-Einstellungen.
@@ -110,8 +109,8 @@ Liest den aktuellen Wert eines ioBroker States auf Anfrage.
 **Object Getter Node**  
 Ruft ioBroker Objektdefinitionen ab, einschließlich Metadaten und Konfigurationsinformationen.
 
-- **Object ID:** Spezifizieren Sie die ioBroker Objekt-Kennung über den Tree-Browser oder manuelle Eingabe.  
-  Wenn leer gelassen, wird `msg.topic` als Objekt-ID verwendet.
+- **Object ID:** Legen Sie den Ziel-ioBroker State über den Tree-Browser oder manuelle Eingabe fest.  
+  Wenn leer gelassen, wird `msg.topic` als State-ID verwendet.
 - **Output:** Die vollständige Objektdefinition wird als `msg.[outputProperty]` gesendet (Standard: `msg.payload`).
 - **Objektstruktur:** Gibt das vollständige ioBroker Objekt zurück, einschließlich Typ, allgemeine Eigenschaften, native Konfiguration und Zugriffskontrollinformationen.
 - **Server-Konfiguration:** Konfigurieren Sie die ioBroker Server-Details in den Node-Einstellungen.
@@ -124,7 +123,7 @@ Ruft ioBroker Objektdefinitionen ab, einschließlich Metadaten und Konfiguration
 Geteilte Konfiguration für ioBroker Server-Einstellungen.
 
 - **ioBroker Host/Port:** Konfigurieren Sie den ioBroker WebSocket-Endpunkt.
-- **Authentifizierung:** Optionaler Benutzername/Passwort für gesicherte ioBroker Installationen.
+- **Authentifizierung:** Benutzername/Passwort (optional) für gesicherte ioBroker Installationen.
 
 ## Installation
 
@@ -140,7 +139,7 @@ Geteilte Konfiguration für ioBroker Server-Einstellungen.
 4. Wechseln Sie zum "Install" Tab
 5. Suchen Sie nach `node-red-contrib-iobroker`
 6. Klicken Sie "Install" neben dem Paket
-7. Bestätigen Sie die Installation wenn aufgefordert
+7. Bestätigen Sie die Installation, wenn dazu aufgefordert wird
 8. Die Nodes werden nach der Installation in der Palette verfügbar sein
 
 ### Methode 2: Installation von Release-Datei
@@ -149,7 +148,7 @@ Geteilte Konfiguration für ioBroker Server-Einstellungen.
 3. Klicken Sie auf die Menü-Schaltfläche (☰) und wählen Sie "Manage palette"
 4. Wechseln Sie zum "Install" Tab
 5. Klicken Sie "Upload a .tgz file" und wählen Sie die heruntergeladene .tgz Datei
-6. Warten Sie, bis die Installation abgeschlossen ist und starten Sie Node-RED neu, wenn aufgefordert
+6. Warten Sie, bis die Installation abgeschlossen ist und starten Sie Node-RED neu, wenn dazu aufgefordert wird
 
 ### Methode 3: Installation über npm Kommandozeile
 ```bash
@@ -248,7 +247,7 @@ Alle Nodes verfügen über einen **interaktiven State-Browser**, der es einfach 
 - **Tree-Browser:** Klicken Sie "Switch to tree selection", um verfügbare States zu durchsuchen
 - **Suchfunktion:** Verwenden Sie die Suchbox, um States in der Tree-Ansicht zu filtern
 - **Smart Caching:** State-Listen werden für bessere Performance zwischengespeichert
-- **Echtzeit-Aktualisierung:** Aktualisieren Sie die State-Liste mit der Aktualisieren-Schaltfläche
+- **Echtzeit-Aktualisierung:** Aktualisieren Sie die State-Liste mit der Refresh-Schaltfläche
 - **Wildcard-Unterstützung:** Pattern mit `*` werden automatisch erkannt und validiert
 
 ### Wildcard-Pattern
@@ -261,11 +260,11 @@ Wildcard-Pattern ermöglichen das Abonnieren mehrerer States gleichzeitig:
   - `0_userdata.0.*` - alle States unter 0_userdata.0
   - `*.temperature` - alle Temperatur-States
 - **Auto-Erkennung:** Wildcard-Modus wird automatisch aktiviert, wenn `*` im Pattern erkannt wird
-- **Performance:** Vermeiden Sie zu breite Pattern wie `*` oder `*.*`
+- **Performance:** Vermeiden Sie zu weitreichende Pattern wie `*` oder `*.*`
 
 ## Objekt-Management
 
-Die `iobgetobject` Node bietet Zugriff auf ioBroker Objektdefinitionen, die die strukturellen und Konfigurationsinformationen für alle ioBroker Entitäten enthalten. Objektdefinitionen umfassen wesentliche Metadaten wie Objekttyp-Klassifizierung (State, Channel, Device, Adapter), allgemeine Eigenschaften einschließlich Namen und Rollen, adapter-spezifische native Konfigurationen und Zugriffskontroll-Einstellungen.
+Die `iobgetobject` Node bietet Zugriff auf ioBroker Objektdefinitionen, die die strukturellen und Konfigurationsinformationen für alle ioBroker Objekte enthalten. Objektdefinitionen umfassen wesentliche Metadaten wie Objekttyp-Klassifizierung (State, Channel, Device, Adapter), allgemeine Eigenschaften einschließlich Namen und Rollen, Adapter-spezifische native Konfigurationen und Zugriffskontroll-Einstellungen.
 
 Die `iobout` Node kann automatisch fehlende Objekte erstellen, wenn die **Auto-Create Objects** Funktion aktiviert ist. Dies ermöglicht es Node-RED Flows, dynamisch neue ioBroker States zu erstellen, ohne manuelle Konfiguration in der ioBroker Admin-Oberfläche.
 
@@ -274,7 +273,7 @@ Die `iobout` Node kann automatisch fehlende Objekte erstellen, wenn die **Auto-C
 1. **Existenz prüfen:** Die Node prüft zuerst, ob das Zielobjekt bereits existiert
 2. **Erstellen falls fehlend:** Wenn das Objekt nicht existiert und Auto-Create aktiviert ist:
    - Erstellt eine vollständige ioBroker Objektdefinition
-   - Setzt angemessene Metadaten (Name, Rolle, Typ, Lese-/Schreibberechtigungen)
+   - Setzt Metadaten (Name, Rolle, Typ, Lese-/Schreibberechtigungen)
    - Wendet konfigurierte oder erkannte Eigenschaften an (Einheit, Min-/Max-Werte, etc.)
 3. **Wert setzen:** Fährt fort mit dem normalen Setzen des State-Werts
 
@@ -291,10 +290,10 @@ Die `iobout` Node kann automatisch fehlende Objekte erstellen, wenn die **Auto-C
 Mehrere Nodes können die gleiche ioBroker Verbindung für effiziente Ressourcennutzung teilen:
 - **Automatisches Teilen:** Nodes mit identischen Server-Konfigurationen teilen Verbindungen
 - **Unabhängige Abonnements:** Jede Node behält ihre eigenen State-Abonnements
-- **Effiziente Wiederverbindung:** Verbindungsausfälle betreffen alle teilenden Nodes, erholen sich aber automatisch
+- **Effiziente Wiederverbindung:** Verbindungsausfälle betreffen alle Nodes, verbinden sich aber wieder automatisch
 
 ### Status-Überwachung
-Überwachen Sie die Verbindungsgesundheit, indem Sie Status-Anfragen an jede Node senden (außer iobin):
+Überwachen Sie die Verbindungsdaten, indem Sie Status-Anfragen an jede Node senden (außer iobin):
 ```javascript
 msg.topic = "status"
 ```
@@ -303,19 +302,18 @@ Antwort enthält:
 - Verbindungsstatus und Server-Details
 - Authentifizierungsinformationen und Token-Status
 - Verbindungshistorie (Verbinden/Trennen-Zähler, Zeitstempel)
-- Node-spezifische Informationen (Initial-Value-Status)
 
 ## WebSocket-Verbindung
 
 Die Nodes verbinden sich mit ioBrokers WebSocket-Schnittstelle über **eine** von drei Optionen:
 
-### Port-Optionen:
+### Ports:
 
 1. **WebSocket-Adapter** (Standard-Port 8084)
    - Dedizierter WebSocket-Adapter
 
 2. **Web-Adapter** (Standard-Port 8082)
-   - Erfordert "Use pure web-sockets (iobroker.ws)" aktiviert zu sein
+   - Erfordert aktiviertes "Use pure web-sockets (iobroker.ws)"
 
 3. **Admin-Adapter** (Standard-Port 8081)
    - Verwendet die Admin-Oberflächen-WebSocket
