@@ -1,15 +1,15 @@
 const connectionManager = require('./lib/manager/websocket-manager');
 
-module.exports = function(RED) {
+module.exports = function (RED) {
     function iobin(config) {
         RED.nodes.createNode(this, config);
         const node = this;
-        
+
         function setError(message, statusText) {
             node.error(message);
             setStatus("red", "ring", statusText);
         }
-        
+
         function setStatus(fill, shape, text) {
             try {
                 node.status({ fill, shape, text });
@@ -17,25 +17,25 @@ module.exports = function(RED) {
                 node.warn(`Status update error: ${error.message}`);
             }
         }
-        
+
         // Get server configuration
         const globalConfig = RED.nodes.getNode(config.server);
         if (!globalConfig) {
             return setError("No server configuration selected", "No server config");
         }
-        
+
         const { iobhost, iobport, user, password, usessl } = globalConfig;
         if (!iobhost || !iobport) {
             return setError("ioBroker host or port missing", "Host/port missing");
         }
-        
+
         const statePattern = config.state?.trim();
         if (!statePattern) {
             return setError("State ID/Pattern missing", "State ID missing");
         }
-        
+
         const isWildcardPattern = statePattern.includes('*');
-        
+
         const settings = {
             outputProperty: config.outputProperty?.trim() || "payload",
             ackFilter: config.ackFilter || "both",
@@ -44,12 +44,15 @@ module.exports = function(RED) {
             nodeId: node.id,
             useWildcard: isWildcardPattern
         };
-        
+
         node.currentConfig = { iobhost, iobport, user, password, usessl };
         node.isInitialized = false;
         node.isSubscribed = false;
         node.statePattern = statePattern;
-        
+
+        // Log initial value setting for debugging
+        node.log(`Initial value setting: ${settings.sendInitialValue} (config: ${config.sendInitialValue}, isWildcard: ${isWildcardPattern})`);
+
         function shouldSendMessage(ack, filter) {
             switch (filter) {
                 case "ack": return ack === true;
@@ -57,74 +60,82 @@ module.exports = function(RED) {
                 default: return true;
             }
         }
-        
+
         function createMessage(stateId, state, isInitialValue = false) {
             const message = {
                 topic: stateId,
                 state: state,
                 timestamp: Date.now()
             };
-            
+
             if (isWildcardPattern) {
                 message.pattern = node.statePattern;
             }
-            
+
             if (isInitialValue) {
                 message.initial = true;
             }
-            
+
             message[settings.outputProperty] = state.val;
             return message;
         }
-        
+
         function onStateChange(stateId, state) {
             try {
                 if (!state || state.val === undefined) {
                     node.warn(`Invalid state data received for ${stateId}`);
                     return;
                 }
-                
+
                 if (!shouldSendMessage(state.ack, settings.ackFilter)) {
                     return;
                 }
-                
+
                 const message = createMessage(stateId, state, false);
                 node.send(message);
-                
+
                 const timestamp = new Date().toLocaleTimeString(undefined, { hour12: false })
-                const statusText = isWildcardPattern 
+                const statusText = isWildcardPattern
                     ? `Pattern active - Last: ${timestamp}`
                     : `Last: ${timestamp}`;
                 setStatus("green", "dot", statusText);
-                
+
             } catch (error) {
                 node.error(`State change processing error: ${error.message}`);
                 setError(`Processing error: ${error.message}`, "Process error");
             }
         }
-        
+
         function createCallback() {
             const callback = onStateChange;
-            
+
+            // IMPORTANT: Set the wantsInitialValue flag
             callback.wantsInitialValue = settings.sendInitialValue;
-            
-            callback.onInitialValue = function(stateId, state) {
+
+            // Log for debugging
+            node.log(`Callback created with wantsInitialValue: ${callback.wantsInitialValue}`);
+
+            callback.onInitialValue = function (stateId, state) {
                 try {
+                    node.log(`Initial value callback triggered for ${stateId}: ${state.val}`);
+
                     if (!shouldSendMessage(state.ack, settings.ackFilter)) {
+                        node.log(`Initial value filtered out due to ack filter: ${stateId}`);
                         return;
                     }
-                    
+
                     const message = createMessage(stateId, state, true);
                     node.send(message);
-                    
+
                     node.log(`Initial value sent for ${stateId}: ${state.val}`);
-                    
+
                 } catch (error) {
                     node.error(`Initial value processing error: ${error.message}`);
                 }
             };
-            
-            callback.updateStatus = function(status) {
+
+            // Status update callback - called by the centralized manager
+            callback.updateStatus = function (status) {
                 switch (status) {
                     case 'ready':
                         const statusText = isWildcardPattern
@@ -132,12 +143,6 @@ module.exports = function(RED) {
                             : "Ready";
                         setStatus("green", "dot", statusText);
                         node.isInitialized = true;
-                        break;
-                    case 'connected':
-                        const connectedText = isWildcardPattern
-                            ? `Pattern connected: ${node.statePattern}`
-                            : "Connected";
-                        setStatus("green", "ring", connectedText);
                         break;
                     case 'connecting':
                         setStatus("yellow", "ring", "Connecting...");
@@ -148,15 +153,8 @@ module.exports = function(RED) {
                         node.isInitialized = false;
                         node.isSubscribed = false;
                         break;
-                    case 'reconnecting':
-                        setStatus("yellow", "ring", "Reconnecting...");
-                        node.isSubscribed = false;
-                        break;
                     case 'retrying':
                         setStatus("yellow", "ring", "Retrying...");
-                        break;
-                    case 'retrying_production':
-                        setStatus("yellow", "ring", "Retrying (prod)...");
                         break;
                     case 'failed_permanently':
                         setStatus("red", "ring", "Auth failed");
@@ -165,31 +163,31 @@ module.exports = function(RED) {
                         setStatus("grey", "ring", status);
                 }
             };
-            
-            callback.onReconnect = function() {
+
+            callback.onReconnect = function () {
                 node.log("Reconnection detected - resubscribing");
                 node.isSubscribed = false;
                 setStatus("yellow", "ring", "Resubscribing...");
             };
-            
-            callback.onDisconnect = function() {
+
+            callback.onDisconnect = function () {
                 node.log("Disconnection detected by node");
                 setStatus("red", "ring", "Disconnected");
                 node.isSubscribed = false;
             };
-            
-            callback.onSubscribed = function() {
+
+            callback.onSubscribed = function () {
                 node.log("Subscription successful");
                 node.isSubscribed = true;
             };
-            
+
             return callback;
         }
-        
+
         function hasConfigChanged() {
             const currentGlobalConfig = RED.nodes.getNode(config.server);
             if (!currentGlobalConfig) return false;
-            
+
             const configChanged = (
                 node.currentConfig.iobhost !== currentGlobalConfig.iobhost ||
                 node.currentConfig.iobport !== currentGlobalConfig.iobport ||
@@ -197,29 +195,31 @@ module.exports = function(RED) {
                 node.currentConfig.password !== currentGlobalConfig.password ||
                 node.currentConfig.usessl !== currentGlobalConfig.usessl
             );
-            
+
             if (configChanged) {
                 node.log(`Configuration change detected`);
                 node.isSubscribed = false;
             }
-            
+
             return configChanged;
         }
-        
+
         async function initialize() {
+            // Check if we're already subscribed and connection is ready
             const status = connectionManager.getConnectionStatus(settings.serverId);
-            if (node.isSubscribed && status.connected) {
+            if (node.isSubscribed && status.connected && status.ready) {
                 node.log("Already subscribed and connected, skipping initialization");
                 return;
             }
-            
+
             try {
                 setStatus("yellow", "ring", "Connecting...");
-                
+
+                // Handle configuration changes
                 if (hasConfigChanged()) {
                     const newGlobalConfig = RED.nodes.getNode(config.server);
                     const oldServerId = settings.serverId;
-                    
+
                     node.currentConfig = {
                         iobhost: newGlobalConfig.iobhost,
                         iobport: newGlobalConfig.iobport,
@@ -227,18 +227,19 @@ module.exports = function(RED) {
                         password: newGlobalConfig.password,
                         usessl: newGlobalConfig.usessl
                     };
-                    
+
                     const newServerId = `${newGlobalConfig.iobhost}:${newGlobalConfig.iobport}`;
                     settings.serverId = newServerId;
-                    
+
                     if (oldServerId !== newServerId) {
                         node.log(`Server changed from ${oldServerId} to ${newServerId}, forcing connection reset`);
                         await connectionManager.forceServerSwitch(oldServerId, newServerId, newGlobalConfig);
                     }
                 }
-                
+
                 const callback = createCallback();
-                
+
+                // The manager will handle all connection logic centrally
                 await connectionManager.subscribe(
                     settings.nodeId,
                     settings.serverId,
@@ -246,77 +247,76 @@ module.exports = function(RED) {
                     callback,
                     globalConfig
                 );
-                
+
                 node.isSubscribed = true;
-                
-                const patternInfo = isWildcardPattern 
+
+                const patternInfo = isWildcardPattern
                     ? `wildcard pattern: ${statePattern}`
                     : `single state: ${statePattern}`;
-                    
+
                 node.log(`Successfully subscribed to ${patternInfo} via WebSocket${settings.sendInitialValue ? ' (with initial value)' : ''}`);
-                
+
                 setStatus("green", "dot", isWildcardPattern ? `Pattern: ${statePattern}` : "Ready");
                 node.isInitialized = true;
-                
+
             } catch (error) {
                 const errorMsg = error.message || 'Unknown error';
-                
-                if (errorMsg.includes('timeout') || errorMsg.includes('refused') || 
-                    errorMsg.includes('ECONNRESET') || errorMsg.includes('ENOTFOUND') ||
-                    errorMsg.includes('EHOSTUNREACH') || errorMsg.includes('socket hang up')) {
-                    
-                    setStatus("yellow", "ring", "Waiting for server...");
-                    node.log(`Initial connection failed, connection recovery enabled: ${errorMsg}`);
-                    
-                } else if (errorMsg.includes('authentication') || errorMsg.includes('Authentication failed')) {
-                    
-                    setError(`Authentication failed: ${errorMsg}`, "Auth failed");
-                    
+
+                // The centralized manager handles retry logic, so we just log the error
+                node.log(`Connection attempt failed: ${errorMsg} - Manager will handle recovery`);
+
+                // Set appropriate status based on error type
+                if (errorMsg.includes('auth_failed') || errorMsg.includes('Authentication failed')) {
+                    // Permanent authentication failure
+                    setStatus("red", "ring", "Auth failed");
+                } else if (errorMsg.includes('not possible in state')) {
+                    // Connection is in a state where retry isn't possible 
+                    setStatus("red", "ring", "Connection failed");
                 } else {
-                    
-                    setStatus("yellow", "ring", "Connection recovery active");
-                    node.log(`Connection failed, recovery enabled: ${errorMsg}`);
+                    // Other errors - manager will handle recovery
+                    setStatus("yellow", "ring", "Retrying...");
                 }
-                
+
                 node.isSubscribed = false;
             }
         }
-        
-        node.on("close", async function(removed, done) {
+
+        node.on("close", async function (removed, done) {
             node.log("Node closing...");
             node.isInitialized = false;
             node.isSubscribed = false;
-            
+
             try {
                 await connectionManager.unsubscribe(
                     settings.nodeId,
                     settings.serverId,
                     statePattern
                 );
-                
+
                 node.status({});
-                
-                const patternInfo = isWildcardPattern 
+
+                const patternInfo = isWildcardPattern
                     ? `wildcard pattern ${statePattern}`
                     : `single state ${statePattern}`;
-                    
+
                 node.log(`Successfully unsubscribed from ${patternInfo}`);
-                
+
             } catch (error) {
                 node.warn(`Cleanup error: ${error.message}`);
             } finally {
                 done();
             }
         });
-        
-        node.on("error", function(error) {
+
+        node.on("error", function (error) {
             node.error(`Node error: ${error.message}`);
             setError(`Node error: ${error.message}`, "Node error");
             node.isSubscribed = false;
         });
-        
+
+        // Initialize the node
         initialize();
     }
-    
+
     RED.nodes.registerType("iobin", iobin);
 };

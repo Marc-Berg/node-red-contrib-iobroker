@@ -60,7 +60,6 @@ module.exports = function(RED) {
             if (Array.isArray(value)) return "array";
             if (Buffer.isBuffer && Buffer.isBuffer(value)) return "file";
             if (typeof value === "object") {
-                // Check if object looks like file data
                 if (value.filename || value.mimetype || value.buffer || 
                     (value.data && value.type) || value.base64) {
                     return "file";
@@ -81,14 +80,13 @@ module.exports = function(RED) {
                 max: msg.stateMax !== undefined ? msg.stateMax : settings.stateMax
             };
 
-            // Handle readonly setting - Default is writable (false)
-            let readonly = false; // Default: writable
+            // Handle readonly setting
+            let readonly = false;
             if (msg.stateReadonly !== undefined) {
                 readonly = msg.stateReadonly === true || msg.stateReadonly === "true";
             } else if (settings.stateReadonly !== "") {
                 readonly = settings.stateReadonly === "true";
             }
-            // If neither message nor config specifies readonly, it stays writable (false)
             props.readonly = readonly;
 
             return props;
@@ -127,11 +125,10 @@ module.exports = function(RED) {
         // Check if object exists and create if needed
         async function ensureObjectExists(stateId, msg, value) {
             if (!settings.autoCreate) {
-                return true; // Skip object creation if auto-create is disabled
+                return true;
             }
 
             try {
-                // Check if object already exists
                 const existingObject = await connectionManager.getObject(settings.serverId, stateId);
                 
                 if (existingObject) {
@@ -139,7 +136,6 @@ module.exports = function(RED) {
                     return true;
                 }
 
-                // Object doesn't exist, create it
                 node.log(`Object ${stateId} not found, creating with auto-create settings`);
                 const objectProperties = getObjectProperties(msg, stateId, value);
                 await createObject(stateId, objectProperties);
@@ -147,7 +143,6 @@ module.exports = function(RED) {
                 return true;
             } catch (error) {
                 if (error.message && error.message.includes('not found')) {
-                    // Object truly doesn't exist, try to create it
                     try {
                         const objectProperties = getObjectProperties(msg, stateId, value);
                         await createObject(stateId, objectProperties);
@@ -157,14 +152,13 @@ module.exports = function(RED) {
                         throw createError;
                     }
                 } else {
-                    // Other error
                     node.error(`Error checking object existence for ${stateId}: ${error.message}`);
                     throw error;
                 }
             }
         }
 
-        // Create callback for event notifications
+        // Create callback for event notifications from centralized manager
         function createEventCallback() {
             const callback = function() {};
 
@@ -175,9 +169,6 @@ module.exports = function(RED) {
                         setStatus("green", "dot", readyText);
                         node.isInitialized = true;
                         break;
-                    case 'connected':
-                        setStatus("green", "ring", "Connected");
-                        break;
                     case 'connecting':
                         setStatus("yellow", "ring", "Connecting...");
                         break;
@@ -185,14 +176,8 @@ module.exports = function(RED) {
                         setStatus("red", "ring", "Disconnected");
                         node.isInitialized = false;
                         break;
-                    case 'reconnecting':
-                        setStatus("yellow", "ring", "Reconnecting...");
-                        break;
                     case 'retrying':
                         setStatus("yellow", "ring", "Retrying...");
-                        break;
-                    case 'retrying_production':
-                        setStatus("yellow", "ring", "Retrying (prod)...");
                         break;
                     case 'failed_permanently':
                         setStatus("red", "ring", "Auth failed");
@@ -237,17 +222,16 @@ module.exports = function(RED) {
             return configChanged;
         }
 
-        // Initialize connection
+        // Initialize connection using centralized manager
         async function initializeConnection() {
             try {
                 setStatus("yellow", "ring", "Connecting...");
                 
-                // Always check for configuration changes
+                // Handle configuration changes
                 if (hasConfigChanged()) {
                     const newGlobalConfig = RED.nodes.getNode(config.server);
                     const oldServerId = settings.serverId;
                     
-                    // Update internal configuration
                     node.currentConfig = {
                         iobhost: newGlobalConfig.iobhost,
                         iobport: newGlobalConfig.iobport,
@@ -259,14 +243,13 @@ module.exports = function(RED) {
                     const newServerId = `${newGlobalConfig.iobhost}:${newGlobalConfig.iobport}`;
                     settings.serverId = newServerId;
                     
-                    // Force connection reset for configuration changes
                     if (oldServerId !== newServerId) {
                         node.log(`Server changed from ${oldServerId} to ${newServerId}, forcing connection reset`);
                         await connectionManager.forceServerSwitch(oldServerId, newServerId, newGlobalConfig);
                     }
                 }
                 
-                // Register for events only - using existing API pattern
+                // Register for events with centralized manager
                 const eventCallback = createEventCallback();
                 await connectionManager.registerForEvents(
                     settings.nodeId,
@@ -275,18 +258,23 @@ module.exports = function(RED) {
                     globalConfig
                 );
                 
-                const readyText = settings.autoCreate ? "Ready (Auto-create enabled)" : "Ready";
-                setStatus("green", "dot", readyText);
-                node.isInitialized = true;
-                node.log(`Connection established for output node (auto-create: ${settings.autoCreate})`);
+                // Only set ready status if connection is actually ready
+                const status = connectionManager.getConnectionStatus(settings.serverId);
+                if (status.ready) {
+                    const readyText = settings.autoCreate ? "Ready (Auto-create enabled)" : "Ready";
+                    setStatus("green", "dot", readyText);
+                    node.isInitialized = true;
+                    node.log(`Connection established for output node (auto-create: ${settings.autoCreate})`);
+                } else {
+                    // Node is registered, will get status updates when connection is ready
+                    setStatus("yellow", "ring", "Waiting for connection...");
+                    node.log(`Output node registered - waiting for connection to be ready`);
+                }
                 
             } catch (error) {
                 const errorMsg = error.message || 'Unknown error';
-                setError(`Connection failed: ${errorMsg}`, "Connection failed");
-                node.error(`Connection failed: ${errorMsg}`);
-                
-                // The new architecture will handle retries automatically via recovery callbacks
-                // No manual retry logic needed here
+                setStatus("red", "ring", "Registration failed");
+                node.error(`Node registration failed: ${errorMsg}`);
             }
         }
 
@@ -356,7 +344,7 @@ module.exports = function(RED) {
         node.on("close", async function(done) {
             node.log("Output node closing...");
             
-            // Unregister from events
+            // Unregister from events via centralized manager
             connectionManager.unregisterFromEvents(settings.nodeId);
 
             try {
