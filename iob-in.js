@@ -50,6 +50,9 @@ module.exports = function(RED) {
         node.isSubscribed = false;
         node.statePattern = statePattern;
         
+        // Log initial value setting for debugging
+        node.log(`Initial value setting: ${settings.sendInitialValue} (config: ${config.sendInitialValue}, isWildcard: ${isWildcardPattern})`);
+        
         function shouldSendMessage(ack, filter) {
             switch (filter) {
                 case "ack": return ack === true;
@@ -106,11 +109,18 @@ module.exports = function(RED) {
         function createCallback() {
             const callback = onStateChange;
             
+            // IMPORTANT: Set the wantsInitialValue flag
             callback.wantsInitialValue = settings.sendInitialValue;
+            
+            // Log for debugging
+            node.log(`Callback created with wantsInitialValue: ${callback.wantsInitialValue}`);
             
             callback.onInitialValue = function(stateId, state) {
                 try {
+                    node.log(`Initial value callback triggered for ${stateId}: ${state.val}`);
+                    
                     if (!shouldSendMessage(state.ack, settings.ackFilter)) {
+                        node.log(`Initial value filtered out due to ack filter: ${stateId}`);
                         return;
                     }
                     
