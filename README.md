@@ -1,5 +1,8 @@
 # Node-RED Nodes for ioBroker Integration
 
+> **🌍 Languages / Sprachen:**
+> [🇺🇸 English](README.md) | [🇩🇪 Deutsch](README.de.md)
+
 ![Version](https://img.shields.io/npm/v/node-red-contrib-iobroker)
 ![License](https://img.shields.io/badge/license-MIT-blue.svg)
 ![Node-RED](https://img.shields.io/badge/Node--RED-compatible-red.svg)
