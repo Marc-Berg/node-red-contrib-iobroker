@@ -42,6 +42,7 @@ Externe Node-RED Integrations-Nodes für ioBroker Kommunikation. KEIN ioBroker A
 - **Automatische Wiederverbindung** und Verbindungsstatus-Überwachung
 - **Bidirektionale Kommunikation** für State-Änderungen und Befehle
 - **Objekt-Management** für den Zugriff auf ioBroker Objektdefinitionen
+- **Objekt-Subscriptions** für Überwachung von Struktur- und Konfigurationsänderungen
 - **Automatische Objekterstellung** - fehlende ioBroker Objekte automatisch erstellen
 - **OAuth2-Authentifizierung** für Installationen mit Authentifizierung
 - **No-Auth-Modus** ungesicherte Installationen ohne Authentifizierung
@@ -72,6 +73,19 @@ Abonniert ioBroker State-Änderungen und leitet Updates in Echtzeit an Ihren Flo
 - **Send initial value:** Wenn aktiviert, wird der aktuelle State-Wert sofort nach Verbindungsaufbau gesendet, gefolgt von regulären Änderungsbenachrichtigungen.
   - Der "Ack" - Filter gilt auch für Initial-Values!
   - **Hinweis:** Initial-Values werden automatisch für Wildcard-Pattern deaktiviert, um Performance-Probleme zu vermeiden
+- **Server-Konfiguration:** Konfigurieren Sie die ioBroker Server-Details in den Node-Einstellungen.
+
+### WS ioB inObj  ![alt text](images/iobinobject.png)
+**Object Input Node**  
+Abonniert ioBroker Objekt-Änderungen und überwacht Struktur- und Konfigurationsmodifikationen in Echtzeit.
+
+- **Object Pattern:** ioBroker Objekt-ID oder Wildcard-Pattern (z.B. `system.adapter.*`)
+- **Output:** Objekt-Definition wird als `msg.[outputProperty]` gesendet (Standard: `msg.payload`).  
+  Das vollständige Objekt ist in `msg.object` verfügbar, Operation in `msg.operation` (update/delete).
+- **Anwendungsfälle:**
+  - **Adapter-Monitoring:** `system.adapter.*` für Adapter-Installationen/Updates
+  - **Konfigurations-Überwachung:** `system.adapter.admin.*` für Admin-Einstellungen
+  - **Benutzerdaten:** `0_userdata.0.*` für User-erstellte Objekte
 - **Server-Konfiguration:** Konfigurieren Sie die ioBroker Server-Details in den Node-Einstellungen.
 
 ### WS ioB out  ![alt text](images/iobout.png)
@@ -232,6 +246,7 @@ Senden Sie eine Nachricht mit `msg.topic = "status"` an jede Node, um detaillier
    - Setzen Sie die Output/Input-Eigenschaft für den Wert (Standard: `msg.payload`).
    - Für `iobin` wählen Sie, ob bei allen Updates oder nur bei bestätigten/unbestätigten Änderungen ausgelöst werden soll.
    - Für `iobin` aktivieren Sie optional **"Send initial value on startup"**, um den aktuellen State-Wert sofort nach (Wieder-)Verbindung zu erhalten.
+   - Für `iobinobject` verwenden Sie Wildcard-Pattern wie `system.adapter.*` für Adapter-Monitoring.
    - Für `iobout` wählen Sie zwischen "value" (ack=true) oder "command" (ack=false) Modus.
    - Für `iobout` aktivieren Sie optional **"Auto create objects"**, um fehlende ioBroker Objekte automatisch zu erstellen.
    - Für `iobget` und `iobgetobject` setzen Sie die State- oder Objekt-ID oder lassen Sie sie leer, um `msg.topic` zu verwenden.
@@ -265,6 +280,11 @@ Wildcard-Pattern ermöglichen das Abonnieren mehrerer States gleichzeitig:
 ## Objekt-Management
 
 Die `iobgetobject` Node bietet Zugriff auf ioBroker Objektdefinitionen, die die strukturellen und Konfigurationsinformationen für alle ioBroker Objekte enthalten. Objektdefinitionen umfassen wesentliche Metadaten wie Objekttyp-Klassifizierung (State, Channel, Device, Adapter), allgemeine Eigenschaften einschließlich Namen und Rollen, Adapter-spezifische native Konfigurationen und Zugriffskontroll-Einstellungen.
+
+Die `iobinobject` Node ermöglicht das Abonnieren von Objekt-Änderungen für:
+- **Adapter-Monitoring:** Überwachung von Adapter-Installationen und Updates (`system.adapter.*`)
+- **Konfigurations-Tracking:** Verfolgung von Einstellungsänderungen (`system.adapter.admin.*`)
+- **System-Strukturänderungen:** Erkennung neuer Geräte und Objekte (`0_userdata.0.*`)
 
 Die `iobout` Node kann automatisch fehlende Objekte erstellen, wenn die **Auto-Create Objects** Funktion aktiviert ist. Dies ermöglicht es Node-RED Flows, dynamisch neue ioBroker States zu erstellen, ohne manuelle Konfiguration in der ioBroker Admin-Oberfläche.
 

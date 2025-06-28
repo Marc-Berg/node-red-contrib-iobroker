@@ -1,0 +1,68 @@
+<?xml version="1.0" encoding="UTF-8" standalone="no"?>
+<svg
+   version="1.1"
+   id="Layer_2"
+   x="0px"
+   y="0px"
+   width="648.5px"
+   height="652.8px"
+   viewBox="0 0 648.5 652.8"
+   style="enable-background:new 0 0 648.5 652.8;"
+   xml:space="preserve"
+   xmlns="http://www.w3.org/2000/svg">
+<style
+   type="text/css"
+   id="style1">
+   .st0{fill:#164477;}
+   .st1{fill:#3399CC;}
+   .st2{fill:#ffffff;}
+   .st3{fill:#ff9500;stroke:#e67e00;stroke-width:4;}
+</style>
+
+<!-- EXAKT IDENTISCH ZU IOBROKER_INOUT: Komplettes Original Design -->
+<g id="g4">
+   <g id="g1">
+      <path
+   class="st0"
+   d="m 386,91 v 68.6 c 68.2,25.1 117,90.5 117,167 0,98.1 -80.2,177.9 -178.7,177.9 -98.5,0 -178.7,-79.8 -178.7,-177.9 0,-76.5 48.8,-141.9 117,-167 V 91 C 159.2,118.5 8.0147517,473.20662 8.0147517,586.20662 8.0147517,720.80662 191,570.2 324.2,570.2 c 133.2,0 315.30189,148.83991 315.30189,14.23991 C 639.50189,496.17387 489.2,118.5 386,91 Z"
+   id="path1" />
+   </g>
+   <path
+   class="st1"
+   d="M324.2,148.6c12.4,0,24.5,1.3,36.3,3.7V85.6c-11.8-1.8-23.9-2.7-36.3-2.7s-24.4,0.9-36.3,2.7v66.7   C299.7,149.9,311.8,148.6,324.2,148.6z"
+   id="path2" />
+   <g id="g3">
+      <path
+   class="st1"
+   d="M324.2,175.3c-12.5,0-24.6,1.5-36.2,4.4v291c11.6,2.9,23.8,4.4,36.2,4.4c12.5,0,24.6-1.5,36.3-4.4v-291    C348.9,176.9,336.7,175.3,324.2,175.3z"
+   id="path3" />
+   </g>
+</g>
+
+<!-- ZUSÄTZLICH: Identisches oranges Zahnrad-Symbol für Object -->
+<g transform="translate(520,520)">
+  <!-- Zahnrad Basis -->
+  <circle cx="0" cy="0" r="60" class="st3"/>
+  
+  <!-- 8 Zähne um das Zahnrad -->
+  <rect x="-8" y="-80" width="16" height="25" class="st3"/>
+  <rect x="-8" y="55" width="16" height="25" class="st3"/>
+  <rect x="55" y="-8" width="25" height="16" class="st3"/>
+  <rect x="-80" y="-8" width="25" height="16" class="st3"/>
+  
+  <!-- Diagonale Zähne -->
+  <g transform="rotate(45)">
+    <rect x="-8" y="-80" width="16" height="25" class="st3"/>
+    <rect x="-8" y="55" width="16" height="25" class="st3"/>
+    <rect x="55" y="-8" width="25" height="16" class="st3"/>
+    <rect x="-80" y="-8" width="25" height="16" class="st3"/>
+  </g>
+  
+  <!-- Innerer weißer Kreis -->
+  <circle cx="0" cy="0" r="35" class="st2" stroke="#e67e00" stroke-width="4"/>
+  
+  <!-- Zentrales Loch -->
+  <circle cx="0" cy="0" r="15" fill="#e67e00"/>
+</g>
+
+</svg>

@@ -1,0 +1,264 @@
+<script type="text/javascript">
+// Shared TreeView loader with robust error handling
+function loadSharedTreeView() {
+    return new Promise((resolve, reject) => {
+        if (window.ioBrokerSharedTreeView && window.ioBrokerSharedTreeView.initialized) {
+            resolve();
+            return;
+        }
+        
+        const script = document.createElement('script');
+        script.src = 'iobroker/shared/iobroker-treeview.js?v=1.0.0';
+        script.async = true;
+        
+        script.onload = () => {
+            if (window.ioBrokerSharedTreeView && window.ioBrokerSharedTreeView.initialized) {
+                console.log('TreeView component loaded successfully');
+                resolve();
+            } else {
+                reject(new Error('TreeView component failed to initialize'));
+            }
+        };
+        
+        script.onerror = () => {
+            console.error('TreeView component script not found');
+            reject(new Error('TreeView component script not found'));
+        };
+        
+        document.head.appendChild(script);
+    });
+}
+
+RED.nodes.registerType('iobinobject', {
+    category: 'ioBroker',
+    color: '#a6bbcf',
+    defaults: {
+        name: { value: "" },
+        objectPattern: { value: "", required: true },
+        outputProperty: { value: "payload" },
+        useWildcard: { value: true },
+        outputMode: { value: "individual" },
+        server: { value: "", type: "iob-config" }
+    },
+    inputs: 0,
+    outputs: 1,
+    icon: "iobroker_inobject.svg",
+    paletteLabel: "WS ioB inObj",
+    label: function() {
+        if (this.name) return this.name;
+        
+        if (this.objectPattern) {
+            return this.objectPattern.includes('*') ? 
+                `${this.objectPattern} (wildcard)` : 
+                this.objectPattern;
+        }
+        
+        return "iob-inobject";
+    },
+    
+    oneditprepare: function() {
+        const node = this;
+        const serverInput = $('#node-input-server');
+        
+        // Auto-select server configuration
+        if (!this.server || this.server === '') {
+            const configNodes = [];
+            RED.nodes.eachConfig(function(config) {
+                if (config.type === 'iob-config') {
+                    configNodes.push(config);
+                }
+            });
+            
+            if (configNodes.length === 1) {
+                this.server = configNodes[0].id;
+                serverInput.val(this.server);
+                
+                setTimeout(() => {
+                    RED.notify(`Auto-selected server: ${configNodes[0].name || configNodes[0].iobhost}`, {
+                        type: "info",
+                        timeout: 1500
+                    });
+                }, 500);
+            }
+        }
+        
+        // Load and initialize TreeView component with wildcard detection
+        loadSharedTreeView().then(() => {
+            this.treeController = window.ioBrokerSharedTreeView.setup({
+                nodeType: 'iobinobject',
+                inputId: 'node-input-objectPattern',
+                serverInputId: 'node-input-server',
+                searchPlaceholder: 'Search objects (supports wildcards)...',
+                itemType: 'objects',
+                dataEndpoint: '/iobroker/ws/states', // Same endpoint, different context
+                enableWildcardDetection: true,
+                wildcardInputId: null // No initial value checkbox for objects
+            });
+        }).catch(error => {
+            console.error('Failed to load TreeView component:', error);
+            
+            // Show fallback message and implement basic wildcard detection
+            const fallbackMessage = $(`
+                <div style="margin-top: 5px; padding: 8px; background-color: #fff3cd; border: 1px solid #ffeaa7; border-radius: 4px; font-size: 12px; color: #856404;">
+                    <i class="fa fa-exclamation-triangle"></i> TreeView component not available. Manual input with wildcard detection.
+                </div>
+            `);
+            $('#node-input-objectPattern').after(fallbackMessage);
+            
+            // Fallback wildcard detection
+            $('#node-input-objectPattern').on('input keyup change', function() {
+                const pattern = $(this).val();
+                const hasWildcardChars = pattern.includes('*');
+                
+                if (hasWildcardChars) {
+                    // Show wildcard info
+                    let wildcardWarning = $('#basic-wildcard-warning-obj');
+                    if (wildcardWarning.length === 0) {
+                        wildcardWarning = $(`
+                            <div id="basic-wildcard-warning-obj" style="margin-top: 5px; padding: 8px; background-color: #e8f4fd; border: 1px solid #bee5eb; border-radius: 4px; font-size: 12px; color: #0c5460;">
+                                <i class="fa fa-info-circle"></i> Wildcard pattern detected for object subscription.
+                            </div>
+                        `);
+                        $(this).after(wildcardWarning);
+                    }
+                    wildcardWarning.show();
+                } else {
+                    $('#basic-wildcard-warning-obj').hide();
+                }
+            });
+        });
+    },
+    
+    oneditsave: function() {
+        // Auto-detect and save wildcard mode based on pattern
+        const patternValue = $('#node-input-objectPattern').val();
+        const hasWildcardChars = patternValue.includes('*');
+        
+        // Automatically set useWildcard based on pattern detection
+        this.useWildcard = hasWildcardChars;
+        
+        // Cleanup tree controller
+        if (this.treeController) {
+            this.treeController.cleanup();
+        }
+    },
+    
+    oneditresize: function() {
+        // Handle responsive design - placeholder for future enhancements
+    }
+});
+</script>
+
+<script type="text/html" data-template-name="iobinobject">
+    <div class="form-row">
+        <label for="node-input-name"><i class="icon-tag"></i> Name</label>
+        <input type="text" id="node-input-name" placeholder="Node name (optional)">
+    </div>
+    
+    <div class="form-row">
+        <label for="node-input-objectPattern"><i class="icon-tag"></i> Object Pattern</label>
+        <input type="text" id="node-input-objectPattern" placeholder="e.g. system.adapter.* or specific object ID" required>
+    </div>
+      
+    <div class="form-row">
+        <label for="node-input-outputProperty"><i class="icon-tag"></i> Output Property</label>
+        <input type="text" id="node-input-outputProperty" placeholder="payload">
+    </div>
+    
+    <div class="form-row">
+        <label for="node-input-server"><i class="icon-tag"></i> Server</label>
+        <input type="text" id="node-input-server" required>
+    </div>
+    
+    <!-- Object Subscription Information -->
+    <div class="form-row" style="margin-top: 15px; padding: 10px; background-color: #e8f4fd; border: 1px solid #bee5eb; border-radius: 4px;">
+        <div style="color: #0c5460; font-size: 13px;">
+            <i class="fa fa-info-circle" style="color: #17a2b8; margin-right: 5px;"></i>
+            <strong>Object Subscription:</strong><br>
+            Monitors changes to ioBroker object definitions (metadata, configuration, structure).
+            <ul style="margin: 8px 0 0 20px; padding: 0;">
+                <li>Best used with wildcard patterns (e.g., <code>system.adapter.*</code>)</li>
+                <li>Receives notifications when objects are created, modified, or deleted</li>
+                <li>Useful for monitoring adapter installations, configuration changes</li>
+            </ul>
+        </div>
+    </div>
+</script>
+
+<script type="text/html" data-help-name="iobinobject">
+    <p>ioBroker object subscription via WebSocket with automatic wildcard detection.</p>
+    
+    <h3>Purpose</h3>
+    <p>Monitors changes to ioBroker object definitions, including metadata, configuration, and structural changes. Objects define the properties and capabilities of states, channels, devices, and adapters.</p>
+    
+    <h3>Input Modes</h3>
+    <ul>
+        <li><b>Single Object:</b> Subscribe to one specific object ID</li>
+        <li><b>Wildcard Pattern:</b> Subscribe to multiple objects matching a pattern (recommended)</li>
+    </ul>
+    
+    <h3>Wildcard Patterns</h3>
+    <ul>
+        <li><code>*</code> matches any number of characters</li>
+        <li><code>?</code> is <strong>not supported</strong> by ioBroker</li>
+        <li>Recommended examples:
+            <ul>
+                <li><code>system.adapter.*</code> - all adapter objects</li>
+                <li><code>system.adapter.admin.*</code> - all admin adapter objects</li>
+                <li><code>*.info.*</code> - all info objects</li>
+                <li><code>0_userdata.0.*</code> - all user data objects</li>
+            </ul>
+        </li>
+        <li><strong>Note:</strong> Wildcard mode is automatically detected when * is present in the pattern</li>
+    </ul>
+    
+    <h3>Object Selection</h3>
+    <ul>
+        <li><b>Manual input:</b> Type the object ID or pattern directly</li>
+        <li><b>Tree browser:</b> Browse and select from available objects</li>
+        <li><b>Auto-detection:</b> Wildcard mode is enabled automatically when * is detected in the pattern</li>
+    </ul>
+    
+    <h3>Configuration</h3>
+    <ul>
+        <li><b>Object Pattern:</b> The ioBroker object ID or wildcard pattern to monitor</li>
+        <li><b>Output Property:</b> Message property to store the object data (default: payload)</li>
+        <li><b>Server:</b> ioBroker server configuration</li>
+    </ul>
+    
+    <h3>Output</h3>
+    <ul>
+        <li>Object definition in <code>msg.[outputProperty]</code> when it changes</li>
+        <li>Complete object data in <code>msg.object</code></li>
+        <li>Object ID in <code>msg.topic</code></li>
+        <li>Timestamp in <code>msg.timestamp</code></li>
+        <li><b>For wildcards:</b> Original pattern in <code>msg.pattern</code></li>
+        <li><b>Change type:</b> Operation type in <code>msg.operation</code> (update, delete)</li>
+    </ul>
+    
+    <h3>Object Structure</h3>
+    <p>Object definitions contain standard ioBroker object properties:</p>
+    <ul>
+        <li><b>_id:</b> Object identifier</li>
+        <li><b>type:</b> Object type (state, channel, device, adapter, etc.)</li>
+        <li><b>common:</b> Common properties like names and roles</li>
+        <li><b>native:</b> Adapter-specific properties</li>
+        <li><b>acl:</b> Access control list</li>
+    </ul>
+    
+    <h3>Use Cases</h3>
+    <ul>
+        <li>Monitor adapter installations and updates</li>
+        <li>Track configuration changes</li>
+        <li>Detect new device discoveries</li>
+        <li>Monitor system health and structure changes</li>
+        <li>Audit object creation and deletion</li>
+    </ul>
+    
+    <h3>Performance Notes</h3>
+    <ul>
+        <li>Object changes are less frequent than state changes</li>
+        <li>Wildcard patterns are recommended for practical use</li>
+        <li>Avoid overly broad patterns like <code>*</code> for performance</li>
+    </ul>
+</script>
