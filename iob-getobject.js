@@ -16,15 +16,26 @@ module.exports = function(RED) {
             return setError("ioBroker host or port missing", "Host/port missing");
         }
 
+        // Auto-detect wildcard mode from object ID
+        const configObjectId = config.objectId?.trim() || "";
+        const isWildcardPattern = configObjectId.includes('*');
+
         // Configuration with defaults
         const settings = {
             outputProperty: config.outputProperty?.trim() || "payload",
+            outputMode: config.outputMode || (isWildcardPattern ? "array" : "single"),
+            useWildcard: isWildcardPattern,
             serverId: connectionManager.getServerId(globalConfig),
             nodeId: node.id
         };
 
         node.currentConfig = { iobhost, iobport, user, password, usessl };
         node.isInitialized = false;
+
+        // Log initial configuration
+        if (isWildcardPattern) {
+            node.log(`Wildcard pattern detected: ${configObjectId} (output mode: ${settings.outputMode})`);
+        }
 
         // Helper functions
         function setError(message, statusText) {
@@ -40,6 +51,59 @@ module.exports = function(RED) {
             }
         }
 
+        function formatOutput(objects, objectIdOrPattern, outputMode) {
+            if (!objects) {
+                return null;
+            }
+
+            // Handle single object result
+            if (!Array.isArray(objects) && typeof objects === 'object') {
+                return {
+                    [settings.outputProperty]: objects,
+                    objects: objects,
+                    objectId: objectIdOrPattern,
+                    count: 1,
+                    timestamp: Date.now()
+                };
+            }
+
+            // Handle multiple objects (from wildcard pattern)
+            const objectArray = Array.isArray(objects) ? objects : Object.values(objects);
+            const objectMap = {};
+            
+            // Create object map
+            objectArray.forEach(obj => {
+                if (obj && obj._id) {
+                    objectMap[obj._id] = obj;
+                }
+            });
+
+            let outputData;
+            switch (outputMode) {
+                case 'array':
+                    outputData = objectArray;
+                    break;
+                case 'object':
+                    outputData = objectMap;
+                    break;
+                case 'single':
+                    // For single mode with multiple results, take the first one
+                    outputData = objectArray.length > 0 ? objectArray[0] : null;
+                    break;
+                default:
+                    outputData = objectArray;
+            }
+
+            return {
+                [settings.outputProperty]: outputData,
+                objects: objectMap,
+                objectId: objectIdOrPattern,
+                pattern: isWildcardPattern ? objectIdOrPattern : undefined,
+                count: objectArray.length,
+                timestamp: Date.now()
+            };
+        }
+
         // Create callback for event notifications
         function createEventCallback() {
             const callback = function() {};
@@ -47,7 +111,8 @@ module.exports = function(RED) {
             callback.updateStatus = function(status) {
                 switch (status) {
                     case 'ready':
-                        setStatus("green", "dot", "Ready");
+                        const readyText = isWildcardPattern ? "Ready (Pattern mode)" : "Ready";
+                        setStatus("green", "dot", readyText);
                         node.isInitialized = true;
                         break;
                     case 'connecting':
@@ -70,7 +135,8 @@ module.exports = function(RED) {
 
             callback.onReconnect = function() {
                 node.log("Reconnection detected by get object node");
-                setStatus("green", "dot", "Ready");
+                const reconnectedText = isWildcardPattern ? "Reconnected (Pattern)" : "Reconnected";
+                setStatus("green", "dot", reconnectedText);
                 node.isInitialized = true;
             };
 
@@ -135,9 +201,10 @@ module.exports = function(RED) {
                 // Only set ready status if connection is actually ready
                 const status = connectionManager.getConnectionStatus(settings.serverId);
                 if (status.ready) {
-                    setStatus("green", "dot", "Ready");
+                    const readyText = isWildcardPattern ? "Ready (Pattern mode)" : "Ready";
+                    setStatus("green", "dot", readyText);
                     node.isInitialized = true;
-                    node.log(`Connection established for get object node`);
+                    node.log(`Connection established for get object node (wildcard: ${isWildcardPattern})`);
                 } else {
                     // Node is registered, will get status updates when connection is ready
                     setStatus("yellow", "ring", "Waiting for connection...");
@@ -166,64 +233,115 @@ module.exports = function(RED) {
                     return;
                 }
 
-                const configObjectId = config.objectId?.trim();
-                const objectId = configObjectId || (typeof msg.topic === "string" ? msg.topic.trim() : "");
-                
-                if (!objectId) {
+                const objectIdOrPattern = configObjectId || (typeof msg.topic === "string" ? msg.topic.trim() : "");
+                if (!objectIdOrPattern) {
                     setStatus("red", "ring", "Object ID missing");
                     const error = new Error("Object ID missing (neither configured nor in msg.topic)");
                     done && done(error);
                     return;
                 }
 
-                setStatus("blue", "dot", `Reading object ${objectId}...`);
+                // Detect if this specific request is a wildcard pattern
+                const isCurrentWildcard = objectIdOrPattern.includes('*');
+                const currentOutputMode = msg.outputMode || settings.outputMode;
 
-                const objectData = await connectionManager.getObject(settings.serverId, objectId);
-                
-                if (!objectData) {
-                    setStatus("yellow", "ring", "Object not found");
-                    node.warn(`Object not found: ${objectId}`);
+                if (isCurrentWildcard) {
+                    setStatus("blue", "dot", `Reading objects ${objectIdOrPattern}...`);
                     
-                    // Send message with null payload but include object ID for reference
-                    msg[settings.outputProperty] = null;
-                    msg.object = null;
-                    msg.objectId = objectId;
-                    msg.timestamp = Date.now();
-                    msg.error = "Object not found";
-                    
-                    send(msg);
-                    done && done();
-                    return;
+                    try {
+                        // Use getObjects for wildcard patterns
+                        const objects = await connectionManager.getObjects(settings.serverId, objectIdOrPattern);
+                        
+                        if (!objects || (Array.isArray(objects) && objects.length === 0) || 
+                            (typeof objects === 'object' && Object.keys(objects).length === 0)) {
+                            setStatus("yellow", "ring", "No objects found");
+                            node.warn(`No objects found for pattern: ${objectIdOrPattern}`);
+                            
+                            // Send message with empty result
+                            const result = formatOutput(currentOutputMode === 'array' ? [] : {}, objectIdOrPattern, currentOutputMode);
+                            Object.assign(msg, result);
+                            
+                            send(msg);
+                            done && done();
+                            return;
+                        }
+                        
+                        // Format output according to configured mode
+                        const result = formatOutput(objects, objectIdOrPattern, currentOutputMode);
+                        Object.assign(msg, result);
+                        
+                        setStatus("green", "dot", isWildcardPattern ? "Ready (Pattern)" : "Ready");
+                        node.log(`Successfully retrieved ${result.count} objects for pattern: ${objectIdOrPattern} (mode: ${currentOutputMode})`);
+                        
+                        send(msg);
+                        done && done();
+                        
+                    } catch (error) {
+                        setStatus("red", "ring", "Pattern error");
+                        node.error(`Error retrieving objects for pattern ${objectIdOrPattern}: ${error.message}`);
+                        
+                        // Send error message with details
+                        msg.error = error.message;
+                        const result = formatOutput(null, objectIdOrPattern, currentOutputMode);
+                        Object.assign(msg, result);
+                        
+                        send(msg);
+                        done && done(error);
+                    }
+                } else {
+                    // Single object retrieval
+                    setStatus("blue", "dot", `Reading object ${objectIdOrPattern}...`);
+
+                    try {
+                        const objectData = await connectionManager.getObject(settings.serverId, objectIdOrPattern);
+                        
+                        if (!objectData) {
+                            setStatus("yellow", "ring", "Object not found");
+                            node.warn(`Object not found: ${objectIdOrPattern}`);
+                            
+                            // Send message with null payload but include object ID for reference
+                            const result = formatOutput(null, objectIdOrPattern, 'single');
+                            result.error = "Object not found";
+                            Object.assign(msg, result);
+                            
+                            send(msg);
+                            done && done();
+                            return;
+                        }
+                        
+                        // Format single object output
+                        const result = formatOutput(objectData, objectIdOrPattern, 'single');
+                        
+                        // Add some useful metadata for single objects
+                        if (objectData.common) {
+                            result.objectType = objectData.type || 'unknown';
+                            result.objectName = objectData.common.name || objectIdOrPattern;
+                            result.objectRole = objectData.common.role || 'unknown';
+                        }
+                        
+                        Object.assign(msg, result);
+                        
+                        setStatus("green", "dot", "Ready");
+                        send(msg);
+                        done && done();
+                        
+                    } catch (error) {
+                        setStatus("red", "ring", "Error");
+                        node.error(`Error processing input: ${error.message}`);
+                        
+                        // Send error message with details
+                        msg.error = error.message;
+                        const result = formatOutput(null, objectIdOrPattern, 'single');
+                        Object.assign(msg, result);
+                        
+                        send(msg);
+                        done && done(error);
+                    }
                 }
-                
-                // Prepare output message
-                msg[settings.outputProperty] = objectData;
-                msg.object = objectData;
-                msg.objectId = objectId;
-                msg.timestamp = Date.now();
-                
-                // Add some useful metadata
-                if (objectData.common) {
-                    msg.objectType = objectData.type || 'unknown';
-                    msg.objectName = objectData.common.name || objectId;
-                    msg.objectRole = objectData.common.role || 'unknown';
-                }
-                
-                setStatus("green", "dot", "Ready");
-                send(msg);
-                done && done();
                 
             } catch (error) {
                 setStatus("red", "ring", "Error");
                 node.error(`Error processing input: ${error.message}`);
-                
-                // Send error message with details
-                msg.error = error.message;
-                msg[settings.outputProperty] = null;
-                msg.object = null;
-                msg.timestamp = Date.now();
-                
-                send(msg);
                 done && done(error);
             }
         });
