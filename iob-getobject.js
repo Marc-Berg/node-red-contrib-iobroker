@@ -249,7 +249,7 @@ module.exports = function(RED) {
                     setStatus("blue", "dot", `Reading objects ${objectIdOrPattern}...`);
                     
                     try {
-                        // Use getObjects for wildcard patterns
+                        // Use getObjects for wildcard patterns - server-side filtering
                         const objects = await connectionManager.getObjects(settings.serverId, objectIdOrPattern);
                         
                         if (!objects || (Array.isArray(objects) && objects.length === 0) || 
