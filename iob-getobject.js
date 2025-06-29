@@ -24,6 +24,7 @@ module.exports = function(RED) {
         const settings = {
             outputProperty: config.outputProperty?.trim() || "payload",
             outputMode: config.outputMode || (isWildcardPattern ? "array" : "single"),
+            objectType: config.objectType?.trim() || "",
             useWildcard: isWildcardPattern,
             serverId: connectionManager.getServerId(globalConfig),
             nodeId: node.id
@@ -36,6 +37,17 @@ module.exports = function(RED) {
         if (isWildcardPattern) {
             node.log(`Wildcard pattern detected: ${configObjectId} (output mode: ${settings.outputMode})`);
         }
+        if (settings.objectType) {
+            node.log(`Object type filter: ${settings.objectType}`);
+        }
+        
+        // Debug logging for configuration
+        node.log(`Node configuration: ${JSON.stringify({
+            objectId: configObjectId,
+            outputMode: settings.outputMode,
+            objectType: settings.objectType,
+            useWildcard: settings.useWildcard
+        })}`);
 
         // Helper functions
         function setError(message, statusText) {
@@ -62,6 +74,7 @@ module.exports = function(RED) {
                     [settings.outputProperty]: objects,
                     objects: objects,
                     objectId: objectIdOrPattern,
+                    objectType: settings.objectType || 'any',
                     count: 1,
                     timestamp: Date.now()
                 };
@@ -99,6 +112,7 @@ module.exports = function(RED) {
                 objects: objectMap,
                 objectId: objectIdOrPattern,
                 pattern: isWildcardPattern ? objectIdOrPattern : undefined,
+                objectType: settings.objectType || 'any',
                 count: objectArray.length,
                 timestamp: Date.now()
             };
@@ -204,7 +218,7 @@ module.exports = function(RED) {
                     const readyText = isWildcardPattern ? "Ready (Pattern mode)" : "Ready";
                     setStatus("green", "dot", readyText);
                     node.isInitialized = true;
-                    node.log(`Connection established for get object node (wildcard: ${isWildcardPattern})`);
+                    node.log(`Connection established for get object node (wildcard: ${isWildcardPattern}, type filter: ${settings.objectType || 'none'})`);
                 } else {
                     // Node is registered, will get status updates when connection is ready
                     setStatus("yellow", "ring", "Waiting for connection...");
@@ -244,18 +258,27 @@ module.exports = function(RED) {
                 // Detect if this specific request is a wildcard pattern
                 const isCurrentWildcard = objectIdOrPattern.includes('*');
                 const currentOutputMode = msg.outputMode || settings.outputMode;
+                const currentObjectType = msg.objectType || settings.objectType;
+                
+                // Debug logging for type filter
+                if (currentObjectType) {
+                    node.log(`Using object type filter: ${currentObjectType}`);
+                } else {
+                    node.log(`No object type filter applied`);
+                }
 
                 if (isCurrentWildcard) {
                     setStatus("blue", "dot", `Reading objects ${objectIdOrPattern}...`);
                     
                     try {
                         // Use getObjects for wildcard patterns - server-side filtering
-                        const objects = await connectionManager.getObjects(settings.serverId, objectIdOrPattern);
+                        const objects = await connectionManager.getObjects(settings.serverId, objectIdOrPattern, currentObjectType);
                         
                         if (!objects || (Array.isArray(objects) && objects.length === 0) || 
                             (typeof objects === 'object' && Object.keys(objects).length === 0)) {
                             setStatus("yellow", "ring", "No objects found");
-                            node.warn(`No objects found for pattern: ${objectIdOrPattern}`);
+                            const typeInfo = currentObjectType ? ` (type: ${currentObjectType})` : '';
+                            node.warn(`No objects found for pattern: ${objectIdOrPattern}${typeInfo}`);
                             
                             // Send message with empty result
                             const result = formatOutput(currentOutputMode === 'array' ? [] : {}, objectIdOrPattern, currentOutputMode);
@@ -271,7 +294,8 @@ module.exports = function(RED) {
                         Object.assign(msg, result);
                         
                         setStatus("green", "dot", isWildcardPattern ? "Ready (Pattern)" : "Ready");
-                        node.log(`Successfully retrieved ${result.count} objects for pattern: ${objectIdOrPattern} (mode: ${currentOutputMode})`);
+                        const typeInfo = currentObjectType ? ` (filtered by type: ${currentObjectType})` : '';
+                        node.log(`Successfully retrieved ${result.count} objects for pattern: ${objectIdOrPattern} (mode: ${currentOutputMode})${typeInfo}`);
                         
                         send(msg);
                         done && done();
@@ -283,6 +307,7 @@ module.exports = function(RED) {
                         // Send error message with details
                         msg.error = error.message;
                         const result = formatOutput(null, objectIdOrPattern, currentOutputMode);
+                        result.errorType = error.message.includes('timeout') ? 'timeout' : 'unknown';
                         Object.assign(msg, result);
                         
                         send(msg);
@@ -293,15 +318,22 @@ module.exports = function(RED) {
                     setStatus("blue", "dot", `Reading object ${objectIdOrPattern}...`);
 
                     try {
-                        const objectData = await connectionManager.getObject(settings.serverId, objectIdOrPattern);
+                        // For single objects, we can still apply type filtering
+                        let objectData = await connectionManager.getObject(settings.serverId, objectIdOrPattern);
+                        
+                        // Apply type filter for single objects if specified
+                        if (objectData && currentObjectType && objectData.type !== currentObjectType) {
+                            objectData = null; // Filter out object if type doesn't match
+                        }
                         
                         if (!objectData) {
+                            const typeInfo = currentObjectType ? ` (type filter: ${currentObjectType})` : '';
                             setStatus("yellow", "ring", "Object not found");
-                            node.warn(`Object not found: ${objectIdOrPattern}`);
+                            node.warn(`Object not found: ${objectIdOrPattern}${typeInfo}`);
                             
                             // Send message with null payload but include object ID for reference
                             const result = formatOutput(null, objectIdOrPattern, 'single');
-                            result.error = "Object not found";
+                            result.error = currentObjectType ? "Object not found or type mismatch" : "Object not found";
                             Object.assign(msg, result);
                             
                             send(msg);
@@ -314,7 +346,7 @@ module.exports = function(RED) {
                         
                         // Add some useful metadata for single objects
                         if (objectData.common) {
-                            result.objectType = objectData.type || 'unknown';
+                            result.objectTypeName = objectData.type || 'unknown';
                             result.objectName = objectData.common.name || objectIdOrPattern;
                             result.objectRole = objectData.common.role || 'unknown';
                         }
@@ -322,6 +354,9 @@ module.exports = function(RED) {
                         Object.assign(msg, result);
                         
                         setStatus("green", "dot", "Ready");
+                        const typeInfo = currentObjectType ? ` (type filter: ${currentObjectType})` : '';
+                        node.log(`Successfully retrieved object: ${objectIdOrPattern}${typeInfo}`);
+                        
                         send(msg);
                         done && done();
                         
@@ -332,6 +367,7 @@ module.exports = function(RED) {
                         // Send error message with details
                         msg.error = error.message;
                         const result = formatOutput(null, objectIdOrPattern, 'single');
+                        result.errorType = error.message.includes('timeout') ? 'timeout' : 'unknown';
                         Object.assign(msg, result);
                         
                         send(msg);

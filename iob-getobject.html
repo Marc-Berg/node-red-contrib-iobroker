@@ -37,6 +37,7 @@ RED.nodes.registerType('iobgetobject', {
         objectId: { value: "" },
         outputProperty: { value: "payload" },
         outputMode: { value: "single" },
+        objectType: { value: "" },
         useWildcard: { value: false },
         server: { value: "", type: "iob-config" }
     },
@@ -84,12 +85,68 @@ RED.nodes.registerType('iobgetobject', {
             const outputMode = $(this).val();
             $('.output-mode-info').hide();
             $(`.output-mode-info.${outputMode}`).show();
+            
+            // Validate pattern compatibility with output mode
+            validatePatternCompatibility();
         });
+        
+        // Object ID input change handler for pattern validation
+        $('#node-input-objectId').on('input keyup change', function() {
+            validatePatternCompatibility();
+        });
+        
+        // Validation function for pattern and output mode compatibility
+        function validatePatternCompatibility() {
+            const objectId = $('#node-input-objectId').val().trim();
+            const outputMode = $('#node-input-outputMode').val();
+            const isPattern = objectId.includes('*');
+            
+            // Remove existing validation messages
+            $('#pattern-validation-warning').remove();
+            
+            let warningMessage = '';
+            let warningType = '';
+            
+            if (isPattern && outputMode === 'single') {
+                warningMessage = '<strong>Warning:</strong> Wildcard pattern detected but "Single Object" mode selected. This will return only the first matching object. Consider using "Array" or "Object Map" mode.';
+                warningType = 'warning';
+            } else if (!isPattern && (outputMode === 'array' || outputMode === 'object')) {
+                warningMessage = '<strong>Info:</strong> Single object ID with "' + (outputMode === 'array' ? 'Array' : 'Object Map') + '" mode. The result will be wrapped in an ' + (outputMode === 'array' ? 'array' : 'object') + '.';
+                warningType = 'info';
+            }
+            
+            if (warningMessage) {
+                const warningClass = warningType === 'warning' ? 'warning' : 'info';
+                const iconClass = warningType === 'warning' ? 'fa-exclamation-triangle' : 'fa-info-circle';
+                const warningDiv = $(`
+                    <div id="pattern-validation-warning" style="margin-top: 8px; padding: 8px; background-color: ${warningType === 'warning' ? '#fff3cd' : '#d1ecf1'}; border: 1px solid ${warningType === 'warning' ? '#ffeaa7' : '#bee5eb'}; border-radius: 4px; font-size: 12px; color: ${warningType === 'warning' ? '#856404' : '#0c5460'};">
+                        <i class="fa ${iconClass}"></i> ${warningMessage}
+                    </div>
+                `);
+                $('#node-input-outputMode').closest('.form-row').after(warningDiv);
+            }
+        }
         
         // Initialize output mode visibility
         const currentOutputMode = $('#node-input-outputMode').val() || 'single';
         $('.output-mode-info').hide();
         $(`.output-mode-info.${currentOutputMode}`).show();
+        
+        // Object type change handler
+        $('#node-input-objectType').on('change', function() {
+            const objectType = $(this).val();
+            if (objectType) {
+                $('#type-filter-info').show();
+            } else {
+                $('#type-filter-info').hide();
+            }
+        });
+        
+        // Initialize type filter info visibility
+        const currentObjectType = $('#node-input-objectType').val();
+        if (currentObjectType) {
+            $('#type-filter-info').show();
+        }
         
         // Load and initialize TreeView component for objects with wildcard detection
         loadSharedTreeView().then(() => {
@@ -147,10 +204,27 @@ RED.nodes.registerType('iobgetobject', {
         this.useWildcard = hasWildcardChars;
         
         // Auto-adjust output mode for wildcards
-        if (hasWildcardChars && $('#node-input-outputMode').val() === 'single') {
-            this.outputMode = 'array';
-            console.log('Auto-adjusted output mode to array for wildcard pattern');
+        const currentOutputMode = $('#node-input-outputMode').val();
+        if (hasWildcardChars && currentOutputMode === 'single') {
+            // Warn user about potential issue but don't force change
+            if (typeof RED !== 'undefined' && RED.notify) {
+                RED.notify('Warning: Wildcard pattern with Single Object mode will return only the first match', { 
+                    type: "warning", 
+                    timeout: 4000 
+                });
+            }
         }
+        
+        // Validate and save object type filter
+        const objectType = $('#node-input-objectType').val();
+        this.objectType = objectType;
+        
+        console.log('Saved configuration:', {
+            objectId: objectIdValue,
+            useWildcard: this.useWildcard,
+            outputMode: currentOutputMode,
+            objectType: this.objectType
+        });
         
         // Cleanup tree controller
         if (this.treeController) {
@@ -181,10 +255,26 @@ RED.nodes.registerType('iobgetobject', {
             <option value="object">Object Map (objectId → object)</option>
         </select>
     </div>
+    <div class="form-row">
+        <label for="node-input-objectType"><i class="icon-tag"></i> Object Type Filter</label>
+        <select id="node-input-objectType" style="width:100%">
+            <option value="">All Types</option>
+            <option value="state">State</option>
+            <option value="channel">Channel</option>
+            <option value="device">Device</option>
+            <option value="folder">Folder</option>
+            <option value="adapter">Adapter</option>
+            <option value="instance">Instance</option>
+            <option value="host">Host</option>
+            <option value="group">Group</option>
+            <option value="user">User</option>
+            <option value="config">Config</option>
+        </select>
+    </div>
     
     <!-- Output Mode Information -->
     <div class="output-mode-info single" style="display: none; margin-top: 5px; padding: 8px; background-color: #e8f4fd; border: 1px solid #bee5eb; border-radius: 4px; font-size: 12px; color: #0c5460;">
-        <i class="fa fa-info-circle"></i> <strong>Single Object Mode:</strong> Returns the object directly in the output property. Best for single object IDs.
+        <i class="fa fa-info-circle"></i> <strong>Single Object Mode:</strong> Returns the object directly in the output property. Best for single object IDs. Wildcard patterns will return only the first match.
     </div>
     
     <div class="output-mode-info array" style="display: none; margin-top: 5px; padding: 8px; background-color: #e8f4fd; border: 1px solid #bee5eb; border-radius: 4px; font-size: 12px; color: #0c5460;">
@@ -193,6 +283,11 @@ RED.nodes.registerType('iobgetobject', {
     
     <div class="output-mode-info object" style="display: none; margin-top: 5px; padding: 8px; background-color: #e8f4fd; border: 1px solid #bee5eb; border-radius: 4px; font-size: 12px; color: #0c5460;">
         <i class="fa fa-info-circle"></i> <strong>Object Map Mode:</strong> Returns an object where keys are object IDs and values are the object definitions. Useful for processing multiple objects while preserving their IDs.
+    </div>
+    
+    <!-- Type Filter Information -->
+    <div id="type-filter-info" style="display: none; margin-top: 5px; padding: 8px; background-color: #f8f9fa; border: 1px solid #dee2e6; border-radius: 4px; font-size: 12px; color: #495057;">
+        <i class="fa fa-filter"></i> <strong>Type Filter:</strong> Only objects of the selected type will be returned. Leave empty to include all object types.
     </div>
     
     <div class="form-row">
@@ -216,12 +311,27 @@ RED.nodes.registerType('iobgetobject', {
         <li><b>Output Property:</b> The message property to store the object data (default: <code>payload</code>).</li>
         <li><b>Output Mode:</b> How to format the output:
             <ul>
-                <li><b>Single Object:</b> Returns the object directly (for single IDs)</li>
+                <li><b>Single Object:</b> Returns the object directly (for single IDs or first match of patterns)</li>
                 <li><b>Array of Objects:</b> Returns an array of objects (ideal for wildcards)</li>
                 <li><b>Object Map:</b> Returns key-value pairs (objectId → object)</li>
             </ul>
         </li>
+        <li><b>Object Type Filter:</b> Filter objects by type (state, channel, device, etc.). Leave empty to include all types.</li>
         <li><b>Server:</b> The ioBroker server configuration.</li>
+    </ul>
+    
+    <h3>Pattern and Mode Compatibility</h3>
+    <ul>
+        <li><b>Single Mode + Pattern:</b> Returns only the first matching object (warning shown)</li>
+        <li><b>Array/Object Mode + Single ID:</b> Wraps single result in array/object (info shown)</li>
+        <li><b>Recommended:</b> Use Array/Object modes with wildcard patterns for best results</li>
+    </ul>
+    
+    <h3>Object Type Filtering</h3>
+    <ul>
+        <li><b>Available Types:</b> state, channel, device, folder, adapter, instance, host, group, user, config</li>
+        <li><b>Performance:</b> Type filtering is applied at the ioBroker level when possible</li>
+        <li><b>Compatibility:</b> Works with all ioBroker adapters (Admin, WebSocket, Web)</li>
     </ul>
     
     <h3>Wildcard Patterns</h3>
@@ -312,5 +422,6 @@ RED.nodes.registerType('iobgetobject', {
         <li>Wildcard patterns may take longer depending on scope</li>
         <li>Avoid overly broad patterns like <code>*</code> for performance</li>
         <li>Use specific patterns when possible (e.g., <code>system.adapter.*</code> instead of <code>*</code>)</li>
+        <li>Type filtering can improve performance by reducing result sets</li>
     </ul>
 </script>
