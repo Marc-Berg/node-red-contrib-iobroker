@@ -121,11 +121,15 @@ Liest den aktuellen Wert eines ioBroker States auf Anfrage.
 
 ### WS ioB getObject ![alt text](images/iobgetobject.png)
 **Object Getter Node**  
-Ruft ioBroker Objektdefinitionen ab, einschließlich Metadaten und Konfigurationsinformationen.
+Ruft ioBroker Objektdefinitionen ab, einschließlich Metadaten und Konfigurationsinformationen. Unterstützt Wildcard-Pattern.
 
 - **Object ID:** Legen Sie den Ziel-ioBroker State über den Tree-Browser oder manuelle Eingabe fest.  
   Wenn leer gelassen, wird `msg.topic` als State-ID verwendet.
+  - **Einzelne Objekte:** `system.adapter.admin.0`
+  - **Wildcard-Pattern:** `system.adapter.*` oder `0_userdata.0.*` (automatisch erkannt)
 - **Output:** Die vollständige Objektdefinition wird als `msg.[outputProperty]` gesendet (Standard: `msg.payload`).
+- **Output Mode:** Einzelobjekt, Array oder Object Map für Wildcard-Pattern.
+- **Object Type Filter:** Filtert nach Objekttyp (state, channel, device, etc.).
 - **Objektstruktur:** Gibt das vollständige ioBroker Objekt zurück, einschließlich Typ, allgemeine Eigenschaften, native Konfiguration und Zugriffskontrollinformationen.
 - **Server-Konfiguration:** Konfigurieren Sie die ioBroker Server-Details in den Node-Einstellungen.
 
