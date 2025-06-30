@@ -11,7 +11,7 @@
 
 ## [0.7.0] - 2025-06-29
 ### Added
-- Object type filtering for iobgetobject node
+- **Object type filtering for iobgetobject node**
 - Wildcard pattern support for iobgetobject
 - Auto-detection of wildcard patterns
 
@@ -20,4 +20,8 @@
 
 ## [0.6.0] - 2025-06-28
 ### Added
-- New node "inobject"
+- **New node "iobinobject"** - Object subscription and monitoring
+- Real-time ioBroker object change monitoring
+- Wildcard pattern support for object subscriptions (e.g., system.adapter.*)
+- Object structure and configuration change detection
+- Object operation tracking (update/delete)
