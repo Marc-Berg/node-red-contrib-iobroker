@@ -44,6 +44,7 @@ Externe Node-RED Integrations-Nodes für ioBroker Kommunikation. KEIN ioBroker A
 - **Objekt-Management** für den Zugriff auf ioBroker Objektdefinitionen
 - **Objekt-Subscriptions** für Überwachung von Struktur- und Konfigurationsänderungen
 - **Automatische Objekterstellung** - fehlende ioBroker Objekte automatisch erstellen
+- **Historische Daten** - Abruf und Analyse von History-Adapter-Daten
 - **OAuth2-Authentifizierung** für Installationen mit Authentifizierung
 - **No-Auth-Modus** ungesicherte Installationen ohne Authentifizierung
 
@@ -54,6 +55,7 @@ Externe Node-RED Integrations-Nodes für ioBroker Kommunikation. KEIN ioBroker A
 - Verteilte Setups, bei denen Node-RED auf anderer Hardware als ioBroker läuft
 - Entwicklungsumgebungen für Tests von Node-RED Flows gegen ioBroker
 - Integrations-Szenarien, bei denen Node-RED als Brücke zwischen ioBroker und anderen Systemen dient
+- Historische Datenanalyse und Berichterstattung
 
 ## Nodes
 
@@ -131,6 +133,36 @@ Ruft ioBroker Objektdefinitionen ab, einschließlich Metadaten und Konfiguration
 - **Output Mode:** Einzelobjekt, Array oder Object Map für Wildcard-Pattern.
 - **Object Type Filter:** Filtert nach Objekttyp (state, channel, device, etc.).
 - **Objektstruktur:** Gibt das vollständige ioBroker Objekt zurück, einschließlich Typ, allgemeine Eigenschaften, native Konfiguration und Zugriffskontrollinformationen.
+- **Server-Konfiguration:** Konfigurieren Sie die ioBroker Server-Details in den Node-Einstellungen.
+
+### WS ioB history ![alt text](images/iobhistory.png)
+**History Node**  
+Ruft historische Daten von ioBroker History-Adaptern ab und bietet verschiedene Aggregations- und Ausgabeformate.
+
+- **State ID:** Der ioBroker State für historische Abfragen. Wenn leer gelassen, wird `msg.topic` verwendet.
+- **History Adapter:** Auswahl des History-Adapters (history, sql, influxdb) mit automatischer Erkennung verfügbarer Instanzen und Status:
+  - 🟢 **Läuft:** Adapter ist aktiviert und aktuell in Betrieb
+  - 🟡 **Aktiviert:** Adapter ist aktiviert aber läuft nicht
+  - 🔴 **Deaktiviert:** Adapter ist installiert aber deaktiviert
+- **Zeitbereich:** Drei Modi zur Zeitbereich-Definition:
+  - **Dauer:** Letzte X Stunden/Tage von jetzt
+  - **Absolut:** Feste Start- und Endzeiten
+  - **Aus Nachricht:** Verwendung von `msg.start`, `msg.end` oder `msg.duration`
+- **Aggregation:** Datenverarbeitung mit verschiedenen Methoden:
+  - **None:** Rohdaten
+  - **On Change:** Nur geänderte Werte
+  - **Average/Min/Max:** Statistische Aggregation über Intervalle
+  - **Min/Max Pairs:** Alle verfügbaren Datenpunkte (adapter-spezifisch)
+  - **Total:** Summe für Energieberechnungen
+  - **Count:** Anzahl der Datenpunkte
+  - **Percentile/Quantile:** Statistische Perzentile
+  - **Integral:** Integralberechnung
+- **Step-Intervall:** Zeitintervall für Aggregation (erforderlich für die meisten Aggregationstypen).
+- **Max Entries:** Maximale Anzahl zurückzugebender Datenpunkte (Standard: 2000).
+- **Ausgabeformat:** Format der zurückgegebenen Daten:
+  - **Array:** Rohe Datenpunkte als Array
+  - **Chart.js:** Format für Chart.js Visualisierung
+  - **Statistiken:** Zusammenfassung mit Min/Max/Durchschnitt
 - **Server-Konfiguration:** Konfigurieren Sie die ioBroker Server-Details in den Node-Einstellungen.
 
 ### iob-config
@@ -254,6 +286,7 @@ Senden Sie eine Nachricht mit `msg.topic = "status"` an jede Node, um detaillier
    - Für `iobout` wählen Sie zwischen "value" (ack=true) oder "command" (ack=false) Modus.
    - Für `iobout` aktivieren Sie optional **"Auto create objects"**, um fehlende ioBroker Objekte automatisch zu erstellen.
    - Für `iobget` und `iobgetobject` setzen Sie die State- oder Objekt-ID oder lassen Sie sie leer, um `msg.topic` zu verwenden.
+   - Für `iobhistory` wählen Sie den History-Adapter, Zeitbereich, Aggregation und Ausgabeformat.
 4. **Verbinden** Sie die Nodes nach Bedarf mit Ihrem Flow.
 
 ## State-Auswahl
@@ -307,6 +340,29 @@ Die `iobout` Node kann automatisch fehlende Objekte erstellen, wenn die **Auto-C
 - **Dynamische Konfiguration:** Überschreiben Sie Eigenschaften über Nachrichten-Eigenschaften (`msg.stateName`, `msg.stateRole`, etc.)
 - **Auto-Erkennung:** Automatische Erkennung von Datentypen aus Payload-Werten
 - **Intelligente Standards:** Verwendung sinnvoller Standards für fehlende Eigenschaften
+
+## Historische Daten
+
+Die `iobhistory` Node ermöglicht den Zugriff auf historische Daten von ioBroker History-Adaptern:
+
+### Unterstützte History-Adapter
+- **History Adapter:** Einfacher Datei-basierter Adapter für kleine Installationen
+- **SQL Adapter:** Datenbank-basiert für mittlere Installationen
+- **InfluxDB Adapter:** Optimiert für Zeitreihen-Daten und große Datenmengen
+
+### Aggregationsmethoden
+- **Raw Data (none):** Alle ursprünglichen Datenpunkte
+- **On Change:** Nur Werte bei Änderungen
+- **Statistical:** Average, Min, Max über definierte Intervalle
+- **Energy Calculations:** Total/Sum für Energieverbrauch
+- **Advanced Analytics:** Percentile, Quantile, Integral
+
+### Anwendungsfälle
+- Energieverbrauchsanalyse und Berichte
+- Temperaturtrends und Statistiken
+- Systemleistungsüberwachung
+- Datenvisualisierung mit Chart.js
+- Historischer Datenexport und Backup
 
 ## Verbindungs-Management
 
@@ -398,6 +454,23 @@ Die Nodes verbinden sich mit ioBrokers WebSocket-Schnittstelle über **eine** vo
    - Prüfen Sie konfigurierte Objekteigenschaften (Typ, Rolle, etc.)
    - Überprüfen Sie, ob Min-/Max-Werte gültige Zahlen sind
    - Stellen Sie sicher, dass Einheiten-Strings richtig formatiert sind
+
+### History-Probleme:
+
+1. **"History adapter not found"**
+   - Überprüfen Sie, ob der History-Adapter installiert und konfiguriert ist
+   - Stellen Sie sicher, dass der Adapter läuft (grüner Status)
+   - Prüfen Sie die Adapter-Konfiguration
+
+2. **"No historical data"**
+   - Überprüfen Sie, ob der State historische Daten aufzeichnet
+   - Prüfen Sie den konfigurierten Zeitbereich
+   - Stellen Sie sicher, dass Daten im gewählten Zeitraum vorhanden sind
+
+3. **"Query timeout"**
+   - Reduzieren Sie den Zeitbereich oder erhöhen Sie das Step-Intervall
+   - Verwenden Sie Aggregation für große Datenmengen
+   - Prüfen Sie die History-Adapter Performance
 
 ### Mehrfach-Server-Unterstützung:
 

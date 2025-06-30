@@ -20,6 +20,7 @@ External Node-RED integration nodes for ioBroker communication. NOT an ioBroker 
 - [State Selection](#state-selection)
 - [Object Management](#object-management)
 - [Connection Management](#connection-management)
+- [Historical Data](#historical-data)
 - [Examples](#examples)
 - [WebSocket Connection](#websocket-connection)
 - [Troubleshooting](#troubleshooting)
@@ -44,6 +45,7 @@ External Node-RED integration nodes for ioBroker communication. NOT an ioBroker 
 - **Object management** for accessing ioBroker object definitions
 - **Object subscriptions** for monitoring structure and configuration changes
 - **Automatic object creation** - create missing ioBroker objects on-the-fly
+- **Historical data access** - retrieve and analyze data from history adapters
 - **OAuth2 authentication support** for secured installations
 - **No-auth mode** for unsecured installations
   
@@ -54,6 +56,7 @@ External Node-RED integration nodes for ioBroker communication. NOT an ioBroker 
 - Distributed setups where Node-RED runs on different hardware than ioBroker
 - Development environments where you want to test Node-RED flows against ioBroker
 - Integration scenarios where Node-RED serves as a bridge between ioBroker and other systems
+- Historical data analysis and reporting
 
 ## Nodes
 
@@ -132,6 +135,36 @@ Retrieves ioBroker object definitions, including metadata and configuration info
 - **Output Mode:** Single object, array, or object map for wildcard patterns.
 - **Object Type Filter:** Filter by object type (state, channel, device, etc.).
 - **Object Structure:** Returns the full ioBroker object including type, common properties, native configuration, and access control information.
+- **Server Configuration:** Configure the ioBroker server details in the node settings.
+
+### WS ioB history ![alt text](images/iobhistory.png)
+**History Node**  
+Retrieves historical data from ioBroker history adapters with various aggregation and output format options.
+
+- **State ID:** The ioBroker state to query for historical data. If empty, `msg.topic` is used.
+- **History Adapter:** Selection of history adapter (history, sql, influxdb) with automatic detection of available instances and status:
+  - 🟢 **Running:** Adapter is enabled and currently operating
+  - 🟡 **Enabled:** Adapter is enabled but not currently running
+  - 🔴 **Disabled:** Adapter is installed but disabled
+- **Time Range:** Three modes for defining the time period:
+  - **Duration:** Last X hours/days from now
+  - **Absolute:** Fixed start and end times
+  - **From Message:** Use `msg.start`, `msg.end`, or `msg.duration`
+- **Aggregation:** Data processing with various methods:
+  - **None:** Raw data points
+  - **On Change:** Only changed values
+  - **Average/Min/Max:** Statistical aggregation over intervals
+  - **Min/Max Pairs:** All available data points (adapter-specific)
+  - **Total:** Sum for energy calculations
+  - **Count:** Number of data points
+  - **Percentile/Quantile:** Statistical percentiles
+  - **Integral:** Integral calculation
+- **Step Interval:** Time interval for aggregation (required for most aggregation types).
+- **Max Entries:** Maximum number of data points to return (default: 2000).
+- **Output Format:** Format of the returned data:
+  - **Array:** Raw data points as array
+  - **Chart.js:** Format for Chart.js visualization
+  - **Statistics:** Summary with min/max/average
 - **Server Configuration:** Configure the ioBroker server details in the node settings.
 
 ### iob-config
@@ -255,6 +288,7 @@ Send a message with `msg.topic = "status"` to any node to get detailed connectio
    - For `iobout`, choose between "value" (ack=true) or "command" (ack=false) mode.
    - For `iobout`, optionally enable **"Auto create objects"** to automatically create missing ioBroker objects.
    - For `iobget` and `iobgetobject`, set the state or object ID or leave empty to use `msg.topic`.
+   - For `iobhistory`, select the history adapter, time range, aggregation, and output format.
 4. **Connect** the nodes to your flow as needed.
 
 ## State Selection
@@ -308,6 +342,29 @@ The `iobout` node can automatically create missing objects when the **Auto-Creat
 - **Dynamic Configuration:** Override properties via message properties (`msg.stateName`, `msg.stateRole`, etc.)
 - **Auto-Detection:** Automatically detect data types from payload values
 - **Intelligent Defaults:** Use sensible defaults for missing properties
+
+## Historical Data
+
+The `iobhistory` node provides access to historical data from ioBroker history adapters:
+
+### Supported History Adapters
+- **History Adapter:** Simple file-based adapter for small installations
+- **SQL Adapter:** Database-based for medium installations
+- **InfluxDB Adapter:** Optimized for time-series data and large datasets
+
+### Aggregation Methods
+- **Raw Data (none):** All original data points
+- **On Change:** Only values when they change
+- **Statistical:** Average, Min, Max over defined intervals
+- **Energy Calculations:** Total/Sum for energy consumption
+- **Advanced Analytics:** Percentile, Quantile, Integral
+
+### Use Cases
+- Energy consumption analysis and reporting
+- Temperature trending and statistics
+- System performance monitoring
+- Data visualization with Chart.js
+- Historical data export and backup
 
 ## Connection Management
 
@@ -400,6 +457,23 @@ The nodes connect to ioBroker's WebSocket interface via **one** of three options
    - Check configured object properties (type, role, etc.)
    - Verify min/max values are valid numbers
    - Ensure unit strings are properly formatted
+
+### History Issues:
+
+1. **"History adapter not found"**
+   - Verify the history adapter is installed and configured
+   - Ensure the adapter is running (green status)
+   - Check adapter configuration
+
+2. **"No historical data"**
+   - Verify the state is configured for historical logging
+   - Check the configured time range
+   - Ensure data exists in the selected time period
+
+3. **"Query timeout"**
+   - Reduce time range or increase step interval
+   - Use aggregation for large datasets
+   - Check history adapter performance
 
 ### Multiple Server Support:
 
