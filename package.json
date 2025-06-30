@@ -41,6 +41,7 @@
       "iobget": "iob-get.js",
       "iobgetobject": "iob-getobject.js",
       "iobhistory": "iob-history.js",
+      "ioblog": "iob-log.js",
       "iob-config": "iob-config.js"
     },
     "examples": [

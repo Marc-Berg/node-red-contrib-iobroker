@@ -1,0 +1,171 @@
+<script type="text/javascript">
+RED.nodes.registerType('ioblog', {
+    category: 'ioBroker',
+    color: '#a6bbcf',
+    defaults: {
+        name: { value: "" },
+        logLevel: { value: "info" },
+        outputProperty: { value: "payload" },
+        includeTimestamp: { value: true },
+        includeSource: { value: true },
+        server: { value: "", type: "iob-config" }
+    },
+    inputs: 0,
+    outputs: 1,
+    icon: "iobroker_log.svg",
+    paletteLabel: "WS ioB log",
+    label: function() {
+        if (this.name) return this.name;
+        return `iob-log (${this.logLevel})`;
+    },
+    
+    oneditprepare: function() {
+        const node = this;
+        const serverInput = $('#node-input-server');
+        
+        // Auto-select server configuration
+        if (!this.server || this.server === '') {
+            const configNodes = [];
+            RED.nodes.eachConfig(function(config) {
+                if (config.type === 'iob-config') {
+                    configNodes.push(config);
+                }
+            });
+            
+            if (configNodes.length === 1) {
+                this.server = configNodes[0].id;
+                serverInput.val(this.server);
+                
+                setTimeout(() => {
+                    RED.notify(`Auto-selected server: ${configNodes[0].name || configNodes[0].iobhost}`, {
+                        type: "info",
+                        timeout: 1500
+                    });
+                }, 500);
+            }
+        }
+        
+        // Update label preview when log level changes
+        $('#node-input-logLevel').on('change', function() {
+            const selectedLevel = $(this).val();
+            $('#log-level-preview').text(`Selected level: ${selectedLevel}`);
+            
+            // Show warning for debug/silly levels
+            if (selectedLevel === 'debug' || selectedLevel === 'silly') {
+                $('#debug-warning').show();
+            } else {
+                $('#debug-warning').hide();
+            }
+        });
+        
+        // Initial update
+        $('#node-input-logLevel').trigger('change');
+    },
+    
+    oneditresize: function() {
+        // Handle responsive design
+    }
+});
+</script>
+
+<script type="text/html" data-template-name="ioblog">
+    <div class="form-row">
+        <label for="node-input-name"><i class="icon-tag"></i> Name</label>
+        <input type="text" id="node-input-name" placeholder="Node name (optional)">
+    </div>
+    
+    <div class="form-row">
+        <label for="node-input-logLevel"><i class="icon-tag"></i> Log Level</label>
+        <select id="node-input-logLevel" style="width:100%">
+            <option value="silly">Silly (all messages)</option>
+            <option value="debug">Debug (debug and above)</option>
+            <option value="info">Info (info and above)</option>
+            <option value="warn">Warning (warn and above)</option>
+            <option value="error">Error (error only)</option>
+        </select>
+        <div id="log-level-preview" style="margin-top: 5px; font-size: 12px; color: #666;"></div>
+        <div id="debug-warning" style="display: none; margin-top: 5px; padding: 8px; background-color: #fff3cd; border: 1px solid #ffeaa7; border-radius: 4px; font-size: 12px; color: #856404;">
+            <i class="fa fa-exclamation-triangle"></i> High volume: Debug and Silly levels may generate many messages
+        </div>
+    </div>
+      
+    <div class="form-row">
+        <label for="node-input-outputProperty"><i class="icon-tag"></i> Output Property</label>
+        <input type="text" id="node-input-outputProperty" placeholder="payload">
+    </div>
+    
+    <div class="form-row">
+        <label for="node-input-includeTimestamp" style="width: auto;">
+            <input type="checkbox" id="node-input-includeTimestamp" style="width: auto; margin-right: 5px;">
+            <i class="icon-tag"></i> Include timestamp in output
+        </label>
+    </div>
+    
+    <div class="form-row">
+        <label for="node-input-includeSource" style="width: auto;">
+            <input type="checkbox" id="node-input-includeSource" style="width: auto; margin-right: 5px;">
+            <i class="icon-tag"></i> Include source adapter in output
+        </label>
+    </div>
+    
+    <div class="form-row">
+        <label for="node-input-server"><i class="icon-tag"></i> Server</label>
+        <input type="text" id="node-input-server" required>
+    </div>
+</script>
+
+<script type="text/html" data-help-name="ioblog">
+    <p>ioBroker live log subscription via WebSocket. Receives log messages in real-time as they occur.</p>
+    
+    <h3>Configuration</h3>
+    <ul>
+        <li><b>Log Level:</b> Minimum log level to receive (higher levels are included)</li>
+        <li><b>Output Property:</b> Message property where log data will be placed (default: payload)</li>
+        <li><b>Include Timestamp:</b> Add formatted timestamp to output message</li>
+        <li><b>Include Source:</b> Add source adapter information to output message</li>
+    </ul>
+    
+    <h3>Log Levels</h3>
+    <ul>
+        <li><b>Silly:</b> All log messages (highest volume)</li>
+        <li><b>Debug:</b> Debug messages and above (high volume)</li>
+        <li><b>Info:</b> Information messages and above (medium volume)</li>
+        <li><b>Warning:</b> Warning and error messages (low volume)</li>
+        <li><b>Error:</b> Error messages only (lowest volume)</li>
+    </ul>
+    
+    <h3>Output Message</h3>
+    <ul>
+        <li>Log message in <code>msg.[outputProperty]</code></li>
+        <li>Complete log object in <code>msg.log</code></li>
+        <li>Log level in <code>msg.level</code></li>
+        <li>Source adapter in <code>msg.source</code> (if available)</li>
+        <li>Timestamp in <code>msg.timestamp</code> (if enabled)</li>
+        <li>Raw log data in <code>msg.raw</code></li>
+    </ul>
+    
+    <h3>Log Object Structure</h3>
+    <p>The complete log object contains:</p>
+    <ul>
+        <li><code>severity</code> - Log level (silly, debug, info, warn, error)</li>
+        <li><code>message</code> - The actual log message</li>
+        <li><code>from</code> - Source adapter that generated the log</li>
+        <li><code>ts</code> - Unix timestamp</li>
+        <li><code>level</code> - Numeric log level</li>
+    </ul>
+    
+    <h3>Use Cases</h3>
+    <ul>
+        <li><b>Error Monitoring:</b> Set level to "Error" to catch critical issues</li>
+        <li><b>System Monitoring:</b> Use "Info" level for general system activity</li>
+        <li><b>Development:</b> Use "Debug" or "Silly" for detailed troubleshooting</li>
+        <li><b>Alerting:</b> Filter by source adapter and send notifications</li>
+    </ul>
+    
+    <h3>Performance Notes</h3>
+    <ul>
+        <li>Lower log levels (silly, debug) generate high message volumes</li>
+        <li>Consider filtering by source adapter for specific monitoring</li>
+        <li>Use appropriate log levels to reduce processing overhead</li>
+    </ul>
+</script>

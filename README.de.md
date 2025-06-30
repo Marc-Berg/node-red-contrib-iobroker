@@ -165,6 +165,36 @@ Ruft historische Daten von ioBroker History-Adaptern ab und bietet verschiedene 
   - **Statistiken:** Zusammenfassung mit Min/Max/Durchschnitt
 - **Server-Konfiguration:** Konfigurieren Sie die ioBroker Server-Details in den Node-Einstellungen.
 
+### WS ioB log ![alt text](images/ioblog.png)
+**Log Input Node**  
+Abonniert ioBroker Live-Log-Nachrichten und leitet sie in Echtzeit an Ihren Flow weiter. Überwacht Systemaktivitäten, Fehler und Debug-Informationen.
+
+- **Log Level:** Mindest-Log-Level zum Empfangen (silly, debug, info, warn, error)
+- **Output:** Log-Nachricht wird als `msg.[outputProperty]` gesendet (Standard: `msg.payload`).  
+  Vollständiges Log-Objekt ist in `msg.log` verfügbar, Level in `msg.level`, Quelle in `msg.source`.
+- **Filterung:** Nur Logs auf oder über dem gewählten Level werden weitergeleitet
+- **Echtzeit:** Empfängt Log-Nachrichten sofort bei Generierung durch ioBroker
+- **Anwendungsfälle:**
+  - **Fehler-Monitoring:** Level "error" für kritische Systemprobleme
+  - **System-Überwachung:** Level "info" für allgemeine Systemaktivität
+  - **Entwicklung:** Level "debug"/"silly" für detailliertes Troubleshooting
+  - **Adapter-Monitoring:** Filterung nach Quell-Adapter
+- **Performance:** Niedrigere Log-Level (silly, debug) erzeugen hohe Nachrichtenvolumen
+- **Server-Konfiguration:** Konfigurieren Sie die ioBroker Server-Details in den Node-Einstellungen.
+
+**Log-Nachrichten-Struktur:**
+- `msg.payload` - Die eigentliche Log-Nachricht
+- `msg.log` - Vollständiges Log-Objekt mit severity, message, from, ts, level
+- `msg.level` - Log-Level (silly, debug, info, warn, error)  
+- `msg.source` - Quell-Adapter der Log-Nachricht (wenn aktiviert)
+- `msg.timestamp` - Formatierter Zeitstempel (wenn aktiviert)
+- `msg.raw` - Rohe Log-Daten von ioBroker
+
+**Konfigurationsoptionen:**
+- **Include Timestamp:** Formatierte Zeitstempel zur Ausgabe hinzufügen
+- **Include Source:** Quell-Adapter-Informationen zur Ausgabe hinzufügen  
+- **Output Property:** Anpassung wo Log-Daten in der Nachricht platziert werden
+
 ### iob-config
 
 ![alt text](images/iob-config.png)
