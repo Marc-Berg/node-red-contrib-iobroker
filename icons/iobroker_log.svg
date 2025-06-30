@@ -1,0 +1,30 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="40" height="60" viewBox="0 0 40 60">
+  <!-- Background -->
+  <rect x="2" y="2" width="36" height="56" rx="4" ry="4" fill="#2c3e50" stroke="#34495e" stroke-width="1"/>
+  
+  <!-- Screen area -->
+  <rect x="5" y="8" width="30" height="44" rx="2" ry="2" fill="#1a252f"/>
+  
+  <!-- Log lines -->
+  <rect x="8" y="12" width="24" height="2" fill="#27ae60"/>
+  <rect x="8" y="16" width="20" height="2" fill="#3498db"/>
+  <rect x="8" y="20" width="22" height="2" fill="#3498db"/>
+  <rect x="8" y="24" width="18" height="2" fill="#f39c12"/>
+  <rect x="8" y="28" width="26" height="2" fill="#3498db"/>
+  <rect x="8" y="32" width="16" height="2" fill="#e74c3c"/>
+  <rect x="8" y="36" width="24" height="2" fill="#3498db"/>
+  <rect x="8" y="40" width="20" height="2" fill="#3498db"/>
+  <rect x="8" y="44" width="22" height="2" fill="#95a5a6"/>
+  
+  <!-- Live indicator -->
+  <circle cx="32" cy="12" r="2" fill="#e74c3c">
+    <animate attributeName="opacity" values="1;0.3;1" dur="1.5s" repeatCount="indefinite"/>
+  </circle>
+  
+  <!-- Bottom border -->
+  <rect x="5" y="54" width="30" height="2" fill="#34495e"/>
+  
+  <!-- Side connectors -->
+  <rect x="0" y="28" width="4" height="4" fill="#7f8c8d"/>
+  <rect x="36" y="28" width="4" height="4" fill="#7f8c8d"/>
+</svg>

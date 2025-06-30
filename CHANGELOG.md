@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.9.0] - 2025-06-30
+### Added
+- **New node "ioblog"** - Live log subscription and monitoring
+- Real-time log message streaming from ioBroker with configurable log levels
+- Client-side log level filtering (silly, debug, info, warn, error)
+- Support for timestamp and source adapter inclusion in output messages
+
 ## [0.8.1] - 2025-06-30
 ### Fixed
 - **iobgetobject node crash when type filter excludes all objects** - Fixed "Cannot set properties of null" error that occurred when object type filtering resulted in no matches
