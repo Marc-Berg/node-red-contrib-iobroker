@@ -40,6 +40,7 @@
       "iobinobject": "iob-inobject.js",
       "iobget": "iob-get.js",
       "iobgetobject": "iob-getobject.js",
+      "iobhistory": "iob-history.js",
       "iob-config": "iob-config.js"
     },
     "examples": [
