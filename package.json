@@ -26,15 +26,15 @@
     "node": ">=14.0.0"
   },
   "dependencies": {
-    "ws": "^8.18.2",
-    "express": "^4.18.0"
+    "express": "^5.1.0",
+    "ws": "^8.18.3"
   },
   "peerDependencies": {
     "node-red": ">=2.0.0"
   },
   "node-red": {
     "version": ">=2.0.0",
-  "nodes": {
+    "nodes": {
       "iobin": "iob-in.js",
       "iobout": "iob-out.js",
       "iobinobject": "iob-inobject.js",
@@ -47,7 +47,7 @@
     "examples": [
       "examples/iob-in.json",
       "examples/iob-inobject.json",
-      "examples/iob-out.json", 
+      "examples/iob-out.json",
       "examples/iob-get.json",
       "examples/iob-getobject.json"
     ],
