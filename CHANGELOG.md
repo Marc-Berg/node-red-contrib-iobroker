@@ -1,5 +1,9 @@
 # Changelog
 
+## [0.8.1] - 2025-06-30
+### Fixed
+- **iobgetobject node crash when type filter excludes all objects** - Fixed "Cannot set properties of null" error that occurred when object type filtering resulted in no matches
+
 ## [0.8.0] - 2025-06-30
 ### Added
 - **New node "iobhistory"** - Historical data retrieval from ioBroker history adapters

@@ -64,8 +64,22 @@ module.exports = function(RED) {
         }
 
         function formatOutput(objects, objectIdOrPattern, outputMode) {
+            // Always return a valid result object, even if objects is null/empty
+            const baseResult = {
+                [settings.outputProperty]: null,
+                objects: null,
+                objectId: objectIdOrPattern,
+                objectType: settings.objectType || 'any',
+                count: 0,
+                timestamp: Date.now()
+            };
+
             if (!objects) {
-                return null;
+                // For patterns, add pattern property
+                if (isWildcardPattern || (objectIdOrPattern && objectIdOrPattern.includes('*'))) {
+                    baseResult.pattern = objectIdOrPattern;
+                }
+                return baseResult;
             }
 
             // Handle single object result
@@ -107,15 +121,21 @@ module.exports = function(RED) {
                     outputData = objectArray;
             }
 
-            return {
+            const result = {
                 [settings.outputProperty]: outputData,
                 objects: objectMap,
                 objectId: objectIdOrPattern,
-                pattern: isWildcardPattern ? objectIdOrPattern : undefined,
                 objectType: settings.objectType || 'any',
                 count: objectArray.length,
                 timestamp: Date.now()
             };
+
+            // Add pattern property for wildcard patterns
+            if (isWildcardPattern || (objectIdOrPattern && objectIdOrPattern.includes('*'))) {
+                result.pattern = objectIdOrPattern;
+            }
+
+            return result;
         }
 
         // Create callback for event notifications
@@ -304,9 +324,9 @@ module.exports = function(RED) {
                         setStatus("red", "ring", "Pattern error");
                         node.error(`Error retrieving objects for pattern ${objectIdOrPattern}: ${error.message}`);
                         
-                        // Send error message with details
-                        msg.error = error.message;
+                        // Send error message with details - formatOutput now always returns a valid object
                         const result = formatOutput(null, objectIdOrPattern, currentOutputMode);
+                        result.error = error.message;
                         result.errorType = error.message.includes('timeout') ? 'timeout' : 'unknown';
                         Object.assign(msg, result);
                         
@@ -331,7 +351,7 @@ module.exports = function(RED) {
                             setStatus("yellow", "ring", "Object not found");
                             node.warn(`Object not found: ${objectIdOrPattern}${typeInfo}`);
                             
-                            // Send message with null payload but include object ID for reference
+                            // Send message with null payload but include object ID for reference - formatOutput now always returns a valid object
                             const result = formatOutput(null, objectIdOrPattern, 'single');
                             result.error = currentObjectType ? "Object not found or type mismatch" : "Object not found";
                             Object.assign(msg, result);
@@ -364,9 +384,9 @@ module.exports = function(RED) {
                         setStatus("red", "ring", "Error");
                         node.error(`Error processing input: ${error.message}`);
                         
-                        // Send error message with details
-                        msg.error = error.message;
+                        // Send error message with details - formatOutput now always returns a valid object
                         const result = formatOutput(null, objectIdOrPattern, 'single');
+                        result.error = error.message;
                         result.errorType = error.message.includes('timeout') ? 'timeout' : 'unknown';
                         Object.assign(msg, result);
                         
