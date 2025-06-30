@@ -1,6 +1,6 @@
 # Changelog
 
-## [0.8.0] - 2025-01-30
+## [0.8.0] - 2025-06-30
 ### Added
 - **New node "iobhistory"** - Historical data retrieval from ioBroker history adapters
 - History adapter auto-detection with real-time status indicators (🟢🟡🔴)
