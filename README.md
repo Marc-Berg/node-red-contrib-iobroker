@@ -8,7 +8,7 @@
 ![Node-RED](https://img.shields.io/badge/Node--RED-compatible-red.svg)
 ![Downloads](https://img.shields.io/npm/dt/node-red-contrib-iobroker)
 
-External Node-RED integration nodes for ioBroker communication. NOT an ioBroker adapter - standalone package for external Node-RED instances to connect with ioBroker via WebSocket.
+External Node-RED integration nodes for ioBroker communication. NOT an ioBroker adapter - standalone package for external Node-RED instances to connect with ioBroker via WebSocket. Provides input, output, get, object management, historical data access, and live log monitoring capabilities.
 
 ## Table of Contents
 - [Features](#features)

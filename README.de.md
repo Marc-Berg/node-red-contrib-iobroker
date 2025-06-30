@@ -8,7 +8,7 @@
 ![Node-RED](https://img.shields.io/badge/Node--RED-compatible-red.svg)
 ![Downloads](https://img.shields.io/npm/dt/node-red-contrib-iobroker)
 
-Externe Node-RED Integrations-Nodes für ioBroker Kommunikation. KEIN ioBroker Adapter - eigenständiges Paket für externe Node-RED Instanzen zur Verbindung mit ioBroker über WebSocket.
+Externe Node-RED Integrations-Nodes für ioBroker Kommunikation. KEIN ioBroker Adapter - eigenständiges Paket für externe Node-RED Instanzen zur Verbindung mit ioBroker über WebSocket. Bietet Input, Output, Get, Objekt-Management, historische Datenabfrage und Live-Log-Monitoring.
 
 ## Inhaltsverzeichnis
 - [Funktionen](#funktionen)
