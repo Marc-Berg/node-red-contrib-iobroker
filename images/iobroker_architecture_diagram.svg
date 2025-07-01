@@ -1,0 +1,597 @@
+<?xml version="1.0" encoding="UTF-8" standalone="no"?>
+<svg
+   width="900"
+   height="650"
+   viewBox="0 0 900 650"
+   version="1.1"
+   id="svg48"
+   sodipodi:docname="iobroker_architecture_diagram(4).svg"
+   inkscape:version="1.3.2 (091e20e, 2023-11-25, custom)"
+   xmlns:inkscape="http://www.inkscape.org/namespaces/inkscape"
+   xmlns:sodipodi="http://sodipodi.sourceforge.net/DTD/sodipodi-0.dtd"
+   xmlns="http://www.w3.org/2000/svg"
+   xmlns:svg="http://www.w3.org/2000/svg">
+  <sodipodi:namedview
+     id="namedview48"
+     pagecolor="#ffffff"
+     bordercolor="#000000"
+     borderopacity="0.25"
+     inkscape:showpageshadow="2"
+     inkscape:pageopacity="0.0"
+     inkscape:pagecheckerboard="0"
+     inkscape:deskcolor="#d1d1d1"
+     inkscape:zoom="1.607852"
+     inkscape:cx="467.70473"
+     inkscape:cy="293.24838"
+     inkscape:window-width="1920"
+     inkscape:window-height="974"
+     inkscape:window-x="-11"
+     inkscape:window-y="-11"
+     inkscape:window-maximized="1"
+     inkscape:current-layer="svg48"
+     showguides="false" />
+  <defs
+     id="defs4">
+    <style
+       id="style1">
+      .title { font-family: Arial, sans-serif; font-size: 16px; font-weight: bold; text-anchor: middle; }
+      .subtitle { font-family: Arial, sans-serif; font-size: 12px; text-anchor: middle; }
+      .label { font-family: Arial, sans-serif; font-size: 11px; text-anchor: middle; }
+      .port { font-family: Arial, sans-serif; font-size: 10px; fill: #666; text-anchor: middle; }
+      .connection-label { font-family: Arial, sans-serif; font-size: 9px; fill: #333; text-anchor: middle; }
+      .recommended { stroke: #28a745; stroke-width: 3; }
+      .optional { stroke: #6c757d; stroke-width: 2; stroke-dasharray: 5,5; }
+      .internal { stroke: #007bff; stroke-width: 2; }
+      .data-flow { fill: none; stroke: #fd7e14; stroke-width: 1.5; marker-end: url(#arrowhead); }
+      .admin-connection { stroke: #ff9800; stroke-width: 2; }
+    </style>
+    <marker
+       id="arrowhead"
+       markerWidth="10"
+       markerHeight="7"
+       refX="9"
+       refY="3.5"
+       orient="auto">
+      <polygon
+         points="0 0, 10 3.5, 0 7"
+         fill="#fd7e14"
+         id="polygon1" />
+    </marker>
+    <marker
+       id="arrowhead-green"
+       markerWidth="10"
+       markerHeight="7"
+       refX="9"
+       refY="3.5"
+       orient="auto">
+      <polygon
+         points="0 0, 10 3.5, 0 7"
+         fill="#28a745"
+         id="polygon2" />
+    </marker>
+    <marker
+       id="arrowhead-blue"
+       markerWidth="10"
+       markerHeight="7"
+       refX="9"
+       refY="3.5"
+       orient="auto">
+      <polygon
+         points="0 0, 10 3.5, 0 7"
+         fill="#007bff"
+         id="polygon3" />
+    </marker>
+    <marker
+       id="arrowhead-orange"
+       markerWidth="10"
+       markerHeight="7"
+       refX="9"
+       refY="3.5"
+       orient="auto">
+      <polygon
+         points="0 0, 10 3.5, 0 7"
+         fill="#ff9800"
+         id="polygon4" />
+    </marker>
+  </defs>
+  <!-- Background -->
+  <rect
+     width="900"
+     height="650"
+     fill="#f8f9fa"
+     stroke="#dee2e6"
+     stroke-width="1"
+     id="rect4"
+     x="22"
+     y="0" />
+  <!-- Title -->
+  <text
+     x="408.66034"
+     y="31.759134"
+     class="title"
+     fill="#212529"
+     id="text4">Recommended Node-RED to ioBroker Communication Architecture</text>
+  <!-- User Box (left side) -->
+  <rect
+     x="72"
+     y="60"
+     width="120"
+     height="100"
+     fill="#e8f5e8"
+     stroke="#4caf50"
+     stroke-width="2"
+     rx="10"
+     id="rect5" />
+  <text
+     x="132"
+     y="80"
+     class="subtitle"
+     fill="#4caf50"
+     id="text5">User</text>
+  <!-- User Icon/Symbol -->
+  <circle
+     cx="132"
+     cy="110"
+     r="20"
+     fill="#4caf50"
+     stroke="#388e3c"
+     stroke-width="2"
+     id="circle5" />
+  <circle
+     cx="132"
+     cy="105"
+     r="6"
+     fill="#ffffff"
+     id="circle6" />
+  <path
+     d="m 117,125 q 15,-10 30,0"
+     fill="#ffffff"
+     stroke="none"
+     id="path6" />
+  <text
+     x="132"
+     y="145"
+     class="label"
+     fill="#4caf50"
+     id="text6">Web Browser</text>
+  <!-- External System Box - Node-RED -->
+  <rect
+     x="256.18411"
+     y="59.891838"
+     width="476.19739"
+     height="100.21632"
+     fill="#e3f2fd"
+     stroke="#1976d2"
+     stroke-width="1.78368"
+     rx="7.9366226"
+     id="rect6"
+     style="stroke:#647687;stroke-opacity:1;fill:#0a0202;fill-opacity:0.23140496" />
+  <text
+     x="500"
+     y="80"
+     class="subtitle"
+     fill="#1976d2"
+     id="text7"
+     style="font-size:12px;font-family:Arial, sans-serif;text-anchor:middle;fill:#02080f;fill-opacity:1"><tspan
+       style="font-style:normal;font-variant:normal;font-weight:normal;font-stretch:normal;font-size:16px;font-family:Arial, sans-serif;-inkscape-font-specification:'Arial, sans-serif, Normal';font-variant-ligatures:normal;font-variant-caps:normal;font-variant-numeric:normal;font-variant-east-asian:normal;fill:#02080f;fill-opacity:1"
+       id="tspan49">External System</tspan></text>
+  <!-- Node-RED -->
+  <rect
+     x="289.32788"
+     y="100.24803"
+     width="409.03033"
+     height="49.503933"
+     fill="#8bc34a"
+     stroke="#4caf50"
+     stroke-width="2.49607"
+     rx="7.8659673"
+     id="rect7"
+     style="fill:#8f0000;fill-opacity:1;stroke:#ffffff;stroke-opacity:1" />
+  <text
+     x="500"
+     y="120"
+     class="title"
+     fill="white"
+     id="text8">Node-RED</text>
+  <text
+     x="430"
+     y="140"
+     class="label"
+     fill="white"
+     id="text9">node-red-contrib-iobroker</text>
+  <text
+     x="570"
+     y="140"
+     class="label"
+     fill="white"
+     id="text10">WS ioB nodes</text>
+  <!-- Network -->
+  <text
+     x="290.63535"
+     y="192.48779"
+     class="label"
+     fill="#666666"
+     id="text11">Network (LAN/WiFi)</text>
+  <!-- ioBroker System Box -->
+  <rect
+     x="49.95158"
+     y="219.95158"
+     width="724.21924"
+     height="380.09683"
+     fill="#fff3e0"
+     stroke="#f57c00"
+     stroke-width="1.90316"
+     rx="9.0527401"
+     id="rect11" />
+  <text
+     x="417.65872"
+     y="240"
+     class="subtitle"
+     fill="#f57c00"
+     id="text12"
+     style="font-size:12px;font-family:Arial, sans-serif;text-anchor:middle;fill:#f57c00"><tspan
+       style="font-style:normal;font-variant:normal;font-weight:normal;font-stretch:normal;font-size:17.3333px;font-family:Arial, sans-serif;-inkscape-font-specification:'Arial, sans-serif, Normal';font-variant-ligatures:normal;font-variant-caps:normal;font-variant-numeric:normal;font-variant-east-asian:normal"
+       id="tspan48">ioBroker System</tspan></text>
+  <!-- Four adapters in a row - SWAPPED POSITIONS -->
+  <!-- Admin Main (orange) now on the left -->
+  <rect
+     x="100"
+     y="260"
+     width="140"
+     height="80"
+     fill="#ff9800"
+     stroke="#f57c00"
+     stroke-width="2"
+     rx="5"
+     id="rect12" />
+  <text
+     x="170"
+     y="280"
+     class="label"
+     fill="white"
+     id="text13">Admin Adapter</text>
+  <text
+     x="170"
+     y="295"
+     class="label"
+     fill="#ffffff"
+     id="text14">(Main Instance .0)</text>
+  <text
+     x="170"
+     y="315"
+     class="label"
+     fill="white"
+     id="text15">Port 8081</text>
+  <text
+     x="170"
+     y="330"
+     class="port"
+     id="text16">For ioBroker Admin UI</text>
+  <!-- Admin Dedicated (green) now on the right -->
+  <rect
+     x="260"
+     y="260"
+     width="140"
+     height="80"
+     fill="#4caf50"
+     stroke="#388e3c"
+     stroke-width="3"
+     rx="5"
+     id="rect16" />
+  <text
+     x="330"
+     y="280"
+     class="label"
+     fill="white"
+     id="text17">Admin Adapter</text>
+  <text
+     x="330"
+     y="295"
+     class="label"
+     fill="#ffffff"
+     id="text18">(Dedicated Instance .1)</text>
+  <text
+     x="330"
+     y="315"
+     class="label"
+     fill="#ffffff"
+     id="text19">e.g. Port 8091</text>
+  <text
+     x="330"
+     y="330"
+     class="port"
+     id="text20">For Node-RED only</text>
+  <rect
+     x="420"
+     y="260"
+     width="140"
+     height="80"
+     fill="#9e9e9e"
+     stroke="#757575"
+     stroke-width="1"
+     stroke-dasharray="3,3"
+     rx="5"
+     id="rect20" />
+  <text
+     x="490"
+     y="280"
+     class="label"
+     fill="white"
+     id="text21">Web Adapter</text>
+  <text
+     x="490"
+     y="300"
+     class="label"
+     fill="white"
+     id="text22">Port 8082</text>
+  <text
+     x="490"
+     y="320"
+     class="port"
+     id="text23">(Optional)</text>
+  <rect
+     x="580"
+     y="260"
+     width="140"
+     height="80"
+     fill="#9e9e9e"
+     stroke="#757575"
+     stroke-width="1"
+     stroke-dasharray="3,3"
+     rx="5"
+     id="rect23" />
+  <text
+     x="650"
+     y="280"
+     class="label"
+     fill="white"
+     id="text24">WebSocket Adapter</text>
+  <text
+     x="650"
+     y="300"
+     class="label"
+     fill="white"
+     id="text25">Port 8084</text>
+  <text
+     x="650"
+     y="320"
+     class="port"
+     id="text26">(Optional)</text>
+  <!-- js-controller (middle level) -->
+  <rect
+     x="250"
+     y="380"
+     width="400"
+     height="70"
+     fill="#2196f3"
+     stroke="#1976d2"
+     stroke-width="2"
+     rx="5"
+     id="rect26" />
+  <text
+     x="450"
+     y="405"
+     class="title"
+     fill="white"
+     id="text27">js-controller</text>
+  <text
+     x="450"
+     y="425"
+     class="label"
+     fill="white"
+     id="text28">Core Engine - State and Object Management</text>
+  <text
+     x="450"
+     y="440"
+     class="label"
+     fill="white"
+     id="text29">Central Data Hub for all Adapters</text>
+  <!-- Data Sources (bottom level) - removed Protocol adapter -->
+  <rect
+     x="150"
+     y="500"
+     width="120"
+     height="60"
+     fill="#ff5722"
+     stroke="#d84315"
+     stroke-width="1"
+     rx="3"
+     id="rect29" />
+  <text
+     x="210"
+     y="525"
+     class="label"
+     fill="white"
+     id="text30">History</text>
+  <text
+     x="210"
+     y="540"
+     class="label"
+     fill="white"
+     id="text31">Adapter</text>
+  <rect
+     x="290"
+     y="500"
+     width="120"
+     height="60"
+     fill="#9c27b0"
+     stroke="#7b1fa2"
+     stroke-width="1"
+     rx="3"
+     id="rect31" />
+  <text
+     x="350"
+     y="525"
+     class="label"
+     fill="white"
+     id="text32">Other</text>
+  <text
+     x="350"
+     y="540"
+     class="label"
+     fill="white"
+     id="text33">Adapters</text>
+  <rect
+     x="430"
+     y="500"
+     width="120"
+     height="60"
+     fill="#607d8b"
+     stroke="#455a64"
+     stroke-width="1"
+     rx="3"
+     id="rect33" />
+  <text
+     x="490"
+     y="525"
+     class="label"
+     fill="white"
+     id="text34">Device</text>
+  <text
+     x="490"
+     y="540"
+     class="label"
+     fill="white"
+     id="text35">Adapters</text>
+  <rect
+     x="570"
+     y="500"
+     width="120"
+     height="60"
+     fill="#795548"
+     stroke="#5d4037"
+     stroke-width="1"
+     rx="3"
+     id="rect35" />
+  <text
+     x="630"
+     y="525"
+     class="label"
+     fill="white"
+     id="text36">Smart Home</text>
+  <text
+     x="630"
+     y="540"
+     class="label"
+     fill="white"
+     id="text37">Adapters</text>
+  <!-- Admin User Connection to Main Instance -->
+  <line
+     x1="133.05818"
+     y1="159.25575"
+     x2="133.05818"
+     y2="260.61331"
+     class="admin-connection"
+     marker-end="url(#arrowhead-orange)"
+     id="line37" />
+  <text
+     x="156.85385"
+     y="195.55481"
+     class="connection-label"
+     fill="#ff9800"
+     id="text38">Admin UI</text>
+  <!-- Main WebSocket Connection (Recommended) from Node-RED to Dedicated Admin -->
+  <line
+     x1="418.68918"
+     y1="152.22791"
+     x2="326.03467"
+     y2="260.4169"
+     class="recommended"
+     marker-end="url(#arrowhead-green)"
+     id="line38" />
+  <text
+     x="296.21109"
+     y="250.13533"
+     class="connection-label"
+     fill="#28a745"
+     id="text39">Recommended</text>
+  <!-- Optional Connections -->
+  <line
+     x1="470"
+     y1="150"
+     x2="490"
+     y2="260"
+     class="optional"
+     id="line39" />
+  <text
+     x="504.62787"
+     y="250.13531"
+     class="connection-label"
+     fill="#6c757d"
+     id="text40">Optional</text>
+  <line
+     x1="530"
+     y1="150"
+     x2="650"
+     y2="260"
+     class="optional"
+     id="line40" />
+  <text
+     x="663.88361"
+     y="251.89445"
+     class="connection-label"
+     fill="#6c757d"
+     id="text41">Optional</text>
+  <!-- Internal Connections from adapters to js-controller -->
+  <line
+     x1="170"
+     y1="340"
+     x2="350"
+     y2="380"
+     class="internal"
+     marker-end="url(#arrowhead-blue)"
+     id="line41" />
+  <line
+     x1="330"
+     y1="340"
+     x2="420"
+     y2="380"
+     class="internal"
+     marker-end="url(#arrowhead-blue)"
+     id="line42" />
+  <line
+     x1="490"
+     y1="340"
+     x2="470"
+     y2="380"
+     class="internal"
+     marker-end="url(#arrowhead-blue)"
+     id="line43" />
+  <line
+     x1="650"
+     y1="340"
+     x2="520"
+     y2="380"
+     class="internal"
+     marker-end="url(#arrowhead-blue)"
+     id="line44" />
+  <!-- Data Flow Connections from data adapters to js-controller -->
+  <line
+     x1="210"
+     y1="500"
+     x2="370"
+     y2="450"
+     class="data-flow"
+     id="line45" />
+  <line
+     x1="350"
+     y1="500"
+     x2="420"
+     y2="450"
+     class="data-flow"
+     id="line46" />
+  <line
+     x1="490"
+     y1="500"
+     x2="470"
+     y2="450"
+     class="data-flow"
+     id="line47" />
+  <line
+     x1="630"
+     y1="500"
+     x2="520"
+     y2="450"
+     class="data-flow"
+     id="line48" />
+</svg>
