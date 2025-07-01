@@ -1,5 +1,10 @@
 # Changelog
 
+## [0.9.1] - 2025-07-01
+### Fixed
+- **Race condition causing nodes to display "Waiting for Connection" status while functional**
+  - Fixed timing issue between WebSocket connection establishment and node registration
+
 ## [0.9.0] - 2025-06-30
 ### Added
 - **New node "ioblog"** - Live log subscription and monitoring
