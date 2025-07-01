@@ -48,16 +48,6 @@ The diagram shows the recommended architecture with a dedicated Admin adapter in
 | **WS ioB history** | Access historical data | Energy consumption analysis |
 | **WS ioB log** | Live log monitoring | System health monitoring |
 
-## ✨ Key Features
-
-- **Real-time WebSocket communication** with automatic reconnection
-- **Wildcard pattern support** - subscribe to multiple states at once
-- **Automatic object creation** for missing ioBroker objects  
-- **Shared connection management** - multiple nodes share connections
-- **Historical data access** from history adapters (History, SQL, InfluxDB)
-- **OAuth2 authentication** for secured installations
-- **SSL/TLS support** for encrypted connections
-
 ## 🔧 Configuration
 
 ### Recommended Setup: Dedicated Admin Instance
@@ -66,7 +56,6 @@ The diagram shows the recommended architecture with a dedicated Admin adapter in
 - Isolates Node-RED traffic from main admin interface
 - Prevents conflicts with regular admin usage
 - Allows custom security settings
-- Better performance and reliability
 
 **Setup Steps:**
 1. **Install second Admin adapter instance** in ioBroker:
@@ -89,13 +78,11 @@ The diagram shows the recommended architecture with a dedicated Admin adapter in
 **Authentication Settings:**
 - **No Authentication** (default): Leave username/password empty
 - **OAuth2**: Enter valid ioBroker username/password
-- **Session Duration**: Set to ≥3600 seconds to avoid connection drops
 
 ### Alternative Adapter Options
 
 If you prefer not to use a dedicated Admin instance:
 
-**Admin adapter** (port 8081) - Usually pre-installed, **required for logs**
 **WebSocket adapter** (port 8084) - Dedicated WebSocket adapter for external connections
 **Web adapter** (port 8082) - Requires "Use pure web-sockets" option enabled
 
