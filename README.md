@@ -77,90 +77,15 @@ Choose one of these ioBroker adapters:
 
 ## 📋 Node Documentation
 
-### WS ioB in - State Subscription
-Subscribe to ioBroker state changes in real-time.
-
-**Configuration:**
-- **State**: Single state ID or wildcard pattern
-- **Output Property**: Message property for value (default: payload)
-- **Trigger on**: All updates, acknowledged only, or unacknowledged only
-- **Send initial value**: Emit current value on startup
-
-**Wildcard Examples:**
-- system.adapter.*.alive - All adapter alive states
-- 0_userdata.0.* - All states under 0_userdata.0  
-- *.temperature - All temperature states
-
-**Output Message includes:**
-- payload: The state value
-- topic: State ID
-- state: Complete state object with value, acknowledge flag, timestamp, and source
-- timestamp: Update timestamp
-
-### WS ioB out - State Output
-Send values to ioBroker states with automatic object creation.
-
-**Configuration:**
-- **State**: Target state ID (or use msg.topic)
-- **Input Property**: Source property (default: payload)
-- **Set Mode**: Value (ack=true) or Command (ack=false)
-- **Auto-Create Objects**: Create missing objects automatically
-
-**Auto-Create Properties:**
-Configure object properties either statically in the node configuration or dynamically via message properties like stateName, stateRole, payloadType, stateUnit, stateMin, and stateMax.
-
-### WS ioB get - State Getter
-Read current state values on demand.
-
-**Usage:**
-Send any message to trigger state reading. Use either the configured state or provide state ID via msg.topic. The current value will be returned in msg.payload.
-
-### WS ioB getObject - Object Getter  
-Retrieve ioBroker object definitions with wildcard support.
-
-**Examples:**
-- system.adapter.admin.0 - Single object
-- system.adapter.* - All adapter objects
-- 0_userdata.0.* - All user data objects
-
-**Output Modes:**
-- **Single Object**: Returns object directly
-- **Array**: Returns array of objects  
-- **Object Map**: Returns mapping of objectId to object
-
-### WS ioB inObj - Object Subscription
-Monitor changes to ioBroker objects (structure/configuration).
-
-**Use Cases:**
-- Monitor adapter installations: system.adapter.*
-- Track configuration changes: system.adapter.admin.*  
-- Watch user data: 0_userdata.0.*
-
-### WS ioB history - Historical Data
-Access historical data from ioBroker history adapters.
-
-**Configuration:**
-- **History Adapter**: Auto-detected with status indicators
-- **Time Range**: Duration, Absolute, or From Message
-- **Aggregation**: None, OnChange, Average, Min, Max, Total, etc.
-- **Output Format**: Array, Chart.js, or Statistics
-
-**Example Query Parameters:**
-- stateId: system.adapter.admin.0.memRss
-- duration: 24 with durationUnit: hours
-- aggregate: average
-- step: 3600 (for hourly intervals)
-
-### WS ioB log - Live Logs
-Subscribe to ioBroker live log messages.
-
-**Log Levels:** silly, debug, info, warn, error
-
-**Output includes:**
-- payload: Log message text
-- level: Log level
-- source: Source adapter
-- timestamp: ISO timestamp
+| Node | Purpose | Documentation |
+|------|---------|---------------|
+| **WS ioB in** | Subscribe to state changes in real-time | [📖 Details](nodes/iob-in.md) |
+| **WS ioB out** | Send values to states with auto-creation | [📖 Details](nodes/iob-out.md) |
+| **WS ioB get** | Read current state values on demand | [📖 Details](nodes/iob-get.md) |
+| **WS ioB getObject** | Retrieve object definitions | [📖 Details](nodes/iob-getobject.md) |
+| **WS ioB inObj** | Monitor object structure changes | [📖 Details](nodes/iob-inobj.md) |
+| **WS ioB history** | Access historical data from adapters | [📖 Details](nodes/iob-history.md) |
+| **WS ioB log** | Subscribe to live log messages | [📖 Details](nodes/iob-log.md) |
 
 ## ⚠️ Important Notes
 
@@ -171,8 +96,12 @@ Subscribe to ioBroker live log messages.
 
 ## 📚 Additional Resources
 
-- **🔍 Troubleshooting**: [Troubleshooting Guide](docs/troubleshooting.md)
-- **🎯 Use Cases**: [Common Use Cases](docs/use-cases.md)
+- **🔍 Troubleshooting**: [Troubleshooting Guide](troubleshooting.md)
+- **🎯 Use Cases**: [Common Use Cases](use-cases.md)
+- **📖 Node Documentation**: 
+  - [WS ioB in](ws-iob-in.md) | [WS ioB out](ws-iob-out.md) | [WS ioB get](ws-iob-get.md)
+  - [WS ioB getObject](ws-iob-getobject.md) | [WS ioB inObj](ws-iob-inobj.md) 
+  - [WS ioB history](ws-iob-history.md) | [WS ioB log](ws-iob-log.md)
 - **📖 Full Documentation**: [GitHub Repository](https://github.com/Marc-Berg/node-red-contrib-iobroker)
 - **🐛 Bug Reports**: [GitHub Issues](https://github.com/Marc-Berg/node-red-contrib-iobroker/issues)
 - **💡 Feature Requests**: [GitHub Discussions](https://github.com/Marc-Berg/node-red-contrib-iobroker/discussions)
