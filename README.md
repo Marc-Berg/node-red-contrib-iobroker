@@ -38,15 +38,15 @@ The diagram shows the recommended architecture with a dedicated Admin adapter in
 
 ## 📦 Available Nodes
 
-| Node | Purpose | Example Use |
-|------|---------|-------------|
-| **WS ioB in** | Subscribe to state changes | Monitor temperature sensors |
-| **WS ioB out** | Send values to states | Control lights, switches |
-| **WS ioB get** | Read current state values | Get sensor readings on demand |
-| **WS ioB getObj** | Retrieve object definitions | Access device metadata |
-| **WS ioB inObj** | Monitor object changes | Track adapter installations |
-| **WS ioB history** | Access historical data | Energy consumption analysis |
-| **WS ioB log** | Live log monitoring | System health monitoring |
+| Node | Purpose | Example Use | Documentation |
+|------|---------|-------------|---------------|
+| **WS ioB in** | Subscribe to state changes | Monitor temperature sensors  | [📖 Details](docs/nodes/iob-in.md) |
+| **WS ioB out** | Send values to states with auto-creation | Control lights, switches |[📖 Details](docs/nodes/iob-out.md) |
+| **WS ioB get** | Read current state values | Get sensor readings on demand |  [📖 Details](docs/nodes/iob-get.md) |
+| **WS ioB getObj** | Retrieve object definitions | Access device metadata | [📖 Details](docs/nodes/iob-getobject.md) |
+| **WS ioB inObj** | Monitor object changes | Track adapter installations | [📖 Details](docs/nodes/iob-inobj.md) |
+| **WS ioB history** | Access historical data | Energy consumption analysis | [📖 Details](docs/nodes/iob-history.md) |
+| **WS ioB log** | Live log monitoring | System health monitoring | [📖 Details](docs/nodes/iob-log.md) |
 
 ## 🔧 Configuration
 
@@ -85,18 +85,6 @@ If you prefer not to use a dedicated Admin instance:
 
 **WebSocket adapter** (port 8084) - Dedicated WebSocket adapter for external connections
 **Web adapter** (port 8082) - Requires "Use pure web-sockets" option enabled
-
-## 📋 Node Documentation
-
-| Node | Purpose | Documentation |
-|------|---------|---------------|
-| **WS ioB in** | Subscribe to state changes in real-time | [📖 Details](docs/nodes/iob-in.md) |
-| **WS ioB out** | Send values to states with auto-creation | [📖 Details](docs/nodes/iob-out.md) |
-| **WS ioB get** | Read current state values on demand | [📖 Details](docs/nodes/iob-get.md) |
-| **WS ioB getObj** | Retrieve object definitions | [📖 Details](docs/nodes/iob-getobject.md) |
-| **WS ioB inObj** | Monitor object structure changes | [📖 Details](docs/nodes/iob-inobj.md) |
-| **WS ioB history** | Access historical data from adapters | [📖 Details](docs/nodes/iob-history.md) |
-| **WS ioB log** | Subscribe to live log messages | [📖 Details](docs/nodes/iob-log.md) |
 
 ## ⚠️ Important Notes
 
