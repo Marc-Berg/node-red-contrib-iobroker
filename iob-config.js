@@ -37,7 +37,6 @@ function setupStaticResources(RED) {
             }
         }));
 
-        console.log('[ioBroker] Shared TreeView resources available at /iobroker/shared/');
         staticResourcesSetup = true;
         return true;
 
@@ -155,7 +154,6 @@ function setupAPIEndpoints(RED) {
                     // Convert map to array
                     for (const config of adapterConfigs.values()) {
                         historyAdapters.push(config);
-                        console.log(`[ioBroker] Found adapter ${config.name}: enabled=${config.enabled}, alive=${config.alive}`);
                     }
                 }
 
@@ -180,7 +178,6 @@ function setupAPIEndpoints(RED) {
             }
         });
 
-        console.log('[ioBroker] TreeView API endpoints configured');
         apiEndpointsSetup = true;
         return true;
 
@@ -193,10 +190,6 @@ function setupAPIEndpoints(RED) {
 module.exports = function (RED) {
     const staticResult = setupStaticResources(RED);
     const apiResult = setupAPIEndpoints(RED);
-
-    if (staticResult && apiResult) {
-        console.log('[ioBroker] TreeView components initialized successfully');
-    }
 
     function ioBConfig(n) {
         RED.nodes.createNode(this, n);
