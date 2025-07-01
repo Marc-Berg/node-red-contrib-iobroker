@@ -79,7 +79,8 @@ Choose one of these ioBroker adapters:
 
 | Node | Purpose | Documentation |
 |------|---------|---------------|
-| **WS ioB in** | Subscribe to state changes in real-time | [📖 Details](docs/nodes/iob-in.md) |
+| **WS ioB in** | Subscribe to state changes in real-time | [📖 Details](docs/nodes/iob-
+in.md) |
 | **WS ioB out** | Send values to states with auto-creation | [📖 Details](docs/nodes/iob-out.md) |
 | **WS ioB get** | Read current state values on demand | [📖 Details](docs/nodes/iob-get.md) |
 | **WS ioB getObject** | Retrieve object definitions | [📖 Details](docs/nodes/iob-getobject.md) |
