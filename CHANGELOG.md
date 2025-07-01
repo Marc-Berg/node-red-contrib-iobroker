@@ -8,9 +8,9 @@
 ## [0.9.0] - 2025-06-30
 ### Added
 - **New node "ioblog"** - Live log subscription and monitoring
-- Real-time log message streaming from ioBroker with configurable log levels
-- Client-side log level filtering (silly, debug, info, warn, error)
-- Support for timestamp and source adapter inclusion in output messages
+  - Real-time log message streaming from ioBroker with configurable log levels
+  - Client-side log level filtering (silly, debug, info, warn, error)
+  - Support for timestamp and source adapter inclusion in output messages
 
 ## [0.8.1] - 2025-06-30
 ### Fixed
@@ -19,25 +19,25 @@
 ## [0.8.0] - 2025-06-30
 ### Added
 - **New node "iobhistory"** - Historical data retrieval from ioBroker history adapters
-- History adapter auto-detection with real-time status indicators (🟢🟡🔴)
-- Support for History, SQL, and InfluxDB adapters
-- Multiple time range modes: Duration, Absolute, and Message-based
-- Advanced aggregation methods: none, onchange, average, min, max, minmax, total, count, percentile, quantile, integral
-- Multiple output formats: Array, Chart.js, and Statistics
+  - History adapter auto-detection with real-time status indicators (🟢🟡🔴)
+  - Support for History, SQL, and InfluxDB adapters
+  - Multiple time range modes: Duration, Absolute, and Message-based
+  - Advanced aggregation methods: none, onchange, average, min, max, minmax, total, count, percentile, quantile, integral
+  - Multiple output formats: Array, Chart.js, and Statistics
 
 ## [0.7.0] - 2025-06-29
 ### Added
 - **Object type filtering for iobgetobject node**
-- Wildcard pattern support for iobgetobject
-- Auto-detection of wildcard patterns
+  - Wildcard pattern support for iobgetobject
+  - Auto-detection of wildcard patterns
 
 ### Fixed
-- Object type filter parameter passing
+  - Object type filter parameter passing
 
 ## [0.6.0] - 2025-06-28
 ### Added
 - **New node "iobinobject"** - Object subscription and monitoring
-- Real-time ioBroker object change monitoring
-- Wildcard pattern support for object subscriptions (e.g., system.adapter.*)
-- Object structure and configuration change detection
-- Object operation tracking (update/delete)
+  - Real-time ioBroker object change monitoring
+  - Wildcard pattern support for object subscriptions (e.g., system.adapter.*)
+  - Object structure and configuration change detection
+  - Object operation tracking (update/delete)
