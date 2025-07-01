@@ -171,8 +171,8 @@ Subscribe to ioBroker live log messages.
 
 ## 📚 Additional Resources
 
-- **🔍 Troubleshooting**: [Troubleshooting Guide](troubleshooting.md)
-- **🎯 Use Cases**: [Common Use Cases](use-cases.md)
+- **🔍 Troubleshooting**: [Troubleshooting Guide](docs/troubleshooting.md)
+- **🎯 Use Cases**: [Common Use Cases](docs/use-cases.md)
 - **📖 Full Documentation**: [GitHub Repository](https://github.com/Marc-Berg/node-red-contrib-iobroker)
 - **🐛 Bug Reports**: [GitHub Issues](https://github.com/Marc-Berg/node-red-contrib-iobroker/issues)
 - **💡 Feature Requests**: [GitHub Discussions](https://github.com/Marc-Berg/node-red-contrib-iobroker/discussions)
