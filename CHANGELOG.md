@@ -1,5 +1,16 @@
 # Changelog
 
+## [0.9.2] - 2025-07-01
+### Added
+- **Architecture diagram** showing recommended Node-RED to ioBroker setup
+- **Dedicated Admin instance recommendation** in documentation
+- **Comprehensive node documentation** with individual files for each node
+
+### Changed
+- **Documentation structure** - extracted troubleshooting and use cases to separate files
+- **Configuration section** - consolidated and simplified setup instructions
+- **Node table** - added direct links to detailed documentation
+
 ## [0.9.1] - 2025-07-01
 ### Fixed
 - **Race condition causing nodes to display "Waiting for Connection" status while functional**
