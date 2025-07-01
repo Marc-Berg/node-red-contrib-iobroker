@@ -431,6 +431,7 @@ The nodes connect to ioBroker's WebSocket interface via **one** of three options
 3. **Admin adapter** (default port 8081)
    - Uses the admin interface WebSocket
    - Usually pre-installed with ioBroker
+   - **Essential for**: ioblog node (live logs) and complete iobinobject functionality
 
 ## Troubleshooting
 

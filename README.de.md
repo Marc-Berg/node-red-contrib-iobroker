@@ -428,6 +428,7 @@ Die Nodes verbinden sich mit ioBrokers WebSocket-Schnittstelle über **eine** vo
 3. **Admin-Adapter** (Standard-Port 8081)
    - Verwendet die Admin-Oberflächen-WebSocket
    - Normalerweise bereits mit ioBroker vorinstalliert
+   - **Erforderlich für**: ioblog Node (Live-Logs) und vollständige iobinobject-Funktionalität
 
 ## Fehlerbehebung
 
