@@ -19,7 +19,7 @@ This guide helps you resolve common issues with the Node-RED ioBroker integratio
 ### Connection Drops Frequently
 1. Check network stability between Node-RED and ioBroker
 2. Increase session duration to ≥3600 seconds (1 hour) in ioBroker settings
-3. Verify WebSocket adapter configuration in ioBroker
+3. Verify adapter configuration in ioBroker
 4. Check for high system load on either server
 
 ## Authentication Problems
@@ -39,8 +39,7 @@ This guide helps you resolve common issues with the Node-RED ioBroker integratio
 ### "Token expired" Error
 1. **Increase session duration** to ≥3600 seconds in ioBroker settings
 2. **Check system time synchronization** between servers
-3. **Restart ioBroker** if session settings don't apply
-4. **Clear authentication cache** by redeploying Node-RED flow
+3. **Clear authentication cache** by redeploying Node-RED flow
 
 ## Node Status Messages
 
@@ -54,14 +53,6 @@ Understanding the visual status indicators on each node:
 - **Blue dot "Processing"**: Node is actively processing data
 - **Gray dot "Disabled"**: Node is disabled or not configured
 
-### Status Text Messages
-- **"Connected"**: Successfully connected to ioBroker
-- **"Connecting..."**: Attempting to establish connection
-- **"Disconnected"**: No connection to ioBroker server
-- **"Authentication failed"**: Invalid username/password
-- **"WebSocket error"**: Communication error with ioBroker
-- **"Configuration error"**: Invalid node configuration
-
 ## Configuration Issues
 
 ### Missing Objects in ioBroker
@@ -71,7 +62,7 @@ Understanding the visual status indicators on each node:
 4. **Review adapter configuration** for target states
 
 ### Wildcard Patterns Not Working
-1. **Check pattern syntax** - use `*` for single level, `**` for multiple levels
+1. **Check pattern syntax** - use `*`, `?` is not supported
 2. **Avoid overly broad patterns** like `*` or `*.*` for performance
 3. **Test pattern** with smaller subsets first
 4. **Verify state existence** in ioBroker objects view
@@ -80,7 +71,6 @@ Understanding the visual status indicators on each node:
 1. **Check history adapter** is installed and running
 2. **Verify data retention** settings in history adapter
 3. **Confirm state logging** is enabled for target states
-4. **Check adapter compatibility** (History, SQL, InfluxDB)
 
 ## Performance Issues
 
@@ -94,13 +84,6 @@ Understanding the visual status indicators on each node:
 1. **Reduce subscription count** by optimizing wildcard patterns
 2. **Implement message filtering** in Node-RED flows
 3. **Check for memory leaks** in custom function nodes
-4. **Monitor connection pooling** efficiency
-
-### Message Queue Backup
-1. **Check processing speed** of downstream nodes
-2. **Implement flow control** mechanisms
-3. **Monitor Node-RED debug logs** for bottlenecks
-4. **Consider message batching** for high-frequency data
 
 ## Getting Diagnostic Information
 
@@ -110,14 +93,12 @@ Send a message with `msg.topic = "status"` to any ioBroker node to get detailed 
 - WebSocket protocol version
 - Authentication status
 - Error history
-- Performance metrics
 
 ### Debug Logging
 Enable debug logging in Node-RED to see detailed communication:
 1. Set logging level to "debug" in settings.js
 2. Monitor Node-RED logs during operation
 3. Check ioBroker logs for server-side issues
-4. Use browser developer tools for WebSocket inspection
 
 ### Common Log Messages
 - `WebSocket connection established`: Successful connection
@@ -131,13 +112,13 @@ Enable debug logging in Node-RED to see detailed communication:
 If you've tried the above solutions and still experience issues:
 
 1. **Check GitHub Issues**: [Known Issues](https://github.com/Marc-Berg/node-red-contrib-iobroker/issues)
-2. **Create Bug Report**: Include Node-RED version, ioBroker version, and error logs
-3. **Join Discussions**: [GitHub Discussions](https://github.com/Marc-Berg/node-red-contrib-iobroker/discussions)
-4. **ioBroker Community**: [ioBroker Forum](https://forum.iobroker.net)
+2. **Create Bug Report**
+3. **ioBroker Community**: [ioBroker Forum](https://forum.iobroker.net)
 
 ### Information to Include in Bug Reports
 - Node-RED version
 - ioBroker version
+- adapter type and version
 - Operating system details
 - Node configuration (sanitized)
 - Error messages and logs

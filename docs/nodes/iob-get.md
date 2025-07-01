@@ -4,7 +4,7 @@ Read current state values from ioBroker on demand without continuous subscriptio
 
 ## Purpose
 
-The WS ioB get node allows you to retrieve the current value of ioBroker states when triggered by an incoming message. Unlike WS ioB in which continuously monitors states, this node reads values only when requested.
+The WS ioB get node allows you to retrieve the current value of ioBroker states when triggered by an incoming message. Unlike `WS ioB in` which continuously monitors states, this node reads values only when requested.
 
 ## Configuration
 
@@ -32,12 +32,6 @@ Configure a specific state ID in the node and trigger with any message:
 ### Dynamic State Reading
 Use `msg.topic` to specify which state to read at runtime:
 
-```javascript
-// In function node before WS ioB get
-msg.topic = "0_userdata.0.temperature";
-return msg;
-```
-
 ### Triggered Readings
 Common trigger scenarios:
 
@@ -50,11 +44,6 @@ Common trigger scenarios:
 - Trigger on button press or motion detection
 - Read current status before making decisions
 - Get baseline values for calculations
-
-**Initialization Reading**
-- Read current states on Node-RED startup
-- Initialize dashboard displays
-- Restore last known values
 
 ## Output Message Format
 
@@ -95,55 +84,6 @@ Complete state object available in `msg.state`:
 }
 ```
 
-## Advanced Usage
-
-### Multiple State Reading
-To read multiple states, use multiple WS ioB get nodes or implement a loop:
-
-```javascript
-// Function node to read multiple states
-const states = ["temp1", "temp2", "temp3"];
-let messages = [];
-
-for (let state of states) {
-    messages.push({
-        ...msg,
-        topic: `sensors.${state}.temperature`
-    });
-}
-
-return [messages];
-```
-
-### Conditional Reading
-Read states based on conditions:
-
-```javascript
-// Only read temperature if motion detected
-if (msg.payload === true) {
-    msg.topic = "sensors.room.temperature";
-    return msg;
-}
-return null;
-```
-
-### Data Aggregation
-Collect multiple readings for analysis:
-
-```javascript
-// Store readings in context
-let readings = context.get('readings') || [];
-readings.push({
-    state: msg.topic,
-    value: msg.payload,
-    timestamp: msg.timestamp
-});
-
-context.set('readings', readings.slice(-100)); // Keep last 100
-msg.readings = readings;
-return msg;
-```
-
 ## Error Handling
 
 ### Common Errors
@@ -158,34 +98,12 @@ When an error occurs:
 - `msg.payload` may be undefined or contain error details
 - Node status shows error state
 
-### Error Recovery
-```javascript
-// Check for errors before processing
-if (msg.error) {
-    node.warn(`Failed to read ${msg.topic}: ${msg.error}`);
-    return null;
-}
-
-// Process successful reading
-return msg;
-```
-
 ## Performance Considerations
 
 ### Request Frequency
 - Avoid rapid successive requests to same state
 - Implement debouncing for user-triggered reads
-- Consider using WS ioB in for frequently changing values
-
-### Batch Optimization
-- Group multiple readings when possible
-- Use separate nodes for independent readings
-- Avoid blocking flows with slow requests
-
-### Connection Efficiency
-- Reuse connection across multiple get nodes
-- Monitor connection status
-- Implement retry logic for failed requests
+- Consider using `WS ioB in` for frequently changing values
 
 ## Comparison with Other Nodes
 
@@ -203,42 +121,6 @@ return msg;
 - Manual refresh operations
 - Conditional reading based on events
 
-## Best Practices
-
-### State Selection
-- Use specific state IDs for better performance
-- Validate state existence before reading
-- Handle missing states gracefully
-
-### Message Flow Design
-- Preserve original message context
-- Implement proper error handling
-- Use meaningful property names
-
-### Resource Management
-- Limit concurrent requests
-- Implement timeouts for long operations
-- Monitor node performance
-
-## Troubleshooting
-
-### No Response
-1. Check state ID exists in ioBroker
-2. Verify WebSocket connection
-3. Confirm read permissions
-4. Test with simple static state
-
-### Incorrect Values
-1. Check state timestamp for staleness
-2. Verify quality indicator
-3. Confirm acknowledgment status
-4. Review source adapter status
-
-### Performance Issues
-1. Reduce request frequency
-2. Check for connection problems
-3. Monitor system resources
-4. Optimize flow design
 
 ## Integration Examples
 
@@ -254,12 +136,6 @@ return msg;
 [Event] → [WS ioB get: "system.adapter.hue.0.alive"] → [Switch] → [Action]
 ```
 
-### Initialization
-```javascript
-// Read current states on startup
-[Inject: once on start] → [WS ioB get] → [Initialize Dashboard]
-```
-
 ## Related Nodes
 
 - **WS ioB in**: Continuous state monitoring
@@ -268,4 +144,4 @@ return msg;
 
 ## Examples
 
-See [Common Use Cases](use-cases.md) for practical implementation examples.
+See [Common Use Cases](../use-cases.md) for practical implementation examples.

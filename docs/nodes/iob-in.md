@@ -29,21 +29,6 @@ The WS ioB in node allows you to monitor ioBroker states and receive notificatio
 - When enabled, emits current state value immediately after subscription
 - Useful for initialization of downstream nodes
 
-## Wildcard Patterns
-
-### Single Level Wildcards
-Use `*` to match any single level in the state hierarchy:
-
-- `system.adapter.*.alive` - All adapter alive states
-- `lights.*.state` - All light states in any room
-- `0_userdata.0.*` - All states under 0_userdata.0
-
-### Multi-Level Wildcards
-Use `**` to match multiple levels:
-
-- `system.**` - All system states at any depth
-- `**.temperature` - All temperature states anywhere
-
 ### Pattern Examples
 
 **Monitor All Adapters**
@@ -63,7 +48,6 @@ sensors.*.temperature
 **Monitor User Data**
 ```
 0_userdata.0.*
-javascript.0.*
 ```
 
 ## Output Message Format
@@ -74,6 +58,7 @@ The node outputs a message with the following structure:
 - `payload`: The state value (number, string, boolean, object)
 - `topic`: The complete state ID
 - `timestamp`: Unix timestamp of the change
+- `pattern`: The wildcard pattern that matched (for wildcard subscriptions)
 
 **State Object:**
 Complete ioBroker state information in `msg.state`:
@@ -82,7 +67,7 @@ Complete ioBroker state information in `msg.state`:
 - `ts`: Timestamp in milliseconds
 - `from`: Source that changed the state
 - `lc`: Last change timestamp
-- `q`: Quality indicator (0=good, others indicate issues)
+- `q`: Quality indicator
 
 **Example Output:**
 ```
@@ -101,35 +86,10 @@ Complete ioBroker state information in `msg.state`:
 }
 ```
 
-## Advanced Usage
-
-### Dynamic Subscription
-Change subscription at runtime by sending a message with `msg.topic` set to the new state pattern:
-
-```
-msg.topic = "system.adapter.admin.*";
-return msg;
-```
-
-### Quality Filtering
-Use the quality indicator in `msg.state.q` to filter unreliable readings:
-- `0`: Good quality
-- `1`: General problem
-- `2`: No connection to device
-- `16`: Substitute value
-- `64`: Not supported
-- `128`: Device not connected
-
-### State Validation
-Check acknowledgment status to distinguish between values and commands:
-- `ack: true` - Confirmed value from device
-- `ack: false` - Command sent to device
-
 ## Performance Considerations
 
 ### Wildcard Optimization
 - **Specific patterns**: Use `lights.*` instead of `*` when possible
-- **Limit scope**: Avoid overly broad patterns like `*` or `**`
 - **Monitor count**: Check node status for active subscription count
 
 ### Message Frequency
@@ -137,30 +97,16 @@ Check acknowledgment status to distinguish between values and commands:
 - Consider using rate limiting or change detection in flow
 - Monitor Node-RED memory usage with many subscriptions
 
-### Connection Efficiency
-- Multiple nodes can share the same ioBroker connection
-- Wildcard patterns are more efficient than multiple single subscriptions
-- Connection status is shown in node status indicator
-
 ## Troubleshooting
 
 ### No Messages Received
 1. Check state exists in ioBroker objects view
 2. Verify wildcard pattern syntax
-3. Confirm WebSocket connection is established
-4. Test with simpler pattern first
+3. Test with simpler pattern first
 
 ### Missing State Changes
 1. Check trigger settings (all/ack/unack)
 2. Verify state actually changes in ioBroker
-3. Look for quality issues in state object
-4. Check if state has logging enabled
-
-### High CPU Usage
-1. Reduce wildcard scope
-2. Implement message filtering
-3. Check for rapid state changes
-4. Monitor subscription count
 
 ### Connection Issues
 1. Verify ioBroker WebSocket adapter is running
@@ -176,4 +122,4 @@ Check acknowledgment status to distinguish between values and commands:
 
 ## Examples
 
-See [Common Use Cases](use-cases.md) for practical implementation examples.
+See [Common Use Cases](../use-cases.md) for practical implementation examples.

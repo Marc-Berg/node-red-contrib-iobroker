@@ -35,7 +35,7 @@ The WS ioB getObject node allows you to retrieve ioBroker object definitions, wh
 
 **Host Objects**
 - `system.host.hostname` - Host system information
-- `system.host.*.processes` - Running processes
+- `system.host.versions` - Node versions
 
 **Configuration Objects**
 - `system.config` - System configuration
@@ -57,22 +57,6 @@ The WS ioB getObject node allows you to retrieve ioBroker object definitions, wh
 - `javascript.0.myScript` - JavaScript variable
 - `hue.0.lights.1.state` - Device state
 
-## Wildcard Patterns
-
-### Single Level Wildcards (`*`)
-Match exactly one level in the object hierarchy:
-
-- `system.adapter.*` - All adapter objects
-- `hue.0.lights.*` - All light devices
-- `*.alive` - All alive states at any adapter level
-
-### Multi-Level Wildcards (`**`)
-Match multiple levels:
-
-- `system.**` - All system objects at any depth
-- `hue.0.**` - All objects under hue.0 adapter
-- `**.temperature` - All temperature objects anywhere
-
 ### Pattern Examples
 
 **Discover Adapters**
@@ -84,7 +68,6 @@ system.adapter.hue.*      // All Hue adapter objects
 
 **Find Device Objects**
 ```
-hue.0.**                  // All Hue objects
 *.lights.*                // All light objects
 zigbee.0.*.available      // Zigbee device availability
 ```
@@ -107,7 +90,7 @@ Returns the object directly when only one match is found:
   type: "instance",
   common: {
     name: "admin",
-    version: "5.3.8",
+    version: "7.0.1",
     enabled: true,
     host: "iobroker-host"
   },
@@ -183,52 +166,6 @@ The `common` section contains:
 - `min`/`max`: Value ranges
 - `states`: Possible values for enums
 
-## Advanced Usage
-
-### Dynamic Object Discovery
-```javascript
-// Find all temperature sensors
-msg.topic = "**.temperature";
-return msg;
-```
-
-### Object Filtering
-```javascript
-// Filter only enabled adapters
-const adapters = msg.payload.filter(obj => 
-    obj.common && obj.common.enabled === true
-);
-msg.payload = adapters;
-return msg;
-```
-
-### Metadata Extraction
-```javascript
-// Extract adapter versions
-const versions = {};
-for (let obj of msg.payload) {
-    if (obj.common && obj.common.version) {
-        versions[obj._id] = obj.common.version;
-    }
-}
-msg.payload = versions;
-return msg;
-```
-
-### Configuration Analysis
-```javascript
-// Analyze adapter configurations
-const configs = msg.payload.map(obj => ({
-    id: obj._id,
-    name: obj.common.name,
-    enabled: obj.common.enabled,
-    host: obj.common.host,
-    native: obj.native
-}));
-msg.payload = configs;
-return msg;
-```
-
 ## Use Cases
 
 ### System Discovery
@@ -240,78 +177,19 @@ return msg;
 ### Dynamic Configuration
 - Build device lists for UIs
 - Generate adapter monitoring
-- Create automatic backups
 - Validate object structures
 
 ### Troubleshooting
 - Check object definitions
 - Verify permissions and roles
 - Analyze configuration issues
-- Document system state
-
-## Performance Considerations
-
-### Pattern Scope
-- Use specific patterns when possible
-- Avoid overly broad wildcards
-- Monitor result count for large patterns
-- Consider pagination for massive results
-
-### Caching
-- Cache frequently accessed objects
-- Implement cache invalidation
-- Use WS ioB inObj for change monitoring
-- Store results in context for reuse
-
-### Request Optimization
-- Batch multiple requests when possible
-- Use appropriate output format
-- Filter results early in the flow
-- Avoid repeated identical requests
 
 ## Error Handling
 
 ### Common Errors
 - **Object not found**: Specified object doesn't exist
 - **Permission denied**: User lacks read permissions
-- **Pattern too broad**: Wildcard matches too many objects
 - **Connection error**: WebSocket unavailable
-
-### Error Recovery
-```javascript
-// Handle errors gracefully
-if (msg.error) {
-    node.warn(`Object retrieval failed: ${msg.error}`);
-    msg.payload = []; // Return empty result
-    return msg;
-}
-
-// Validate result
-if (!Array.isArray(msg.payload)) {
-    msg.payload = [msg.payload]; // Normalize to array
-}
-return msg;
-```
-
-## Best Practices
-
-### Pattern Design
-- Start with specific patterns and broaden as needed
-- Test patterns with small scopes first
-- Document expected result counts
-- Use consistent naming conventions
-
-### Result Processing
-- Handle different output formats consistently
-- Implement proper error checking
-- Filter results appropriately
-- Cache expensive operations
-
-### Security
-- Limit access to sensitive objects
-- Validate object permissions
-- Sanitize object data before use
-- Monitor access patterns
 
 ## Troubleshooting
 
@@ -327,12 +205,6 @@ return msg;
 3. Implement result pagination
 4. Use more specific patterns
 
-### Performance Issues
-1. Reduce pattern scope
-2. Implement result caching
-3. Monitor system resources
-4. Optimize downstream processing
-
 ## Related Nodes
 
 - **WS ioB inObj**: Monitor object changes
@@ -341,4 +213,4 @@ return msg;
 
 ## Examples
 
-See [Common Use Cases](use-cases.md) for practical implementation examples.
+See [Common Use Cases](../use-cases.md) for practical implementation examples.
