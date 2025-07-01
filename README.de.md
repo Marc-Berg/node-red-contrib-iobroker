@@ -1,272 +1,117 @@
-# Node-RED Nodes for ioBroker Integration
+# Node-RED Nodes für ioBroker Integration
 
 ![Version](https://img.shields.io/npm/v/node-red-contrib-iobroker)
 ![License](https://img.shields.io/badge/license-MIT-blue.svg)
 ![Node-RED](https://img.shields.io/badge/Node--RED-compatible-red.svg)
 ![Downloads](https://img.shields.io/npm/dt/node-red-contrib-iobroker)
 
-> **🌍 Languages:** [🇺🇸 English](#) | [🇩🇪 Deutsch](https://github.com/Marc-Berg/node-red-contrib-iobroker/blob/main/README.de.md)
+> **🌍 Sprachen:** [🇺🇸 English](https://github.com/Marc-Berg/node-red-contrib-iobroker/blob/main/README.md) | [🇩🇪 Deutsch](#)
 
-External Node-RED integration nodes for ioBroker communication. **NOT an ioBroker adapter** - standalone package for external Node-RED instances to connect with ioBroker via WebSocket.
+Externe Node-RED Integrations-Nodes für die ioBroker Kommunikation. **KEIN ioBroker Adapter** - eigenständiges Paket für externe Node-RED Instanzen zur Verbindung mit ioBroker über WebSocket.
 
-## 🚀 Quick Start
+## 🚀 Schnellstart
 
 ### Installation
-```bash
-npm install node-red-contrib-iobroker
-```
+Installiere die Nodes über den Node-RED Palette Manager:
+1. Node-RED Oberfläche öffnen
+2. Hamburger-Menü (drei Striche) → Palette verwalten
+3. Zum "Installieren" Tab wechseln
+4. Nach "node-red-contrib-iobroker" suchen
+5. "Installieren" Button klicken
 
-### Basic Setup
-1. **Install** the nodes in your Node-RED instance via Palette Manager
-2. **Add iob-config node** with your ioBroker server details:
-   - Host: `iobroker.local` or IP address
-   - Port: `8081` (Admin), `8082` (Web), or `8084` (WebSocket)
-   - Authentication: Optional username/password
-3. **Use the nodes** in your flows
+### Grundeinrichtung
+1. **Dedizierte Admin Adapter Instanz erstellen** (empfohlen):
+   - Zweite Admin Adapter Instanz in ioBroker installieren
+   - Auf anderem Port konfigurieren (z.B. 8091)
+   - Ausschließlich für Node-RED Verbindungen verwenden
+2. **iob-config Node konfigurieren** mit deiner dedizierten Instanz:
+   - Host: Hostname oder IP-Adresse
+   - Port: 8091 (deine dedizierte Admin Instanz)
+   - Authentifizierung: Optional Benutzername/Passwort
+3. **Nodes in deinen Flows verwenden**
 
-### First Flow Example
-```javascript
-// 1. Drag "WS ioB in" node to canvas
-// 2. Configure: State = "0_userdata.0.test"
-// 3. Connect to Debug node
-// 4. Deploy and watch state changes
-```
+## 🏗️ Architektur Übersicht
 
-## 📦 Available Nodes
+![Node-RED zu ioBroker Architektur](images/iobroker_architecture_diagram.svg)
 
-| Node | Purpose | Example Use |
-|------|---------|-------------|
-| **WS ioB in** | Subscribe to state changes | Monitor temperature sensors |
-| **WS ioB out** | Send values to states | Control lights, switches |
-| **WS ioB get** | Read current state values | Get sensor readings on demand |
-| **WS ioB getObject** | Retrieve object definitions | Access device metadata |
-| **WS ioB inObj** | Monitor object changes | Track adapter installations |
-| **WS ioB history** | Access historical data | Energy consumption analysis |
-| **WS ioB log** | Live log monitoring | System health monitoring |
+Das Diagramm zeigt die empfohlene Architektur mit einer dedizierten Admin Adapter Instanz für Node-RED Verbindungen, getrennt von der Haupt-Admin Oberfläche für normale Benutzer.
 
-## ✨ Key Features
+## 📦 Verfügbare Nodes
 
-- **Real-time WebSocket communication** with automatic reconnection
-- **Wildcard pattern support** - subscribe to multiple states at once
-- **Automatic object creation** for missing ioBroker objects  
-- **Shared connection management** - multiple nodes share connections
-- **Historical data access** from history adapters (History, SQL, InfluxDB)
-- **OAuth2 authentication** for secured installations
-- **SSL/TLS support** for encrypted connections
+| Node | Zweck | Anwendungsbeispiel | Dokumentation |
+|------|-------|-------------------|---------------|
+| **WS ioB in** | State-Änderungen abonnieren | Temperatursensoren überwachen | [📖 Details](docs/nodes/iob-in.md) |
+| **WS ioB out** | Werte an States senden mit Auto-Erstellung | Lichter, Schalter steuern | [📖 Details](docs/nodes/iob-out.md) |
+| **WS ioB get** | Aktuelle State-Werte lesen | Sensormesswerte bei Bedarf abrufen | [📖 Details](docs/nodes/iob-get.md) |
+| **WS ioB getObj** | Objektdefinitionen abrufen | Geräte-Metadaten zugreifen | [📖 Details](docs/nodes/iob-getobject.md) |
+| **WS ioB inObj** | Objektänderungen überwachen | Adapter-Installationen verfolgen | [📖 Details](docs/nodes/iob-inobj.md) |
+| **WS ioB history** | Historische Daten zugreifen | Energieverbrauchsanalyse | [📖 Details](docs/nodes/iob-history.md) |
+| **WS ioB log** | Live-Log Überwachung | Systemzustand überwachen | [📖 Details](docs/nodes/iob-log.md) |
 
-## 🔧 Configuration
+## 🔧 Konfiguration
 
-### Server Configuration (iob-config)
-```javascript
-{
-  "name": "My ioBroker",
-  "host": "192.168.1.100",    // or "iobroker.local"
-  "port": 8081,               // Admin: 8081, Web: 8082, WebSocket: 8084
-  "useSSL": false,            // Enable for HTTPS/WSS
-  "username": "",             // Optional for authentication
-  "password": ""              // Optional for authentication
-}
-```
+### Empfohlene Einrichtung: Dedizierte Admin Instanz
 
-### Authentication Modes
-- **No Authentication** (default): Leave username/password empty
-- **OAuth2**: Enter valid ioBroker username/password
+**Warum eine dedizierte Admin Instanz verwenden?**
+- Isoliert Node-RED Traffic von der Haupt-Admin Oberfläche
+- Verhindert Konflikte mit normaler Admin-Nutzung
+- Ermöglicht benutzerdefinierte Sicherheitseinstellungen
 
-### WebSocket Adapters
-Choose one of these ioBroker adapters:
-- **Admin adapter** (port 8081) - Usually pre-installed, required for logs
-- **WebSocket adapter** (port 8084) - Dedicated WebSocket adapter  
-- **Web adapter** (port 8082) - Requires "Use pure web-sockets" enabled
+**Einrichtungsschritte:**
+1. **Zweite Admin Adapter Instanz installieren** in ioBroker:
+   - Gehe zu Adapter → Admin → Instanz hinzufügen
+   - Benutzerdefinierten Port konfigurieren (z.B. 8091)
+   - Features nach Bedarf aktivieren/deaktivieren
+2. **Sicherheit für Node-RED Zugriff konfigurieren**:
+   - Dedizierten Benutzer für Node-RED erstellen
+   - Angemessene Berechtigungen setzen
+   - Session-Dauer ≥3600 Sekunden konfigurieren
 
-## 📋 Node Documentation
+### Server Konfiguration (iob-config)
 
-### WS ioB in - State Subscription
-Subscribe to ioBroker state changes in real-time.
+**Verbindungseinstellungen:**
+- **Name**: Beschreibender Name für deine ioBroker Instanz
+- **Host**: IP-Adresse (z.B. 192.168.1.100) oder Hostname (z.B. iobroker.local)
+- **Port**: Dein dedizierter Admin Instanz Port (z.B. 8091)
+- **SSL verwenden**: Für HTTPS/WSS Verbindungen aktivieren
 
-**Configuration:**
-- **State**: Single state ID or wildcard pattern
-- **Output Property**: Message property for value (default: `payload`)
-- **Trigger on**: All updates, acknowledged only, or unacknowledged only
-- **Send initial value**: Emit current value on startup
+**Authentifizierungseinstellungen:**
+- **Keine Authentifizierung** (Standard): Benutzername/Passwort leer lassen
+- **OAuth2**: Gültigen ioBroker Benutzername/Passwort eingeben
 
-**Wildcard Examples:**
-```javascript
-"system.adapter.*.alive"     // All adapter alive states
-"0_userdata.0.*"            // All states under 0_userdata.0  
-"*.temperature"             // All temperature states
-```
+### Alternative Adapter Optionen
 
-**Output Message:**
-```javascript
-{
-  "payload": 23.5,
-  "topic": "0_userdata.0.temperature",
-  "state": {
-    "val": 23.5,
-    "ack": true,
-    "ts": 1640995200000,
-    "from": "system.adapter.javascript.0"
-  },
-  "timestamp": 1640995200000
-}
-```
+Falls du keine dedizierte Admin Instanz verwenden möchtest:
 
-### WS ioB out - State Output
-Send values to ioBroker states with automatic object creation.
+**WebSocket Adapter** (Port 8084) - Dedizierter WebSocket Adapter für externe Verbindungen
+**Web Adapter** (Port 8082) - Erfordert aktivierte "Reine Web-Sockets verwenden" Option
 
-**Configuration:**
-- **State**: Target state ID (or use `msg.topic`)
-- **Input Property**: Source property (default: `payload`)
-- **Set Mode**: Value (ack=true) or Command (ack=false)
-- **Auto-Create Objects**: Create missing objects automatically
+## ✨ Hauptfunktionen
 
-**Auto-Create Properties:**
-```javascript
-// Static configuration in node or dynamic via message
-msg.stateName = "Living Room Temperature";
-msg.stateRole = "value.temperature"; 
-msg.payloadType = "number";
-msg.stateUnit = "°C";
-msg.stateMin = -50;
-msg.stateMax = 100;
-```
+- **Echtzeit WebSocket Kommunikation** mit automatischer Wiederverbindung
+- **Wildcard-Pattern Unterstützung** - mehrere States gleichzeitig abonnieren
+- **Automatische Objekterstellung** für fehlende ioBroker Objekte
+- **Geteiltes Verbindungsmanagement** - mehrere Nodes teilen Verbindungen
+- **Historische Datenzugriff** von History Adaptern (History, SQL, InfluxDB)
+- **OAuth2 Authentifizierung** für gesicherte Installationen
+- **SSL/TLS Unterstützung** für verschlüsselte Verbindungen
 
-### WS ioB get - State Getter
-Read current state values on demand.
+## ⚠️ Wichtige Hinweise
 
-**Usage:**
-```javascript
-// Send any message to trigger read
-// Use configured state or msg.topic
-// Receives current value in msg.payload
-```
+- **Nur externe Installation**: Dieses Paket ist für externe Node-RED Instanzen, nicht für den ioBroker Node-RED Adapter
+- **Dedizierte Admin Instanz empfohlen**: Verwende eine separate Admin Adapter Instanz für Node-RED Verbindungen
+- **Authentifizierungs-Token Problem**: Verwende Session-Dauern ≥3600 Sekunden (1 Stunde) um Verbindungsabbrüche zu vermeiden
+- **Performance**: Vermeide zu breite Wildcard-Pattern wie * oder *.*
 
-### WS ioB getObject - Object Getter  
-Retrieve ioBroker object definitions with wildcard support.
+## 📚 Zusätzliche Ressourcen
 
-**Examples:**
-```javascript
-"system.adapter.admin.0"     // Single object
-"system.adapter.*"          // All adapter objects
-"0_userdata.0.*"            // All user data objects
-```
+- **🔍 Fehlerbehebung**: [Troubleshooting Guide](docs/troubleshooting.md)
+- **🎯 Anwendungsfälle**: [Common Use Cases](docs/use-cases.md)
+- **📖 Vollständige Dokumentation**: [GitHub Repository](https://github.com/Marc-Berg/node-red-contrib-iobroker)
+- **🐛 Fehlerberichte**: [GitHub Issues](https://github.com/Marc-Berg/node-red-contrib-iobroker/issues)
+- **📘 ioBroker Forum**: [ioBroker.net](https://forum.iobroker.net)
 
-**Output Modes:**
-- **Single Object**: Returns object directly
-- **Array**: Returns array of objects  
-- **Object Map**: Returns {objectId: object} mapping
+## 📄 Lizenz
 
-### WS ioB inObj - Object Subscription
-Monitor changes to ioBroker objects (structure/configuration).
-
-**Use Cases:**
-- Monitor adapter installations: `system.adapter.*`
-- Track configuration changes: `system.adapter.admin.*`  
-- Watch user data: `0_userdata.0.*`
-
-### WS ioB history - Historical Data
-Access historical data from ioBroker history adapters.
-
-**Configuration:**
-- **History Adapter**: Auto-detected with status indicators
-- **Time Range**: Duration, Absolute, or From Message
-- **Aggregation**: None, OnChange, Average, Min, Max, Total, etc.
-- **Output Format**: Array, Chart.js, or Statistics
-
-**Example Query:**
-```javascript
-{
-  "stateId": "system.adapter.admin.0.memRss",
-  "duration": 24,
-  "durationUnit": "hours", 
-  "aggregate": "average",
-  "step": 3600
-}
-```
-
-### WS ioB log - Live Logs
-Subscribe to ioBroker live log messages.
-
-**Log Levels:** silly, debug, info, warn, error
-**Output:**
-```javascript
-{
-  "payload": "Adapter started",
-  "level": "info",
-  "source": "system.adapter.admin.0",
-  "timestamp": "2024-01-01T12:00:00.000Z"
-}
-```
-
-## 🎯 Common Use Cases
-
-### Home Automation
-```javascript
-// Monitor door sensors
-ioB in: "*.door.state" → Switch → ioB out: "lights.*.state"
-
-// Temperature control  
-ioB in: "*.temperature" → Function → ioB out: "heating.*.setpoint"
-```
-
-### System Monitoring
-```javascript
-// Adapter health monitoring
-ioB in: "system.adapter.*.alive" → Dashboard
-
-// Log error monitoring
-ioB log: level="error" → Notification
-```
-
-### Data Analysis
-```javascript
-// Energy consumption tracking
-ioB history: "energy.*.consumption" → Chart.js visualization
-
-// Performance trending
-ioB history: "system.*.memRss" + aggregation="average"
-```
-
-## ⚠️ Important Notes
-
-- **External Installation Only**: This package is for external Node-RED instances, not the ioBroker Node-RED adapter
-- **Authentication Token Issue**: Use session durations ≥3600 seconds (1 hour) to avoid connection drops
-- **WebSocket Required**: Needs Admin, WebSocket, or Web adapter with WebSocket support
-- **Performance**: Avoid overly broad wildcard patterns like `*` or `*.*`
-
-## 🔍 Troubleshooting
-
-### Connection Issues
-1. **Check WebSocket adapter** is installed and running
-2. **Verify port number** (8081/8082/8084)
-3. **Test network connectivity** from Node-RED to ioBroker
-4. **Check authentication** credentials if using secured installation
-
-### Authentication Problems  
-1. **"Invalid credentials"**: Verify username/password in ioBroker admin
-2. **"Access forbidden"**: Check user permissions in ioBroker
-3. **"Token expired"**: Increase session duration to ≥3600 seconds
-
-### Node Status Messages
-- **Green dot "Ready"**: Connected and operational
-- **Yellow ring "Connecting"**: Establishing connection
-- **Red ring "Disconnected"**: Connection lost, automatic retry
-- **Red ring "Auth failed"**: Authentication error, check credentials
-
-### Getting Status Information
-Send `msg.topic = "status"` to any node to get detailed connection information.
-
-## 📚 Additional Resources
-
-- **📖 Full Documentation**: [GitHub Repository](https://github.com/Marc-Berg/node-red-contrib-iobroker)
-- **🐛 Bug Reports**: [GitHub Issues](https://github.com/Marc-Berg/node-red-contrib-iobroker/issues)
-- **💡 Feature Requests**: [GitHub Discussions](https://github.com/Marc-Berg/node-red-contrib-iobroker/discussions)
-- **📘 ioBroker Documentation**: [ioBroker.net](https://www.iobroker.net)
-
-## 📄 License
-
-MIT License - see [LICENSE](https://github.com/Marc-Berg/node-red-contrib-iobroker/blob/main/LICENSE) file for details.
-
+MIT
 ---
-
-**Need help?** Check the [troubleshooting guide](https://github.com/Marc-Berg/node-red-contrib-iobroker/blob/main/docs/troubleshooting.md) or open an issue on GitHub.

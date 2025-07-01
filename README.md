@@ -103,6 +103,6 @@ If you prefer not to use a dedicated Admin instance:
 
 ## 📄 License
 
-MIT License - see [LICENSE](https://github.com/Marc-Berg/node-red-contrib-iobroker/blob/main/LICENSE) file for details.
+MIT
 
 ---
