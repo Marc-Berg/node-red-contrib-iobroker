@@ -21,16 +21,10 @@ Install the nodes through the Node-RED Palette Manager:
 
 ### Basic Setup
 1. **Configure iob-config node** with your ioBroker server details:
-   - Host: iobroker.local or IP address
-   - Port: 8081 (Admin), 8082 (Web), or 8084 (WebSocket)
+   - Host: <hostname> or IP address
+   - Port: 8081 (Admin), 8082 (Web Adapter), or 8084 (WebSocket/ws Adapter)
    - Authentication: Optional username/password
 2. **Use the nodes** in your flows
-
-### First Flow Example
-1. Drag "WS ioB in" node to canvas
-2. Configure: State = "0_userdata.0.test"
-3. Connect to Debug node
-4. Deploy and watch state changes
 
 ## 📦 Available Nodes
 
@@ -39,7 +33,7 @@ Install the nodes through the Node-RED Palette Manager:
 | **WS ioB in** | Subscribe to state changes | Monitor temperature sensors |
 | **WS ioB out** | Send values to states | Control lights, switches |
 | **WS ioB get** | Read current state values | Get sensor readings on demand |
-| **WS ioB getObject** | Retrieve object definitions | Access device metadata |
+| **WS ioB getObj** | Retrieve object definitions | Access device metadata |
 | **WS ioB inObj** | Monitor object changes | Track adapter installations |
 | **WS ioB history** | Access historical data | Energy consumption analysis |
 | **WS ioB log** | Live log monitoring | System health monitoring |
@@ -71,7 +65,7 @@ Configure your ioBroker connection with the following parameters:
 
 ### WebSocket Adapters
 Choose one of these ioBroker adapters:
-- **Admin adapter** (port 8081) - Usually pre-installed, required for logs
+- **Admin adapter** (port 8081) - Usually pre-installed, **required for logs**
 - **WebSocket adapter** (port 8084) - Dedicated WebSocket adapter  
 - **Web adapter** (port 8082) - Requires "Use pure web-sockets" enabled
 
@@ -79,8 +73,7 @@ Choose one of these ioBroker adapters:
 
 | Node | Purpose | Documentation |
 |------|---------|---------------|
-| **WS ioB in** | Subscribe to state changes in real-time | [📖 Details](docs/nodes/iob-
-in.md) |
+| **WS ioB in** | Subscribe to state changes in real-time | [📖 Details](docs/nodes/iob-in.md) |
 | **WS ioB out** | Send values to states with auto-creation | [📖 Details](docs/nodes/iob-out.md) |
 | **WS ioB get** | Read current state values on demand | [📖 Details](docs/nodes/iob-get.md) |
 | **WS ioB getObject** | Retrieve object definitions | [📖 Details](docs/nodes/iob-getobject.md) |
@@ -97,21 +90,14 @@ in.md) |
 
 ## 📚 Additional Resources
 
-- **🔍 Troubleshooting**: [Troubleshooting Guide](troubleshooting.md)
-- **🎯 Use Cases**: [Common Use Cases](use-cases.md)
-- **📖 Node Documentation**: 
-  - [WS ioB in](ws-iob-in.md) | [WS ioB out](ws-iob-out.md) | [WS ioB get](ws-iob-get.md)
-  - [WS ioB getObject](ws-iob-getobject.md) | [WS ioB inObj](ws-iob-inobj.md) 
-  - [WS ioB history](ws-iob-history.md) | [WS ioB log](ws-iob-log.md)
+- **🔍 Troubleshooting**: [Troubleshooting Guide](docs/troubleshooting.md)
+- **🎯 Use Cases**: [Common Use Cases](docs/use-cases.md)
 - **📖 Full Documentation**: [GitHub Repository](https://github.com/Marc-Berg/node-red-contrib-iobroker)
 - **🐛 Bug Reports**: [GitHub Issues](https://github.com/Marc-Berg/node-red-contrib-iobroker/issues)
-- **💡 Feature Requests**: [GitHub Discussions](https://github.com/Marc-Berg/node-red-contrib-iobroker/discussions)
-- **📘 ioBroker Documentation**: [ioBroker.net](https://www.iobroker.net)
+- **📘 ioBroker Forum**: [ioBroker.net](https://forum.iobroker.net)
 
 ## 📄 License
 
 MIT License - see [LICENSE](https://github.com/Marc-Berg/node-red-contrib-iobroker/blob/main/LICENSE) file for details.
 
 ---
-
-**Need help?** Check the [troubleshooting guide](https://github.com/Marc-Berg/node-red-contrib-iobroker/blob/main/docs/troubleshooting.md) or open an issue on GitHub.
