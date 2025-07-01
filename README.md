@@ -12,25 +12,25 @@ External Node-RED integration nodes for ioBroker communication. **NOT an ioBroke
 ## 🚀 Quick Start
 
 ### Installation
-```bash
-npm install node-red-contrib-iobroker
-```
+Install the nodes through the Node-RED Palette Manager:
+1. Open Node-RED interface
+2. Click on hamburger menu (three lines) → Manage palette
+3. Go to "Install" tab
+4. Search for "node-red-contrib-iobroker"
+5. Click "Install" button
 
 ### Basic Setup
-1. **Install** the nodes in your Node-RED instance via Palette Manager
-2. **Add iob-config node** with your ioBroker server details:
-   - Host: `iobroker.local` or IP address
-   - Port: `8081` (Admin), `8082` (Web), or `8084` (WebSocket)
+1. **Configure iob-config node** with your ioBroker server details:
+   - Host: iobroker.local or IP address
+   - Port: 8081 (Admin), 8082 (Web), or 8084 (WebSocket)
    - Authentication: Optional username/password
-3. **Use the nodes** in your flows
+2. **Use the nodes** in your flows
 
 ### First Flow Example
-```javascript
-// 1. Drag "WS ioB in" node to canvas
-// 2. Configure: State = "0_userdata.0.test"
-// 3. Connect to Debug node
-// 4. Deploy and watch state changes
-```
+1. Drag "WS ioB in" node to canvas
+2. Configure: State = "0_userdata.0.test"
+3. Connect to Debug node
+4. Deploy and watch state changes
 
 ## 📦 Available Nodes
 
@@ -57,16 +57,13 @@ npm install node-red-contrib-iobroker
 ## 🔧 Configuration
 
 ### Server Configuration (iob-config)
-```javascript
-{
-  "name": "My ioBroker",
-  "host": "192.168.1.100",    // or "iobroker.local"
-  "port": 8081,               // Admin: 8081, Web: 8082, WebSocket: 8084
-  "useSSL": false,            // Enable for HTTPS/WSS
-  "username": "",             // Optional for authentication
-  "password": ""              // Optional for authentication
-}
-```
+Configure your ioBroker connection with the following parameters:
+- **Name**: Descriptive name for your ioBroker instance
+- **Host**: IP address (e.g., 192.168.1.100) or hostname (e.g., iobroker.local)
+- **Port**: 8081 for Admin, 8082 for Web, or 8084 for WebSocket adapter
+- **Use SSL**: Enable for HTTPS/WSS connections
+- **Username**: Optional for authentication
+- **Password**: Optional for authentication
 
 ### Authentication Modes
 - **No Authentication** (default): Leave username/password empty
@@ -85,84 +82,59 @@ Subscribe to ioBroker state changes in real-time.
 
 **Configuration:**
 - **State**: Single state ID or wildcard pattern
-- **Output Property**: Message property for value (default: `payload`)
+- **Output Property**: Message property for value (default: payload)
 - **Trigger on**: All updates, acknowledged only, or unacknowledged only
 - **Send initial value**: Emit current value on startup
 
 **Wildcard Examples:**
-```javascript
-"system.adapter.*.alive"     // All adapter alive states
-"0_userdata.0.*"            // All states under 0_userdata.0  
-"*.temperature"             // All temperature states
-```
+- system.adapter.*.alive - All adapter alive states
+- 0_userdata.0.* - All states under 0_userdata.0  
+- *.temperature - All temperature states
 
-**Output Message:**
-```javascript
-{
-  "payload": 23.5,
-  "topic": "0_userdata.0.temperature",
-  "state": {
-    "val": 23.5,
-    "ack": true,
-    "ts": 1640995200000,
-    "from": "system.adapter.javascript.0"
-  },
-  "timestamp": 1640995200000
-}
-```
+**Output Message includes:**
+- payload: The state value
+- topic: State ID
+- state: Complete state object with value, acknowledge flag, timestamp, and source
+- timestamp: Update timestamp
 
 ### WS ioB out - State Output
 Send values to ioBroker states with automatic object creation.
 
 **Configuration:**
-- **State**: Target state ID (or use `msg.topic`)
-- **Input Property**: Source property (default: `payload`)
+- **State**: Target state ID (or use msg.topic)
+- **Input Property**: Source property (default: payload)
 - **Set Mode**: Value (ack=true) or Command (ack=false)
 - **Auto-Create Objects**: Create missing objects automatically
 
 **Auto-Create Properties:**
-```javascript
-// Static configuration in node or dynamic via message
-msg.stateName = "Living Room Temperature";
-msg.stateRole = "value.temperature"; 
-msg.payloadType = "number";
-msg.stateUnit = "°C";
-msg.stateMin = -50;
-msg.stateMax = 100;
-```
+Configure object properties either statically in the node configuration or dynamically via message properties like stateName, stateRole, payloadType, stateUnit, stateMin, and stateMax.
 
 ### WS ioB get - State Getter
 Read current state values on demand.
 
 **Usage:**
-```javascript
-// Send any message to trigger read
-// Use configured state or msg.topic
-// Receives current value in msg.payload
-```
+Send any message to trigger state reading. Use either the configured state or provide state ID via msg.topic. The current value will be returned in msg.payload.
 
 ### WS ioB getObject - Object Getter  
 Retrieve ioBroker object definitions with wildcard support.
 
 **Examples:**
-```javascript
-"system.adapter.admin.0"     // Single object
-"system.adapter.*"          // All adapter objects
-"0_userdata.0.*"            // All user data objects
-```
+- system.adapter.admin.0 - Single object
+- system.adapter.* - All adapter objects
+- 0_userdata.0.* - All user data objects
 
 **Output Modes:**
 - **Single Object**: Returns object directly
 - **Array**: Returns array of objects  
-- **Object Map**: Returns {objectId: object} mapping
+- **Object Map**: Returns mapping of objectId to object
 
 ### WS ioB inObj - Object Subscription
 Monitor changes to ioBroker objects (structure/configuration).
 
 **Use Cases:**
-- Monitor adapter installations: `system.adapter.*`
-- Track configuration changes: `system.adapter.admin.*`  
-- Watch user data: `0_userdata.0.*`
+- Monitor adapter installations: system.adapter.*
+- Track configuration changes: system.adapter.admin.*  
+- Watch user data: 0_userdata.0.*
 
 ### WS ioB history - Historical Data
 Access historical data from ioBroker history adapters.
@@ -173,91 +145,34 @@ Access historical data from ioBroker history adapters.
 - **Aggregation**: None, OnChange, Average, Min, Max, Total, etc.
 - **Output Format**: Array, Chart.js, or Statistics
 
-**Example Query:**
-```javascript
-{
-  "stateId": "system.adapter.admin.0.memRss",
-  "duration": 24,
-  "durationUnit": "hours", 
-  "aggregate": "average",
-  "step": 3600
-}
-```
+**Example Query Parameters:**
+- stateId: system.adapter.admin.0.memRss
+- duration: 24 with durationUnit: hours
+- aggregate: average
+- step: 3600 (for hourly intervals)
 
 ### WS ioB log - Live Logs
 Subscribe to ioBroker live log messages.
 
 **Log Levels:** silly, debug, info, warn, error
-**Output:**
-```javascript
-{
-  "payload": "Adapter started",
-  "level": "info",
-  "source": "system.adapter.admin.0",
-  "timestamp": "2024-01-01T12:00:00.000Z"
-}
-```
 
-## 🎯 Common Use Cases
-
-### Home Automation
-```javascript
-// Monitor door sensors
-ioB in: "*.door.state" → Switch → ioB out: "lights.*.state"
-
-// Temperature control  
-ioB in: "*.temperature" → Function → ioB out: "heating.*.setpoint"
-```
-
-### System Monitoring
-```javascript
-// Adapter health monitoring
-ioB in: "system.adapter.*.alive" → Dashboard
-
-// Log error monitoring
-ioB log: level="error" → Notification
-```
-
-### Data Analysis
-```javascript
-// Energy consumption tracking
-ioB history: "energy.*.consumption" → Chart.js visualization
-
-// Performance trending
-ioB history: "system.*.memRss" + aggregation="average"
-```
+**Output includes:**
+- payload: Log message text
+- level: Log level
+- source: Source adapter
+- timestamp: ISO timestamp
 
 ## ⚠️ Important Notes
 
 - **External Installation Only**: This package is for external Node-RED instances, not the ioBroker Node-RED adapter
 - **Authentication Token Issue**: Use session durations ≥3600 seconds (1 hour) to avoid connection drops
 - **WebSocket Required**: Needs Admin, WebSocket, or Web adapter with WebSocket support
-- **Performance**: Avoid overly broad wildcard patterns like `*` or `*.*`
-
-## 🔍 Troubleshooting
-
-### Connection Issues
-1. **Check WebSocket adapter** is installed and running
-2. **Verify port number** (8081/8082/8084)
-3. **Test network connectivity** from Node-RED to ioBroker
-4. **Check authentication** credentials if using secured installation
-
-### Authentication Problems  
-1. **"Invalid credentials"**: Verify username/password in ioBroker admin
-2. **"Access forbidden"**: Check user permissions in ioBroker
-3. **"Token expired"**: Increase session duration to ≥3600 seconds
-
-### Node Status Messages
-- **Green dot "Ready"**: Connected and operational
-- **Yellow ring "Connecting"**: Establishing connection
-- **Red ring "Disconnected"**: Connection lost, automatic retry
-- **Red ring "Auth failed"**: Authentication error, check credentials
-
-### Getting Status Information
-Send `msg.topic = "status"` to any node to get detailed connection information.
+- **Performance**: Avoid overly broad wildcard patterns like * or *.*
 
 ## 📚 Additional Resources
 
+- **🔍 Troubleshooting**: [Troubleshooting Guide](troubleshooting.md)
+- **🎯 Use Cases**: [Common Use Cases](use-cases.md)
 - **📖 Full Documentation**: [GitHub Repository](https://github.com/Marc-Berg/node-red-contrib-iobroker)
 - **🐛 Bug Reports**: [GitHub Issues](https://github.com/Marc-Berg/node-red-contrib-iobroker/issues)
 - **💡 Feature Requests**: [GitHub Discussions](https://github.com/Marc-Berg/node-red-contrib-iobroker/discussions)
