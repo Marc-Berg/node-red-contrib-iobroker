@@ -79,13 +79,13 @@ Choose one of these ioBroker adapters:
 
 | Node | Purpose | Documentation |
 |------|---------|---------------|
-| **WS ioB in** | Subscribe to state changes in real-time | [📖 Details](nodes/iob-in.md) |
-| **WS ioB out** | Send values to states with auto-creation | [📖 Details](nodes/iob-out.md) |
-| **WS ioB get** | Read current state values on demand | [📖 Details](nodes/iob-get.md) |
-| **WS ioB getObject** | Retrieve object definitions | [📖 Details](nodes/iob-getobject.md) |
-| **WS ioB inObj** | Monitor object structure changes | [📖 Details](nodes/iob-inobj.md) |
-| **WS ioB history** | Access historical data from adapters | [📖 Details](nodes/iob-history.md) |
-| **WS ioB log** | Subscribe to live log messages | [📖 Details](nodes/iob-log.md) |
+| **WS ioB in** | Subscribe to state changes in real-time | [📖 Details](docs/nodes/iob-in.md) |
+| **WS ioB out** | Send values to states with auto-creation | [📖 Details](docs/nodes/iob-out.md) |
+| **WS ioB get** | Read current state values on demand | [📖 Details](docs/nodes/iob-get.md) |
+| **WS ioB getObject** | Retrieve object definitions | [📖 Details](docs/nodes/iob-getobject.md) |
+| **WS ioB inObj** | Monitor object structure changes | [📖 Details](docs/nodes/iob-inobj.md) |
+| **WS ioB history** | Access historical data from adapters | [📖 Details](docs/nodes/iob-history.md) |
+| **WS ioB log** | Subscribe to live log messages | [📖 Details](docs/nodes/iob-log.md) |
 
 ## ⚠️ Important Notes
 
