@@ -20,11 +20,21 @@ Install the nodes through the Node-RED Palette Manager:
 5. Click "Install" button
 
 ### Basic Setup
-1. **Configure iob-config node** with your ioBroker server details:
-   - Host: <hostname> or IP address
-   - Port: 8081 (Admin), 8082 (Web Adapter), or 8084 (WebSocket/ws Adapter)
+1. **Create dedicated Admin adapter instance** (recommended):
+   - Install second Admin adapter instance in ioBroker
+   - Configure on different port (e.g., 8091) 
+   - Use exclusively for Node-RED connections
+2. **Configure iob-config node** with your dedicated instance:
+   - Host: hostname or IP address
+   - Port: 8091 (your dedicated Admin instance)
    - Authentication: Optional username/password
-2. **Use the nodes** in your flows
+3. **Use the nodes** in your flows
+
+## 🏗️ Architecture Overview
+
+![Node-RED to ioBroker Architecture](images/iobroker_architecture_diagram.svg)
+
+The diagram shows the recommended architecture with a dedicated Admin adapter instance for Node-RED connections, separate from the main Admin interface used by regular users.
 
 ## 📦 Available Nodes
 
@@ -50,24 +60,44 @@ Install the nodes through the Node-RED Palette Manager:
 
 ## 🔧 Configuration
 
+### Recommended Setup: Dedicated Admin Instance
+
+**Why use a dedicated Admin instance?**
+- Isolates Node-RED traffic from main admin interface
+- Prevents conflicts with regular admin usage
+- Allows custom security settings
+- Better performance and reliability
+
+**Setup Steps:**
+1. **Install second Admin adapter instance** in ioBroker:
+   - Go to Adapters → Admin → Add Instance
+   - Configure custom port (e.g., 8091)
+   - Enable/disable features as needed
+2. **Configure security** for Node-RED access:
+   - Create dedicated user for Node-RED
+   - Set appropriate permissions
+   - Configure session duration ≥3600 seconds
+
 ### Server Configuration (iob-config)
-Configure your ioBroker connection with the following parameters:
+
+**Connection Settings:**
 - **Name**: Descriptive name for your ioBroker instance
 - **Host**: IP address (e.g., 192.168.1.100) or hostname (e.g., iobroker.local)
-- **Port**: 8081 for Admin, 8082 for Web, or 8084 for WebSocket adapter
+- **Port**: Your dedicated Admin instance port (e.g., 8091)
 - **Use SSL**: Enable for HTTPS/WSS connections
-- **Username**: Optional for authentication
-- **Password**: Optional for authentication
 
-### Authentication Modes
+**Authentication Settings:**
 - **No Authentication** (default): Leave username/password empty
 - **OAuth2**: Enter valid ioBroker username/password
+- **Session Duration**: Set to ≥3600 seconds to avoid connection drops
 
-### WebSocket Adapters
-Choose one of these ioBroker adapters:
-- **Admin adapter** (port 8081) - Usually pre-installed, **required for logs**
-- **WebSocket adapter** (port 8084) - Dedicated WebSocket adapter  
-- **Web adapter** (port 8082) - Requires "Use pure web-sockets" enabled
+### Alternative Adapter Options
+
+If you prefer not to use a dedicated Admin instance:
+
+**Admin adapter** (port 8081) - Usually pre-installed, **required for logs**
+**WebSocket adapter** (port 8084) - Dedicated WebSocket adapter for external connections
+**Web adapter** (port 8082) - Requires "Use pure web-sockets" option enabled
 
 ## 📋 Node Documentation
 
@@ -76,7 +106,7 @@ Choose one of these ioBroker adapters:
 | **WS ioB in** | Subscribe to state changes in real-time | [📖 Details](docs/nodes/iob-in.md) |
 | **WS ioB out** | Send values to states with auto-creation | [📖 Details](docs/nodes/iob-out.md) |
 | **WS ioB get** | Read current state values on demand | [📖 Details](docs/nodes/iob-get.md) |
-| **WS ioB getObject** | Retrieve object definitions | [📖 Details](docs/nodes/iob-getobject.md) |
+| **WS ioB getObj** | Retrieve object definitions | [📖 Details](docs/nodes/iob-getobject.md) |
 | **WS ioB inObj** | Monitor object structure changes | [📖 Details](docs/nodes/iob-inobj.md) |
 | **WS ioB history** | Access historical data from adapters | [📖 Details](docs/nodes/iob-history.md) |
 | **WS ioB log** | Subscribe to live log messages | [📖 Details](docs/nodes/iob-log.md) |
@@ -84,8 +114,8 @@ Choose one of these ioBroker adapters:
 ## ⚠️ Important Notes
 
 - **External Installation Only**: This package is for external Node-RED instances, not the ioBroker Node-RED adapter
+- **Dedicated Admin Instance Recommended**: Use a separate Admin adapter instance for Node-RED connections
 - **Authentication Token Issue**: Use session durations ≥3600 seconds (1 hour) to avoid connection drops
-- **WebSocket Required**: Needs Admin, WebSocket, or Web adapter with WebSocket support
 - **Performance**: Avoid overly broad wildcard patterns like * or *.*
 
 ## 📚 Additional Resources
