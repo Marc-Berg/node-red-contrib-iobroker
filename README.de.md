@@ -83,8 +83,12 @@ Das Diagramm zeigt die empfohlene Architektur mit einer dedizierten Admin Adapte
 
 Falls du keine dedizierte Admin Instanz verwenden möchtest:
 
-**WebSocket Adapter** (Port 8084) - Dedizierter WebSocket Adapter für externe Verbindungen
-**Web Adapter** (Port 8082) - Erfordert aktivierte "Reine Web-Sockets verwenden" Option
+- **WebSocket Adapter** (Port 8084) - Dedizierter WebSocket Adapter für externe Verbindungen
+- **Web Adapter** (Port 8082) - Erfordert aktivierte "Reine Web-Sockets verwenden" Option
+
+**⚠️ Wichtige Einschränkungen bei alternativen Adaptern:**
+- **WS ioB log Node funktioniert nicht** mit WebSocket oder Web Adaptern (erfordert Admin Adapter)
+- **WS ioB getObj Node ist beschränkt** auf state, channel und device Objekttypen
 
 ## ✨ Hauptfunktionen
 
@@ -114,4 +118,5 @@ Falls du keine dedizierte Admin Instanz verwenden möchtest:
 ## 📄 Lizenz
 
 MIT
+
 ---
