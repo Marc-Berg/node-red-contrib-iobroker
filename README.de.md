@@ -102,10 +102,9 @@ Falls du keine dedizierte Admin Instanz verwenden möchtest:
 
 ## ⚠️ Wichtige Hinweise
 
-- **Nur externe Installation**: Dieses Paket ist für externe Node-RED Instanzen, nicht für den ioBroker Node-RED Adapter
-- **Dedizierte Admin Instanz empfohlen**: Verwende eine separate Admin Adapter Instanz für Node-RED Verbindungen
-- **Authentifizierungs-Token Problem**: Verwende Session-Dauern ≥3600 Sekunden (1 Stunde) um Verbindungsabbrüche zu vermeiden
-- **Performance**: Vermeide zu breite Wildcard-Pattern wie * oder *.*
+💡 Für eine einfachere Installation: In den meisten Fällen ist es einfacher, den ioBroker Node-RED Adapter zu verwenden, wenn Sie eine unkomplizierte Einrichtung bevorzugen.
+
+🔧 **Bekanntes Problem - Token Ablauf**: Es gibt derzeit ein bekanntes Problem mit der Authentifizierung und ablaufenden Tokens, das zu Verbindungsabbrüchen führen kann. **Verwenden Sie KEINE Anmelde-Session-Dauern kürzer als 3600 Sekunden** (1 Stunde) in Ihren ioBroker Adapter-Einstellungen!
 
 ## 📚 Zusätzliche Ressourcen
 

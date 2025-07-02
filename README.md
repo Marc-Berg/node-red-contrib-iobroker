@@ -92,10 +92,9 @@ If you prefer not to use a dedicated Admin instance:
 
 ## ⚠️ Important Notes
 
-- **External Installation Only**: This package is for external Node-RED instances, not the ioBroker Node-RED adapter
-- **Dedicated Admin Instance Recommended**: Use a separate Admin adapter instance for Node-RED connections
-- **Authentication Token Issue**: Use session durations ≥3600 seconds (1 hour) to avoid connection drops
-- **Performance**: Avoid overly broad wildcard patterns like * or *.*
+💡 For simpler installation: In most cases, it's easier to use the ioBroker Node-RED adapter if you prefer a straightforward setup.
+
+🔧 **Known Issue - Authentication Token Expiry**: There is currently a known issue with authentication and expiring tokens that can cause connection drops. **Do not use login session durations shorter than 3600 seconds** (1 hour) in your ioBroker adapter settings!
 
 ## 📚 Additional Resources
 
