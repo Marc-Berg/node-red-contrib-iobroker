@@ -83,8 +83,12 @@ The diagram shows the recommended architecture with a dedicated Admin adapter in
 
 If you prefer not to use a dedicated Admin instance:
 
-**WebSocket adapter** (port 8084) - Dedicated WebSocket adapter for external connections
-**Web adapter** (port 8082) - Requires "Use pure web-sockets" option enabled
+- **WebSocket adapter** (port 8084) - Dedicated WebSocket adapter for external connections
+- **Web adapter** (port 8082) - Requires "Use pure web-sockets" option enabled
+
+**⚠️ Important Limitations with Alternative Adapters:**
+- **WS ioB log node does not work** with WebSocket or Web adapters (requires Admin adapter)
+- **WS ioB getObj node is limited** to state, channel, and device object types only
 
 ## ⚠️ Important Notes
 
