@@ -1,6 +1,6 @@
 const connectionManager = require('./lib/manager/websocket-manager');
 
-module.exports = function(RED) {
+module.exports = function (RED) {
     function iobhistory(config) {
         RED.nodes.createNode(this, config);
         const node = this;
@@ -60,18 +60,18 @@ module.exports = function(RED) {
 
         function parseTimeInput(timeInput) {
             if (!timeInput) return null;
-            
+
             // If it's already a number (timestamp), return it
             if (typeof timeInput === 'number') {
                 return timeInput > 10000000000 ? timeInput : timeInput * 1000; // Convert seconds to ms if needed
             }
-            
+
             // If it's a string, try to parse it
             if (typeof timeInput === 'string') {
                 const parsed = new Date(timeInput).getTime();
                 return isNaN(parsed) ? null : parsed;
             }
-            
+
             return null;
         }
 
@@ -97,16 +97,16 @@ module.exports = function(RED) {
                 case 'message':
                     start = parseTimeInput(msg.start);
                     end = parseTimeInput(msg.end);
-                    
+
                     if (!start) {
                         throw new Error('msg.start is required for message time range mode');
                     }
-                    
+
                     if (!end && msg.duration) {
                         const durationMs = convertDurationToMs(parseFloat(msg.duration), 'hours');
                         end = start + durationMs;
                     }
-                    
+
                     if (!end) {
                         end = now;
                     }
@@ -167,7 +167,7 @@ module.exports = function(RED) {
             if (aggregate === 'percentile') {
                 options.percentile = msg.percentile || settings.percentile;
             } else if (aggregate === 'quantile') {
-                options.quantile = msg.quantile || settings.quantile;  
+                options.quantile = msg.quantile || settings.quantile;
             } else if (aggregate === 'integral') {
                 options.integralUnit = msg.integralUnit || settings.integralUnit;
             }
@@ -192,6 +192,9 @@ module.exports = function(RED) {
             switch (format) {
                 case 'chart':
                     output = formatForChart(data, stateId);
+                    break;
+                case 'dashboard2':
+                    output = formatForDashboard2(data, stateId);
                     break;
                 case 'statistics':
                     output = formatStatistics(data, queryOptions);
@@ -236,6 +239,22 @@ module.exports = function(RED) {
             };
         }
 
+        function formatForDashboard2(data, stateId) {
+            const chartData = [];
+
+            data.forEach(point => {
+                if (point.ts && point.val !== undefined) {
+                    chartData.push([point.ts, point.val]);
+                }
+            });
+
+            return [{
+                series: [stateId],
+                data: chartData,
+                labels: [""]
+            }];
+        }
+
         function formatStatistics(data, queryOptions) {
             if (!data || data.length === 0) {
                 return {
@@ -250,7 +269,7 @@ module.exports = function(RED) {
             }
 
             let min = null, max = null, sum = 0, count = 0;
-            
+
             data.forEach(point => {
                 if (point.val !== null && point.val !== undefined && typeof point.val === 'number') {
                     if (min === null || point.val < min.val) min = point;
@@ -275,9 +294,9 @@ module.exports = function(RED) {
 
         // Create callback for event notifications
         function createEventCallback() {
-            const callback = function() {};
+            const callback = function () { };
 
-            callback.updateStatus = function(status) {
+            callback.updateStatus = function (status) {
                 switch (status) {
                     case 'ready':
                         setStatus("green", "dot", "Ready");
@@ -301,13 +320,13 @@ module.exports = function(RED) {
                 }
             };
 
-            callback.onReconnect = function() {
+            callback.onReconnect = function () {
                 node.log("Reconnection detected by history node");
                 setStatus("green", "dot", "Reconnected");
                 node.isInitialized = true;
             };
 
-            callback.onDisconnect = function() {
+            callback.onDisconnect = function () {
                 node.log("Disconnection detected by history node");
                 setStatus("red", "ring", "Disconnected");
             };
@@ -319,7 +338,7 @@ module.exports = function(RED) {
         function hasConfigChanged() {
             const currentGlobalConfig = RED.nodes.getNode(config.server);
             if (!currentGlobalConfig) return false;
-            
+
             return (
                 node.currentConfig.iobhost !== currentGlobalConfig.iobhost ||
                 node.currentConfig.iobport !== currentGlobalConfig.iobport ||
@@ -333,11 +352,11 @@ module.exports = function(RED) {
         async function initializeConnection() {
             try {
                 setStatus("yellow", "ring", "Connecting...");
-                
+
                 if (hasConfigChanged()) {
                     const newGlobalConfig = RED.nodes.getNode(config.server);
                     const oldServerId = settings.serverId;
-                    
+
                     node.currentConfig = {
                         iobhost: newGlobalConfig.iobhost,
                         iobport: newGlobalConfig.iobport,
@@ -345,10 +364,10 @@ module.exports = function(RED) {
                         password: newGlobalConfig.password,
                         usessl: newGlobalConfig.usessl
                     };
-                    
+
                     const newServerId = connectionManager.getServerId(newGlobalConfig);
                     settings.serverId = newServerId;
-                    
+
                     if (oldServerId !== newServerId) {
                         node.log(`Server changed from ${oldServerId} to ${newServerId}, forcing connection reset`);
                         await connectionManager.forceServerSwitch(oldServerId, newServerId, newGlobalConfig);
@@ -363,7 +382,7 @@ module.exports = function(RED) {
                     eventCallback,
                     globalConfig
                 );
-                
+
                 // Check connection status
                 const status = connectionManager.getConnectionStatus(settings.serverId);
                 if (status.ready) {
@@ -374,7 +393,7 @@ module.exports = function(RED) {
                     setStatus("yellow", "ring", "Waiting for connection...");
                     node.log(`History node registered - waiting for connection to be ready`);
                 }
-                
+
             } catch (error) {
                 const errorMsg = error.message || 'Unknown error';
                 setStatus("red", "ring", "Registration failed");
@@ -383,7 +402,7 @@ module.exports = function(RED) {
         }
 
         // Input handler
-        node.on('input', async function(msg, send, done) {
+        node.on('input', async function (msg, send, done) {
             try {
                 if (msg.topic === "status") {
                     const status = connectionManager.getConnectionStatus(settings.serverId);
@@ -411,12 +430,12 @@ module.exports = function(RED) {
                 try {
                     // Calculate time range
                     const timeRange = calculateTimeRange(msg);
-                    
+
                     // Build query options
                     const queryOptions = buildQueryOptions(msg, timeRange);
-                    
+
                     node.log(`History query: ${stateId} from ${new Date(timeRange.start).toISOString()} to ${new Date(timeRange.end).toISOString()} (${queryOptions.aggregate})`);
-                    
+
                     // Execute history query via WebSocket manager
                     const result = await connectionManager.getHistory(
                         settings.serverId,
@@ -424,37 +443,37 @@ module.exports = function(RED) {
                         stateId,
                         queryOptions
                     );
-                    
+
                     const queryTime = Date.now() - queryStartTime;
-                    
+
                     // Format output
                     const outputFormat = msg.outputFormat || settings.outputFormat;
                     const formattedResult = formatOutput(result, stateId, queryOptions, queryTime, outputFormat);
-                    
+
                     // Add result to message
                     Object.assign(msg, formattedResult);
-                    
+
                     setStatus("green", "dot", "Ready");
                     node.log(`History query completed: ${formattedResult.count} data points in ${queryTime}ms`);
-                    
+
                     send(msg);
                     done && done();
-                    
+
                 } catch (queryError) {
                     setStatus("red", "ring", "Query error");
                     node.error(`History query failed for ${stateId}: ${queryError.message}`);
-                    
+
                     // Send error message with details
                     msg.error = queryError.message;
                     msg[settings.outputProperty] = null;
                     msg.stateId = stateId;
                     msg.adapter = settings.historyAdapter;
                     msg.queryTime = Date.now() - queryStartTime;
-                    
+
                     send(msg);
                     done && done(queryError);
                 }
-                
+
             } catch (error) {
                 setStatus("red", "ring", "Error");
                 node.error(`Error processing input: ${error.message}`);
@@ -463,9 +482,9 @@ module.exports = function(RED) {
         });
 
         // Cleanup on node close
-        node.on("close", async function(removed, done) {
+        node.on("close", async function (removed, done) {
             node.log("History node closing...");
-            
+
             // Unregister from events
             connectionManager.unregisterFromEvents(settings.nodeId);
 
@@ -479,7 +498,7 @@ module.exports = function(RED) {
         });
 
         // Error handling
-        node.on("error", function(error) {
+        node.on("error", function (error) {
             node.error(`History node error: ${error.message}`);
             setError(`Node error: ${error.message}`, "Node error");
         });
