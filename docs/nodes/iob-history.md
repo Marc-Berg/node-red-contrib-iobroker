@@ -117,15 +117,12 @@ Formatted for direct use with Chart.js:
 ### Dashboard 2.0 Format
 Formatted for Node-RED Dashboard 2.0 ui-chart components:
 ```javascript
-[{
-  series: ["Temperature"],
-  data: [
-    [1640995200000, 23.5],
-    [1640995500000, 23.7],
-    [1640995800000, 23.3]
-  ],
-  labels: [""]
-}]
+[
+  {x: 1640995200000, y: 23.5},
+  {x: 1640995500000, y: 23.7},
+  {x: 1640995800000, y: 23.3}
+]
+// msg.topic = "Temperature" (series name)
 ```
 
 ### Statistics Format
@@ -160,6 +157,27 @@ Summary statistics:
 - Process data in chunks for large queries
 - Clear unused data from context
 - Monitor Node-RED memory usage
+
+## Dashboard Integration
+
+### Dashboard 2.0 ui-chart
+The Dashboard 2.0 format provides direct compatibility with Node-RED Dashboard 2.0 ui-chart components using default settings:
+
+```
+[WS ioB history: Dashboard 2.0 Format] → [ui-chart]
+```
+
+**ui-chart Configuration:**
+- **Series**: `msg.topic` ✓ (automatically set)
+- **X**: `key` → `x` (one-time setup)
+- **Y**: `key` → `y` (one-time setup)
+
+### Chart.js Integration
+For custom Chart.js implementations:
+
+```
+[WS ioB history: Chart.js Format] → [Chart.js Dashboard Node]
+```
 
 ## Error Handling
 

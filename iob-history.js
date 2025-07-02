@@ -175,6 +175,81 @@ module.exports = function (RED) {
             return options;
         }
 
+        function formatForChart(data, stateId) {
+            const labels = [];
+            const values = [];
+
+            data.forEach(point => {
+                if (point.ts && point.val !== undefined) {
+                    labels.push(new Date(point.ts).toLocaleString());
+                    values.push(point.val);
+                }
+            });
+
+            return {
+                labels: labels,
+                datasets: [{
+                    label: stateId,
+                    data: values,
+                    borderColor: "rgb(75, 192, 192)",
+                    backgroundColor: "rgba(75, 192, 192, 0.2)",
+                    tension: 0.1
+                }]
+            };
+        }
+
+        function formatForDashboard2(data, stateId) {
+            const chartData = [];
+
+            data.forEach(point => {
+                if (point.ts && point.val !== undefined) {
+                    chartData.push({
+                        x: point.ts,
+                        y: point.val
+                    });
+                }
+            });
+
+            return chartData;
+        }
+
+        function formatStatistics(data, queryOptions) {
+            if (!data || data.length === 0) {
+                return {
+                    count: 0,
+                    min: null,
+                    max: null,
+                    avg: null,
+                    first: null,
+                    last: null,
+                    timeRange: { start: queryOptions.start, end: queryOptions.end }
+                };
+            }
+
+            let min = null, max = null, sum = 0, count = 0;
+
+            data.forEach(point => {
+                if (point.val !== null && point.val !== undefined && typeof point.val === 'number') {
+                    if (min === null || point.val < min.val) min = point;
+                    if (max === null || point.val > max.val) max = point;
+                    sum += point.val;
+                    count++;
+                }
+            });
+
+            return {
+                count: data.length,
+                numericCount: count,
+                min: min,
+                max: max,
+                avg: count > 0 ? sum / count : null,
+                sum: sum,
+                first: data[0],
+                last: data[data.length - 1],
+                timeRange: { start: queryOptions.start, end: queryOptions.end }
+            };
+        }
+
         function formatOutput(data, stateId, queryOptions, queryTime, format) {
             if (!data || !Array.isArray(data)) {
                 return {
@@ -213,82 +288,6 @@ module.exports = function (RED) {
                 queryTime: queryTime,
                 count: data.length,
                 timestamp: Date.now()
-            };
-        }
-
-        function formatForChart(data, stateId) {
-            const labels = [];
-            const values = [];
-
-            data.forEach(point => {
-                if (point.ts && point.val !== undefined) {
-                    labels.push(new Date(point.ts).toLocaleString());
-                    values.push(point.val);
-                }
-            });
-
-            return {
-                labels: labels,
-                datasets: [{
-                    label: stateId,
-                    data: values,
-                    borderColor: "rgb(75, 192, 192)",
-                    backgroundColor: "rgba(75, 192, 192, 0.2)",
-                    tension: 0.1
-                }]
-            };
-        }
-
-        function formatForDashboard2(data, stateId) {
-            const chartData = [];
-
-            data.forEach(point => {
-                if (point.ts && point.val !== undefined) {
-                    chartData.push([point.ts, point.val]);
-                }
-            });
-
-            return [{
-                series: [stateId],
-                data: chartData,
-                labels: [""]
-            }];
-        }
-
-        function formatStatistics(data, queryOptions) {
-            if (!data || data.length === 0) {
-                return {
-                    count: 0,
-                    min: null,
-                    max: null,
-                    avg: null,
-                    first: null,
-                    last: null,
-                    timeRange: { start: queryOptions.start, end: queryOptions.end }
-                };
-            }
-
-            let min = null, max = null, sum = 0, count = 0;
-
-            data.forEach(point => {
-                if (point.val !== null && point.val !== undefined && typeof point.val === 'number') {
-                    if (min === null || point.val < min.val) min = point;
-                    if (max === null || point.val > max.val) max = point;
-                    sum += point.val;
-                    count++;
-                }
-            });
-
-            return {
-                count: data.length,
-                numericCount: count,
-                min: min,
-                max: max,
-                avg: count > 0 ? sum / count : null,
-                sum: sum,
-                first: data[0],
-                last: data[data.length - 1],
-                timeRange: { start: queryOptions.start, end: queryOptions.end }
             };
         }
 
@@ -452,6 +451,11 @@ module.exports = function (RED) {
 
                     // Add result to message
                     Object.assign(msg, formattedResult);
+
+                    // For Dashboard 2.0 format, set topic for series name
+                    if (outputFormat === 'dashboard2') {
+                        msg.topic = stateId;
+                    }
 
                     setStatus("green", "dot", "Ready");
                     node.log(`History query completed: ${formattedResult.count} data points in ${queryTime}ms`);
