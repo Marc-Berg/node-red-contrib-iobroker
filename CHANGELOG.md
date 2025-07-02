@@ -1,5 +1,13 @@
 # Changelog
 
+## [0.9.3] - 2025-07-02
+### Added
+- **Dashboard 2.0 output format for iobhistory node**
+  - New "Dashboard 2.0 Format" option in output format dropdown
+  - Direct compatibility with Node-RED Dashboard 2.0 ui-chart components
+  - Timestamp-based data format: `[{series: [], data: [[timestamp, value], ...], labels: [""]}]`
+  - Seamless integration for modern dashboard visualizations
+
 ## [0.9.2] - 2025-07-01
 ### Added
 - **Architecture diagram** showing recommended Node-RED to ioBroker setup

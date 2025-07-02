@@ -54,6 +54,7 @@ The WS ioB history node allows you to retrieve historical data from ioBroker's h
 **Output Format**
 - **Array**: Simple array of data points
 - **Chart.js**: Formatted for Chart.js library
+- **Dashboard 2.0**: Formatted for Node-RED Dashboard 2.0 ui-chart components
 - **Statistics**: Summary statistics
 
 ## Aggregation Types
@@ -111,6 +112,20 @@ Formatted for direct use with Chart.js:
     borderColor: "rgb(75, 192, 192)"
   }]
 }
+```
+
+### Dashboard 2.0 Format
+Formatted for Node-RED Dashboard 2.0 ui-chart components:
+```javascript
+[{
+  series: ["Temperature"],
+  data: [
+    [1640995200000, 23.5],
+    [1640995500000, 23.7],
+    [1640995800000, 23.3]
+  ],
+  labels: [""]
+}]
 ```
 
 ### Statistics Format
@@ -177,9 +192,9 @@ Summary statistics:
 
 ## Integration Examples
 
-### Dashboard Charts
+### Modern Dashboard 2.0 Dashboards
 ```
-[WS ioB history] → [Chart.js Dashboard Node]
+[WS ioB history: Dashboard 2.0] → [ui-chart: Line Chart]
 ```
 
 ### Energy Reports

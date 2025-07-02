@@ -41,7 +41,7 @@ RED.nodes.registerType('iobhistory', {
         stepUnit: { value: "seconds" },
         maxEntries: { value: 2000 },
         outputProperty: { value: "payload" },
-        outputFormat: { value: "array" }, // array, chart, statistics
+        outputFormat: { value: "array" }, // array, chart, dashboard2, statistics
         percentile: { value: 50 },
         quantile: { value: 0.5 },
         integralUnit: { value: 3600 },
@@ -470,6 +470,7 @@ RED.nodes.registerType('iobhistory', {
         <select id="node-input-outputFormat" style="width:100%">
             <option value="array">Array of Data Points</option>
             <option value="chart">Chart.js Format</option>
+            <option value="dashboard2">Dashboard 2.0 Format</option>
             <option value="statistics">Statistics Summary</option>
         </select>
     </div>
@@ -481,6 +482,10 @@ RED.nodes.registerType('iobhistory', {
     
     <div class="output-format-info chart" style="display: none; margin-top: 5px; padding: 8px; background-color: #e8f4fd; border: 1px solid #bee5eb; border-radius: 4px; font-size: 12px; color: #0c5460;">
         <i class="fa fa-info-circle"></i> <strong>Chart.js Format:</strong> Returns Chart.js dataset: <code>{labels: [], datasets: [{data: [], label: ""}]}</code>
+    </div>
+    
+    <div class="output-format-info dashboard2" style="display: none; margin-top: 5px; padding: 8px; background-color: #e8f4fd; border: 1px solid #bee5eb; border-radius: 4px; font-size: 12px; color: #0c5460;">
+        <i class="fa fa-info-circle"></i> <strong>Dashboard 2.0 Format:</strong> Returns ui-chart compatible data: <code>[{series: [""], data: [[timestamp, value], ...], labels: [""]}]</code>
     </div>
     
     <div class="output-format-info statistics" style="display: none; margin-top: 5px; padding: 8px; background-color: #e8f4fd; border: 1px solid #bee5eb; border-radius: 4px; font-size: 12px; color: #0c5460;">
@@ -560,6 +565,17 @@ RED.nodes.registerType('iobhistory', {
     }]
 }</pre>
     
+    <h4>Dashboard 2.0 Format</h4>
+    <pre>msg.payload = [{
+    series: ["system.adapter.admin.0.memRss"],
+    data: [
+        [1589458800000, 123],
+        [1589458860000, 124],
+        ...
+    ],
+    labels: [""]
+}]</pre>
+    
     <h4>Statistics Format</h4>
     <pre>msg.payload = {
     count: 288,
@@ -585,16 +601,14 @@ RED.nodes.registerType('iobhistory', {
         <li>Energy consumption analysis and reporting</li>
         <li>Temperature trending and statistics</li>
         <li>System performance monitoring</li>
-        <li>Data visualization with Chart.js or similar</li>
+        <li>Data visualization with Chart.js or Dashboard 2.0 ui-chart</li>
         <li>Historical data export and backup</li>
+        <li>Real-time dashboard creation with Node-RED Dashboard 2.0</li>
     </ul>
     
     <h3>Performance Notes</h3>
     <ul>
         <li>Use appropriate aggregation to reduce data volume</li>
         <li>Limit time ranges for large datasets</li>
-        <li>InfluxDB adapter performs best for time-series data</li>
-        <li>SQL adapter suitable for medium-scale installations</li>
-        <li>History adapter for small installations only</li>
     </ul>
 </script>
