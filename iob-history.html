@@ -485,7 +485,7 @@ RED.nodes.registerType('iobhistory', {
     </div>
     
     <div class="output-format-info dashboard2" style="display: none; margin-top: 5px; padding: 8px; background-color: #e8f4fd; border: 1px solid #bee5eb; border-radius: 4px; font-size: 12px; color: #0c5460;">
-        <i class="fa fa-info-circle"></i> <strong>Dashboard 2.0 Format:</strong> Returns ui-chart compatible data: <code>[{series: [""], data: [[timestamp, value], ...], labels: [""]}]</code>
+        <i class="fa fa-info-circle"></i> <strong>Dashboard 2.0 Format:</strong> Returns ui-chart compatible data: <code>[{x: timestamp, y: value}, ...]</code> with <code>msg.topic</code> as series name. Configure ui-chart: X="x", Y="y"
     </div>
     
     <div class="output-format-info statistics" style="display: none; margin-top: 5px; padding: 8px; background-color: #e8f4fd; border: 1px solid #bee5eb; border-radius: 4px; font-size: 12px; color: #0c5460;">
@@ -566,15 +566,12 @@ RED.nodes.registerType('iobhistory', {
 }</pre>
     
     <h4>Dashboard 2.0 Format</h4>
-    <pre>msg.payload = [{
-    series: ["system.adapter.admin.0.memRss"],
-    data: [
-        [1589458800000, 123],
-        [1589458860000, 124],
-        ...
-    ],
-    labels: [""]
-}]</pre>
+    <pre>msg.payload = [
+    {x: 1589458800000, y: 123},
+    {x: 1589458860000, y: 124},
+    ...
+]
+msg.topic = "system.adapter.admin.0.memRss"</pre>
     
     <h4>Statistics Format</h4>
     <pre>msg.payload = {

@@ -1,5 +1,10 @@
 # Changelog
 
+## [0.9.4] - 2025-07-02
+### Fixed
+- **Dashboard 2.0 output format for iobhistory node**
+  - Corrected data format to `[{x: timestamp, y: value}, ...]` for proper ui-chart compatibility
+
 ## [0.9.3] - 2025-07-02
 ### Added
 - **Dashboard 2.0 output format for iobhistory node**
