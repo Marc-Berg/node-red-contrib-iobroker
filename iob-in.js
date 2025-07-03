@@ -29,18 +29,11 @@ module.exports = function (RED) {
             return setError("ioBroker host or port missing", "Host/port missing");
         }
 
-        // Configuration validation with backward compatibility
-        let inputMode = config.inputMode;
-        
-        // Handle backward compatibility - detect mode if not set
-        if (!inputMode) {
-            if (config.multipleStates && config.multipleStates.trim()) {
-                inputMode = 'multiple';
-            } else {
-                inputMode = 'single';
-            }
-        }
-        
+        // Default to "single" if inputMode is not set
+        const inputMode = config.inputMode || (
+            config.multipleStates && config.multipleStates.trim() ? 'multiple' : 'single'
+        );
+
         let stateList = [];
         let subscriptionPattern = '';
 
@@ -55,7 +48,7 @@ module.exports = function (RED) {
                 .split('\n')
                 .map(s => s.trim())
                 .filter(s => s.length > 0);
-            
+
             if (stateList.length === 0) {
                 return setError("No states configured for multiple states mode", "No states");
             }
@@ -127,13 +120,13 @@ module.exports = function (RED) {
             // Only check subscribed states, not all states in the list
             const subscribedStateArray = Array.from(node.subscribedStates);
             const missingStates = subscribedStateArray.filter(stateId => !node.currentStateValues.has(stateId));
-            
+
             if (missingStates.length === 0) {
                 return true; // All subscribed states already loaded
             }
 
             node.log(`Loading ${missingStates.length} missing subscribed states for grouped mode`);
-            
+
             try {
                 for (const stateId of missingStates) {
                     try {
@@ -155,7 +148,7 @@ module.exports = function (RED) {
         function createGroupedMessage(changedStateId, changedState) {
             const values = {};
             const states = {};
-            
+
             // Add ALL subscribed states (not all states in the list)
             for (const stateId of node.subscribedStates) {
                 if (node.currentStateValues.has(stateId)) {
