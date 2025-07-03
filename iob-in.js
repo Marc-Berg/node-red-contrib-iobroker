@@ -29,29 +29,62 @@ module.exports = function (RED) {
             return setError("ioBroker host or port missing", "Host/port missing");
         }
 
-        const statePattern = config.state?.trim();
-        if (!statePattern) {
-            return setError("State ID/Pattern missing", "State ID missing");
+        const inputMode = config.inputMode || 'single';
+
+        let stateList = [];
+        let subscriptionPattern = '';
+
+        if (inputMode === 'multiple') {
+            const multipleStatesRaw = config.multipleStates || '';
+            stateList = multipleStatesRaw
+                .split('\n')
+                .map(s => s.trim())
+                .filter(s => s.length > 0);
+
+            if (stateList.length === 0) {
+                return setError("No states configured for multiple states mode", "No states");
+            }
+            subscriptionPattern = '';
+        } else {
+            subscriptionPattern = config.state ? config.state.trim() : '';
+            if (!subscriptionPattern) {
+                return setError("State ID or pattern missing", "Config missing");
+            }
+            stateList = [];
         }
 
-        const isWildcardPattern = statePattern.includes('*');
+        const isWildcardPattern = inputMode === 'single' && subscriptionPattern.includes('*');
+        const isMultipleStates = inputMode === 'multiple';
 
         const settings = {
             outputProperty: config.outputProperty?.trim() || "payload",
             ackFilter: config.ackFilter || "both",
-            sendInitialValue: config.sendInitialValue && !isWildcardPattern, // Disable for wildcards
+            sendInitialValue: config.sendInitialValue && !isWildcardPattern,
+            outputMode: config.outputMode || "individual",
             serverId: connectionManager.getServerId(globalConfig),
             nodeId: node.id,
-            useWildcard: isWildcardPattern
+            useWildcard: isWildcardPattern,
+            inputMode: inputMode
         };
 
         node.currentConfig = { iobhost, iobport, user, password, usessl };
         node.isInitialized = false;
         node.isSubscribed = false;
-        node.statePattern = statePattern;
+        node.subscriptionPattern = subscriptionPattern;
+        node.stateList = stateList;
+        node.currentStateValues = new Map();
+        node.subscribedStates = new Set();
+        node.initialValueCount = 0;
+        node.expectedInitialValues = 0;
+        node.initialGroupedMessageSent = false;
 
-        // Log initial value setting for debugging
-        node.log(`Initial value setting: ${settings.sendInitialValue} (config: ${config.sendInitialValue}, isWildcard: ${isWildcardPattern})`);
+        if (isMultipleStates) {
+            node.log(`Multiple states mode: ${stateList.length} states [${stateList.join(', ')}], output: ${settings.outputMode}`);
+        } else if (isWildcardPattern) {
+            node.log(`Wildcard state mode: ${subscriptionPattern}`);
+        } else {
+            node.log(`Single state mode: ${subscriptionPattern}`);
+        }
 
         function shouldSendMessage(ack, filter) {
             switch (filter) {
@@ -69,7 +102,7 @@ module.exports = function (RED) {
             };
 
             if (isWildcardPattern) {
-                message.pattern = node.statePattern;
+                message.pattern = node.subscriptionPattern;
             }
 
             if (isInitialValue) {
@@ -77,6 +110,71 @@ module.exports = function (RED) {
             }
 
             message[settings.outputProperty] = state.val;
+            return message;
+        }
+
+        async function ensureAllStatesLoaded() {
+            if (!isMultipleStates || settings.outputMode !== 'grouped') {
+                return true;
+            }
+
+            const subscribedStateArray = Array.from(node.subscribedStates);
+            const missingStates = subscribedStateArray.filter(stateId => !node.currentStateValues.has(stateId));
+
+            if (missingStates.length === 0) {
+                return true;
+            }
+
+            node.log(`Loading ${missingStates.length} missing subscribed states for grouped mode`);
+
+            try {
+                for (const stateId of missingStates) {
+                    try {
+                        const state = await connectionManager.getState(settings.serverId, stateId);
+                        if (state && state.val !== undefined) {
+                            node.currentStateValues.set(stateId, state);
+                        }
+                    } catch (getError) {
+                        node.warn(`Could not get value for ${stateId}: ${getError.message}`);
+                    }
+                }
+                return true;
+            } catch (error) {
+                node.warn(`Error loading missing states: ${error.message}`);
+                return false;
+            }
+        }
+
+        function createGroupedMessage(changedStateId, changedState, isInitialMessage = false) {
+            const values = {};
+            const states = {};
+
+            for (const [stateId, stateData] of node.currentStateValues.entries()) {
+                if (stateData && stateData.val !== undefined) {
+                    values[stateId] = stateData.val;
+                    states[stateId] = stateData;
+                }
+            }
+
+            const message = {
+                topic: "grouped_states",
+                [settings.outputProperty]: values,
+                states: states,
+                timestamp: Date.now()
+            };
+
+            if (isInitialMessage) {
+                message.initial = true;
+            }
+
+            if (changedStateId) {
+                message.changedState = changedStateId;
+            }
+
+            if (changedState) {
+                message.changedValue = changedState.val;
+            }
+
             return message;
         }
 
@@ -91,13 +189,51 @@ module.exports = function (RED) {
                     return;
                 }
 
-                const message = createMessage(stateId, state, false);
-                node.send(message);
+                if (isMultipleStates && !node.subscribedStates.has(stateId)) {
+                    return;
+                }
 
-                const timestamp = new Date().toLocaleTimeString(undefined, { hour12: false })
-                const statusText = isWildcardPattern
-                    ? `Pattern active - Last: ${timestamp}`
-                    : `Last: ${timestamp}`;
+                if (isMultipleStates) {
+                    node.currentStateValues.set(stateId, state);
+                }
+
+                if (isMultipleStates) {
+                    if (settings.outputMode === 'grouped') {
+                        if (node.currentStateValues.size < node.subscribedStates.size) {
+                            ensureAllStatesLoaded().then(() => {
+                                const message = createGroupedMessage(stateId, state);
+                                node.send(message);
+                            }).catch(error => {
+                                node.warn(`Error loading all states: ${error.message}, sending available states`);
+                                const message = createGroupedMessage(stateId, state);
+                                node.send(message);
+                            });
+                        } else {
+                            const message = createGroupedMessage(stateId, state);
+                            node.send(message);
+                        }
+                    } else {
+                        const message = createMessage(stateId, state);
+                        node.send(message);
+                    }
+                } else {
+                    const message = createMessage(stateId, state, false);
+                    node.send(message);
+                }
+
+                const timestamp = new Date().toLocaleTimeString(undefined, { hour12: false });
+                let statusText;
+
+                if (isMultipleStates) {
+                    const currentCount = node.currentStateValues.size;
+                    const subscribedCount = node.subscribedStates.size;
+                    statusText = `${subscribedCount} states (${currentCount} current) - Last: ${timestamp}`;
+                } else if (isWildcardPattern) {
+                    statusText = `Pattern active - Last: ${timestamp}`;
+                } else {
+                    statusText = `Last: ${timestamp}`;
+                }
+
                 setStatus("green", "dot", statusText);
 
             } catch (error) {
@@ -109,10 +245,8 @@ module.exports = function (RED) {
         function createCallback() {
             const callback = onStateChange;
 
-            // IMPORTANT: Set the wantsInitialValue flag
             callback.wantsInitialValue = settings.sendInitialValue;
 
-            // Log for debugging
             node.log(`Callback created with wantsInitialValue: ${callback.wantsInitialValue}`);
 
             callback.onInitialValue = function (stateId, state) {
@@ -124,23 +258,52 @@ module.exports = function (RED) {
                         return;
                     }
 
-                    const message = createMessage(stateId, state, true);
-                    node.send(message);
+                    if (isMultipleStates) {
+                        node.currentStateValues.set(stateId, state);
+                        node.initialValueCount++;
 
-                    node.log(`Initial value sent for ${stateId}: ${state.val}`);
+                        if (settings.outputMode === 'grouped') {
+                            if (node.initialValueCount >= node.expectedInitialValues && !node.initialGroupedMessageSent) {
+                                const message = createGroupedMessage(null, null, true);
+                                node.send(message);
+                                node.initialGroupedMessageSent = true;
+                                node.log(`Initial grouped message sent with ${node.initialValueCount} states`);
+                            } else if (node.initialValueCount === 1) {
+                                setTimeout(() => {
+                                    if (!node.initialGroupedMessageSent && node.currentStateValues.size > 0) {
+                                        const message = createGroupedMessage(null, null, true);
+                                        node.send(message);
+                                        node.initialGroupedMessageSent = true;
+                                        node.log(`Initial grouped message sent (timeout fallback)`);
+                                    }
+                                }, 3000);
+                            }
+                        } else {
+                            const message = createMessage(stateId, state, true);
+                            node.send(message);
+                        }
+                    } else {
+                        const message = createMessage(stateId, state, true);
+                        node.send(message);
+                        node.log(`Initial value sent for ${stateId}: ${state.val}`);
+                    }
 
                 } catch (error) {
                     node.error(`Initial value processing error: ${error.message}`);
                 }
             };
 
-            // Status update callback - called by the centralized manager
             callback.updateStatus = function (status) {
                 switch (status) {
                     case 'ready':
-                        const statusText = isWildcardPattern
-                            ? `Pattern ready: ${node.statePattern}`
-                            : "Ready";
+                        let statusText;
+                        if (isMultipleStates) {
+                            statusText = `${stateList.length} states (${settings.outputMode})`;
+                        } else if (isWildcardPattern) {
+                            statusText = `Pattern: ${node.subscriptionPattern}`;
+                        } else {
+                            statusText = "Ready";
+                        }
                         setStatus("green", "dot", statusText);
                         node.isInitialized = true;
                         break;
@@ -167,6 +330,8 @@ module.exports = function (RED) {
             callback.onReconnect = function () {
                 node.log("Reconnection detected - resubscribing");
                 node.isSubscribed = false;
+                node.initialValueCount = 0;
+                node.initialGroupedMessageSent = false;
                 setStatus("yellow", "ring", "Resubscribing...");
             };
 
@@ -180,6 +345,8 @@ module.exports = function (RED) {
                 node.log("Subscription successful");
                 node.isSubscribed = true;
             };
+
+            callback.alreadySubscribed = true;
 
             return callback;
         }
@@ -204,8 +371,42 @@ module.exports = function (RED) {
             return configChanged;
         }
 
+        async function subscribeToStates() {
+            const callback = createCallback();
+
+            if (isMultipleStates) {
+                node.expectedInitialValues = stateList.length;
+                node.initialValueCount = 0;
+
+                for (const stateId of stateList) {
+                    try {
+                        await connectionManager.subscribe(
+                            settings.nodeId,
+                            settings.serverId,
+                            stateId,
+                            callback,
+                            globalConfig
+                        );
+                        node.subscribedStates.add(stateId);
+                    } catch (error) {
+                        node.error(`Failed to subscribe to state ${stateId}: ${error.message}`);
+                        node.expectedInitialValues--;
+                    }
+                }
+                node.log(`Successfully subscribed to ${node.subscribedStates.size} states in ${settings.outputMode} mode`);
+            } else {
+                await connectionManager.subscribe(
+                    settings.nodeId,
+                    settings.serverId,
+                    subscriptionPattern,
+                    callback,
+                    globalConfig
+                );
+                node.log(`Successfully subscribed to ${isWildcardPattern ? 'wildcard pattern' : 'single state'}: ${subscriptionPattern}${settings.sendInitialValue ? ' (with initial value)' : ''}`);
+            }
+        }
+
         async function initialize() {
-            // Check if we're already subscribed and connection is ready
             const status = connectionManager.getConnectionStatus(settings.serverId);
             if (node.isSubscribed && status.connected && status.ready) {
                 node.log("Already subscribed and connected, skipping initialization");
@@ -215,7 +416,11 @@ module.exports = function (RED) {
             try {
                 setStatus("yellow", "ring", "Connecting...");
 
-                // Handle configuration changes
+                node.currentStateValues.clear();
+                node.subscribedStates.clear();
+                node.initialValueCount = 0;
+                node.initialGroupedMessageSent = false;
+
                 if (hasConfigChanged()) {
                     const newGlobalConfig = RED.nodes.getNode(config.server);
                     const oldServerId = settings.serverId;
@@ -237,43 +442,31 @@ module.exports = function (RED) {
                     }
                 }
 
-                const callback = createCallback();
-
-                // The manager will handle all connection logic centrally
-                await connectionManager.subscribe(
-                    settings.nodeId,
-                    settings.serverId,
-                    statePattern,
-                    callback,
-                    globalConfig
-                );
+                await subscribeToStates();
 
                 node.isSubscribed = true;
 
-                const patternInfo = isWildcardPattern
-                    ? `wildcard pattern: ${statePattern}`
-                    : `single state: ${statePattern}`;
+                let statusText;
+                if (isMultipleStates) {
+                    statusText = `${stateList.length} states (${settings.outputMode})`;
+                } else if (isWildcardPattern) {
+                    statusText = `Pattern: ${subscriptionPattern}`;
+                } else {
+                    statusText = "Ready";
+                }
 
-                node.log(`Successfully subscribed to ${patternInfo} via WebSocket${settings.sendInitialValue ? ' (with initial value)' : ''}`);
-
-                setStatus("green", "dot", isWildcardPattern ? `Pattern: ${statePattern}` : "Ready");
+                setStatus("green", "dot", statusText);
                 node.isInitialized = true;
 
             } catch (error) {
                 const errorMsg = error.message || 'Unknown error';
-
-                // The centralized manager handles retry logic, so we just log the error
                 node.log(`Connection attempt failed: ${errorMsg} - Manager will handle recovery`);
 
-                // Set appropriate status based on error type
                 if (errorMsg.includes('auth_failed') || errorMsg.includes('Authentication failed')) {
-                    // Permanent authentication failure
                     setStatus("red", "ring", "Auth failed");
                 } else if (errorMsg.includes('not possible in state')) {
-                    // Connection is in a state where retry isn't possible 
                     setStatus("red", "ring", "Connection failed");
                 } else {
-                    // Other errors - manager will handle recovery
                     setStatus("yellow", "ring", "Retrying...");
                 }
 
@@ -287,19 +480,29 @@ module.exports = function (RED) {
             node.isSubscribed = false;
 
             try {
-                await connectionManager.unsubscribe(
-                    settings.nodeId,
-                    settings.serverId,
-                    statePattern
-                );
+                if (isMultipleStates) {
+                    for (const stateId of stateList) {
+                        try {
+                            await connectionManager.unsubscribe(
+                                settings.nodeId,
+                                settings.serverId,
+                                stateId
+                            );
+                        } catch (error) {
+                            node.warn(`Cleanup error for state ${stateId}: ${error.message}`);
+                        }
+                    }
+                    node.log(`Successfully unsubscribed from ${stateList.length} states`);
+                } else {
+                    await connectionManager.unsubscribe(
+                        settings.nodeId,
+                        settings.serverId,
+                        subscriptionPattern
+                    );
+                    node.log(`Successfully unsubscribed from ${isWildcardPattern ? 'wildcard pattern' : 'single state'}: ${subscriptionPattern}`);
+                }
 
                 node.status({});
-
-                const patternInfo = isWildcardPattern
-                    ? `wildcard pattern ${statePattern}`
-                    : `single state ${statePattern}`;
-
-                node.log(`Successfully unsubscribed from ${patternInfo}`);
 
             } catch (error) {
                 node.warn(`Cleanup error: ${error.message}`);
@@ -314,7 +517,6 @@ module.exports = function (RED) {
             node.isSubscribed = false;
         });
 
-        // Initialize the node
         initialize();
     }
 
