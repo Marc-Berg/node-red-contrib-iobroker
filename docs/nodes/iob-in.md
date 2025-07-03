@@ -103,7 +103,7 @@ Standard message format for each state change:
 **Additional Properties for Initial Values:**
 - `initial`: `true` when message is an initial value
 
-### Grouped Object (Multiple States Grouped Mode) 🆕
+### Grouped Object (Multiple States Grouped Mode)
 
 Single message containing all current values:
 
