@@ -55,6 +55,7 @@ The diagram shows the recommended architecture with a dedicated Admin adapter in
 **Why use a dedicated Admin instance?**
 - Isolates Node-RED traffic from main admin interface
 - Prevents conflicts with regular admin usage
+- Avoids duplicate events when the Admin interface is open in browser
 - Allows custom security settings
 
 **Setup Steps:**

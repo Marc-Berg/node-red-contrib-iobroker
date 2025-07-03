@@ -55,6 +55,7 @@ Das Diagramm zeigt die empfohlene Architektur mit einer dedizierten Admin Adapte
 **Warum eine dedizierte Admin Instanz verwenden?**
 - Isoliert Node-RED Traffic von der Haupt-Admin Oberfläche
 - Verhindert Konflikte mit normaler Admin-Nutzung
+- Vermeidet doppelte Events, wenn das Admin-Interface im Browser geöffnet ist
 - Ermöglicht benutzerdefinierte Sicherheitseinstellungen
 
 **Einrichtungsschritte:**
