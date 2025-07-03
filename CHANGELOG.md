@@ -1,5 +1,21 @@
 # Changelog
 
+## [0.9.5] - 2025-07-03
+### Added
+- **Multiple States mode for WS ioB in node**
+  - New input mode supporting predefined lists of specific states
+  - Grouped output format combining all current values in single message
+  - Individual output mode for separate messages per state change
+
+### Changed
+- **Output message format for grouped mode**
+  - New `grouped_states` topic for combined state messages
+  - Added `changedState` and `changedValue` properties to track triggering state
+
+### Fixed
+ - Fix auth manager reauthenticate bug
+ - Eliminate duplicate code and clean up utilities
+
 ## [0.9.4] - 2025-07-02
 ### Fixed
 - **Dashboard 2.0 output format for iobhistory node**
