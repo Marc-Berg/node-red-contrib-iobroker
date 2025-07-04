@@ -4,7 +4,7 @@
 ![License](https://img.shields.io/badge/license-MIT-blue.svg)
 ![Node-RED](https://img.shields.io/badge/Node--RED-compatible-red.svg)
 ![Downloads](https://img.shields.io/npm/dt/node-red-contrib-iobroker)
-[![Spenden](https://img.shields.io/badge/Donate-PayPal-blue?style=flat&logo=paypal)](https://paypal.me/MarcBergM)
+[![Spenden](https://img.shields.io/badge/Spenden-PayPal-blue?style=flat&logo=paypal)](https://paypal.me/MarcBergM)
 
 > **🌍 Sprachen:** [🇺🇸 English](https://github.com/Marc-Berg/node-red-contrib-iobroker/blob/main/README.md) | [🇩🇪 Deutsch](#)
 
