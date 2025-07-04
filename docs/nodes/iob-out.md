@@ -110,7 +110,10 @@ const states = [
     { topic: "lights.kitchen.state", payload: false }
 ];
 
-return states.map(state => ({ ...msg, ...state }));
+// Send each state as separate message
+states.forEach(state => {
+    node.send({ ...msg, ...state });
+});
 ```
 
 ### Custom Timestamps
@@ -118,6 +121,11 @@ Override automatic timestamp:
 ```
 msg.ts = Date.now() - 3600000;  // 1 hour ago
 ```
+
+### Creating Empty Objects
+Create ioBroker objects without setting a value by passing `null` as the payload. (Set payload type to JSON and value to null)
+
+This creates the object structure in ioBroker without writing any value to it, useful for preparing object definitions before actual data arrives.
 
 ## Error Handling
 
