@@ -26,6 +26,8 @@ module.exports = function(RED) {
             outputMode: config.outputMode || (isWildcardPattern ? "array" : "single"),
             objectType: config.objectType?.trim() || "",
             useWildcard: isWildcardPattern,
+            includeEnums: config.includeEnums || false,
+            enumTypes: config.enumTypes || "all",
             serverId: connectionManager.getServerId(globalConfig),
             nodeId: node.id
         };
@@ -40,14 +42,9 @@ module.exports = function(RED) {
         if (settings.objectType) {
             node.log(`Object type filter: ${settings.objectType}`);
         }
-        
-        // Debug logging for configuration
-        node.log(`Node configuration: ${JSON.stringify({
-            objectId: configObjectId,
-            outputMode: settings.outputMode,
-            objectType: settings.objectType,
-            useWildcard: settings.useWildcard
-        })}`);
+        if (settings.includeEnums) {
+            node.log(`Enum assignments enabled (types: ${settings.enumTypes})`);
+        }
 
         // Helper functions
         function setError(message, statusText) {
@@ -63,7 +60,140 @@ module.exports = function(RED) {
             }
         }
 
-        function formatOutput(objects, objectIdOrPattern, outputMode) {
+        // Enum assignment functions
+        async function loadEnumData() {
+            try {
+                node.log(`Loading enum data from ioBroker...`);
+                const allEnums = await connectionManager.getObjects(settings.serverId, "enum.*");
+                
+                // Organize enums by type for faster lookup
+                const enumsByType = {
+                    rooms: [],
+                    functions: [],
+                    other: []
+                };
+
+                const enumMemberMap = new Map(); // objectId -> [enumData, ...]
+
+                if (allEnums && Array.isArray(allEnums)) {
+                    allEnums.forEach(enumObj => {
+                        if (!enumObj.common || !enumObj.common.members || !Array.isArray(enumObj.common.members)) {
+                            return;
+                        }
+
+                        const enumType = enumObj._id.split('.')[1]; // rooms, functions, etc.
+                        const enumData = {
+                            id: enumObj._id,
+                            name: enumObj.common.name,
+                            type: enumType,
+                            icon: enumObj.common.icon,
+                            color: enumObj.common.color,
+                            members: enumObj.common.members
+                        };
+
+                        // Categorize enum
+                        if (enumType === 'rooms') {
+                            enumsByType.rooms.push(enumData);
+                        } else if (enumType === 'functions') {
+                            enumsByType.functions.push(enumData);
+                        } else {
+                            enumsByType.other.push(enumData);
+                        }
+
+                        // Build reverse lookup map
+                        enumObj.common.members.forEach(memberId => {
+                            if (!enumMemberMap.has(memberId)) {
+                                enumMemberMap.set(memberId, []);
+                            }
+                            enumMemberMap.get(memberId).push(enumData);
+                        });
+                    });
+                }
+
+                const enumData = {
+                    enumsByType,
+                    enumMemberMap,
+                    totalEnums: allEnums ? allEnums.length : 0
+                };
+
+                node.log(`Loaded ${enumData.totalEnums} enums (${enumsByType.rooms.length} rooms, ${enumsByType.functions.length} functions, ${enumsByType.other.length} other)`);
+                
+                return enumData;
+
+            } catch (error) {
+                node.error(`Failed to load enum data: ${error.message}`);
+                return null;
+            }
+        }
+
+        function getEnumAssignments(objectId, enumData) {
+            if (!enumData || !enumData.enumMemberMap.has(objectId)) {
+                return {
+                    rooms: [],
+                    functions: [],
+                    other: [],
+                    totalEnums: 0,
+                    hasRoom: false,
+                    hasFunction: false
+                };
+            }
+
+            const assignedEnums = enumData.enumMemberMap.get(objectId);
+            const assignments = {
+                rooms: [],
+                functions: [],
+                other: [],
+                totalEnums: assignedEnums.length,
+                hasRoom: false,
+                hasFunction: false
+            };
+
+            // Filter by enum types setting
+            const includeRooms = settings.enumTypes === 'all' || settings.enumTypes.includes('rooms');
+            const includeFunctions = settings.enumTypes === 'all' || settings.enumTypes.includes('functions');
+            const includeOther = settings.enumTypes === 'all';
+
+            assignedEnums.forEach(enumData => {
+                if (enumData.type === 'rooms' && includeRooms) {
+                    assignments.rooms.push(enumData);
+                } else if (enumData.type === 'functions' && includeFunctions) {
+                    assignments.functions.push(enumData);
+                } else if (enumData.type !== 'rooms' && enumData.type !== 'functions' && includeOther) {
+                    assignments.other.push(enumData);
+                }
+            });
+
+            assignments.hasRoom = assignments.rooms.length > 0;
+            assignments.hasFunction = assignments.functions.length > 0;
+
+            // Add convenience properties
+            assignments.roomName = assignments.rooms[0]?.name || null;
+            assignments.functionName = assignments.functions[0]?.name || null;
+
+            return assignments;
+        }
+
+        async function enrichObjectsWithEnums(objects, enumData) {
+            if (!settings.includeEnums || !enumData) {
+                return objects;
+            }
+
+            if (Array.isArray(objects)) {
+                return objects.map(obj => {
+                    if (obj && obj._id) {
+                        obj.enumAssignments = getEnumAssignments(obj._id, enumData);
+                    }
+                    return obj;
+                });
+            } else if (objects && typeof objects === 'object' && objects._id) {
+                objects.enumAssignments = getEnumAssignments(objects._id, enumData);
+                return objects;
+            }
+
+            return objects;
+        }
+
+        function formatOutput(objects, objectIdOrPattern, outputMode, enumData = null) {
             // Always return a valid result object, even if objects is null/empty
             const baseResult = {
                 [settings.outputProperty]: null,
@@ -71,7 +201,8 @@ module.exports = function(RED) {
                 objectId: objectIdOrPattern,
                 objectType: settings.objectType || 'any',
                 count: 0,
-                timestamp: Date.now()
+                timestamp: Date.now(),
+                includesEnums: settings.includeEnums
             };
 
             if (!objects) {
@@ -84,22 +215,39 @@ module.exports = function(RED) {
 
             // Handle single object result
             if (!Array.isArray(objects) && typeof objects === 'object') {
+                // Enrich single object with enum assignments
+                const enrichedObject = settings.includeEnums && enumData 
+                    ? { ...objects, enumAssignments: getEnumAssignments(objects._id, enumData) }
+                    : objects;
+
                 return {
-                    [settings.outputProperty]: objects,
-                    objects: objects,
+                    [settings.outputProperty]: enrichedObject,
+                    objects: enrichedObject,
                     objectId: objectIdOrPattern,
                     objectType: settings.objectType || 'any',
                     count: 1,
-                    timestamp: Date.now()
+                    timestamp: Date.now(),
+                    includesEnums: settings.includeEnums
                 };
             }
 
             // Handle multiple objects (from wildcard pattern)
             const objectArray = Array.isArray(objects) ? objects : Object.values(objects);
+            
+            // Enrich objects with enum assignments
+            const enrichedArray = settings.includeEnums && enumData
+                ? objectArray.map(obj => {
+                    if (obj && obj._id) {
+                        return { ...obj, enumAssignments: getEnumAssignments(obj._id, enumData) };
+                    }
+                    return obj;
+                })
+                : objectArray;
+
             const objectMap = {};
             
             // Create object map
-            objectArray.forEach(obj => {
+            enrichedArray.forEach(obj => {
                 if (obj && obj._id) {
                     objectMap[obj._id] = obj;
                 }
@@ -108,17 +256,17 @@ module.exports = function(RED) {
             let outputData;
             switch (outputMode) {
                 case 'array':
-                    outputData = objectArray;
+                    outputData = enrichedArray;
                     break;
                 case 'object':
                     outputData = objectMap;
                     break;
                 case 'single':
                     // For single mode with multiple results, take the first one
-                    outputData = objectArray.length > 0 ? objectArray[0] : null;
+                    outputData = enrichedArray.length > 0 ? enrichedArray[0] : null;
                     break;
                 default:
-                    outputData = objectArray;
+                    outputData = enrichedArray;
             }
 
             const result = {
@@ -126,13 +274,35 @@ module.exports = function(RED) {
                 objects: objectMap,
                 objectId: objectIdOrPattern,
                 objectType: settings.objectType || 'any',
-                count: objectArray.length,
-                timestamp: Date.now()
+                count: enrichedArray.length,
+                timestamp: Date.now(),
+                includesEnums: settings.includeEnums
             };
 
             // Add pattern property for wildcard patterns
             if (isWildcardPattern || (objectIdOrPattern && objectIdOrPattern.includes('*'))) {
                 result.pattern = objectIdOrPattern;
+            }
+
+            // Add enum statistics if enabled
+            if (settings.includeEnums && enumData) {
+                const enumStats = {
+                    objectsWithRooms: 0,
+                    objectsWithFunctions: 0,
+                    objectsWithAnyEnum: 0,
+                    totalEnumAssignments: 0
+                };
+
+                enrichedArray.forEach(obj => {
+                    if (obj && obj.enumAssignments) {
+                        if (obj.enumAssignments.hasRoom) enumStats.objectsWithRooms++;
+                        if (obj.enumAssignments.hasFunction) enumStats.objectsWithFunctions++;
+                        if (obj.enumAssignments.totalEnums > 0) enumStats.objectsWithAnyEnum++;
+                        enumStats.totalEnumAssignments += obj.enumAssignments.totalEnums;
+                    }
+                });
+
+                result.enumStatistics = enumStats;
             }
 
             return result;
@@ -146,7 +316,8 @@ module.exports = function(RED) {
                 switch (status) {
                     case 'ready':
                         const readyText = isWildcardPattern ? "Ready (Pattern mode)" : "Ready";
-                        setStatus("green", "dot", readyText);
+                        const enumText = settings.includeEnums ? " +enums" : "";
+                        setStatus("green", "dot", readyText + enumText);
                         node.isInitialized = true;
                         break;
                     case 'connecting':
@@ -170,7 +341,8 @@ module.exports = function(RED) {
             callback.onReconnect = function() {
                 node.log("Reconnection detected by get object node");
                 const reconnectedText = isWildcardPattern ? "Reconnected (Pattern)" : "Reconnected";
-                setStatus("green", "dot", reconnectedText);
+                const enumText = settings.includeEnums ? " +enums" : "";
+                setStatus("green", "dot", reconnectedText + enumText);
                 node.isInitialized = true;
             };
 
@@ -213,10 +385,9 @@ module.exports = function(RED) {
                         usessl: newGlobalConfig.usessl
                     };
                     
-                    const newServerId = `${newGlobalConfig.iobhost}:${newGlobalConfig.iobport}`;
+                    const newServerId = connectionManager.getServerId(newGlobalConfig);
                     settings.serverId = newServerId;
                     
-                    // Force connection reset for configuration changes
                     if (oldServerId !== newServerId) {
                         node.log(`Server changed from ${oldServerId} to ${newServerId}, forcing connection reset`);
                         await connectionManager.forceServerSwitch(oldServerId, newServerId, newGlobalConfig);
@@ -232,15 +403,15 @@ module.exports = function(RED) {
                     globalConfig
                 );
                 
-                // Only set ready status if connection is actually ready
+                // Check connection status
                 const status = connectionManager.getConnectionStatus(settings.serverId);
                 if (status.ready) {
                     const readyText = isWildcardPattern ? "Ready (Pattern mode)" : "Ready";
-                    setStatus("green", "dot", readyText);
+                    const enumText = settings.includeEnums ? " +enums" : "";
+                    setStatus("green", "dot", readyText + enumText);
                     node.isInitialized = true;
-                    node.log(`Connection established for get object node (wildcard: ${isWildcardPattern}, type filter: ${settings.objectType || 'none'})`);
+                    node.log(`Connection established for get object node (wildcard: ${isWildcardPattern}, type filter: ${settings.objectType || 'none'}, enums: ${settings.includeEnums})`);
                 } else {
-                    // Node is registered, will get status updates when connection is ready
                     setStatus("yellow", "ring", "Waiting for connection...");
                     node.log(`Get object node registered - waiting for connection to be ready`);
                 }
@@ -280,15 +451,19 @@ module.exports = function(RED) {
                 const currentOutputMode = msg.outputMode || settings.outputMode;
                 const currentObjectType = msg.objectType || settings.objectType;
                 
-                // Debug logging for type filter
-                if (currentObjectType) {
-                    node.log(`Using object type filter: ${currentObjectType}`);
-                } else {
-                    node.log(`No object type filter applied`);
+                // Load enum data if needed
+                let enumData = null;
+                if (settings.includeEnums) {
+                    setStatus("blue", "dot", `Loading enums...`);
+                    enumData = await loadEnumData();
+                    if (!enumData) {
+                        node.warn(`Failed to load enum data - continuing without enum assignments`);
+                    }
                 }
 
                 if (isCurrentWildcard) {
-                    setStatus("blue", "dot", `Reading objects ${objectIdOrPattern}...`);
+                    const statusText = settings.includeEnums ? `Reading objects ${objectIdOrPattern} +enums...` : `Reading objects ${objectIdOrPattern}...`;
+                    setStatus("blue", "dot", statusText);
                     
                     try {
                         // Use getObjects for wildcard patterns - server-side filtering
@@ -301,7 +476,7 @@ module.exports = function(RED) {
                             node.warn(`No objects found for pattern: ${objectIdOrPattern}${typeInfo}`);
                             
                             // Send message with empty result
-                            const result = formatOutput(currentOutputMode === 'array' ? [] : {}, objectIdOrPattern, currentOutputMode);
+                            const result = formatOutput(currentOutputMode === 'array' ? [] : {}, objectIdOrPattern, currentOutputMode, enumData);
                             Object.assign(msg, result);
                             
                             send(msg);
@@ -309,13 +484,17 @@ module.exports = function(RED) {
                             return;
                         }
                         
-                        // Format output according to configured mode
-                        const result = formatOutput(objects, objectIdOrPattern, currentOutputMode);
+                        // Format output according to configured mode (including enum enrichment)
+                        const result = formatOutput(objects, objectIdOrPattern, currentOutputMode, enumData);
                         Object.assign(msg, result);
                         
-                        setStatus("green", "dot", isWildcardPattern ? "Ready (Pattern)" : "Ready");
+                        const readyText = isWildcardPattern ? "Ready (Pattern)" : "Ready";
+                        const enumText = settings.includeEnums ? " +enums" : "";
+                        setStatus("green", "dot", readyText + enumText);
+                        
                         const typeInfo = currentObjectType ? ` (filtered by type: ${currentObjectType})` : '';
-                        node.log(`Successfully retrieved ${result.count} objects for pattern: ${objectIdOrPattern} (mode: ${currentOutputMode})${typeInfo}`);
+                        const enumInfo = settings.includeEnums ? ` with enum assignments` : '';
+                        node.log(`Successfully retrieved ${result.count} objects for pattern: ${objectIdOrPattern} (mode: ${currentOutputMode})${typeInfo}${enumInfo}`);
                         
                         send(msg);
                         done && done();
@@ -324,8 +503,8 @@ module.exports = function(RED) {
                         setStatus("red", "ring", "Pattern error");
                         node.error(`Error retrieving objects for pattern ${objectIdOrPattern}: ${error.message}`);
                         
-                        // Send error message with details - formatOutput now always returns a valid object
-                        const result = formatOutput(null, objectIdOrPattern, currentOutputMode);
+                        // Send error message with details
+                        const result = formatOutput(null, objectIdOrPattern, currentOutputMode, enumData);
                         result.error = error.message;
                         result.errorType = error.message.includes('timeout') ? 'timeout' : 'unknown';
                         Object.assign(msg, result);
@@ -335,7 +514,8 @@ module.exports = function(RED) {
                     }
                 } else {
                     // Single object retrieval
-                    setStatus("blue", "dot", `Reading object ${objectIdOrPattern}...`);
+                    const statusText = settings.includeEnums ? `Reading object ${objectIdOrPattern} +enums...` : `Reading object ${objectIdOrPattern}...`;
+                    setStatus("blue", "dot", statusText);
 
                     try {
                         // For single objects, we can still apply type filtering
@@ -351,8 +531,8 @@ module.exports = function(RED) {
                             setStatus("yellow", "ring", "Object not found");
                             node.warn(`Object not found: ${objectIdOrPattern}${typeInfo}`);
                             
-                            // Send message with null payload but include object ID for reference - formatOutput now always returns a valid object
-                            const result = formatOutput(null, objectIdOrPattern, 'single');
+                            // Send message with null payload but include object ID for reference
+                            const result = formatOutput(null, objectIdOrPattern, 'single', enumData);
                             result.error = currentObjectType ? "Object not found or type mismatch" : "Object not found";
                             Object.assign(msg, result);
                             
@@ -361,8 +541,8 @@ module.exports = function(RED) {
                             return;
                         }
                         
-                        // Format single object output
-                        const result = formatOutput(objectData, objectIdOrPattern, 'single');
+                        // Format single object output (including enum enrichment)
+                        const result = formatOutput(objectData, objectIdOrPattern, 'single', enumData);
                         
                         // Add some useful metadata for single objects
                         if (objectData.common) {
@@ -373,9 +553,12 @@ module.exports = function(RED) {
                         
                         Object.assign(msg, result);
                         
-                        setStatus("green", "dot", "Ready");
+                        const enumText = settings.includeEnums ? " +enums" : "";
+                        setStatus("green", "dot", "Ready" + enumText);
+                        
                         const typeInfo = currentObjectType ? ` (type filter: ${currentObjectType})` : '';
-                        node.log(`Successfully retrieved object: ${objectIdOrPattern}${typeInfo}`);
+                        const enumInfo = settings.includeEnums ? ` with enum assignments` : '';
+                        node.log(`Successfully retrieved object: ${objectIdOrPattern}${typeInfo}${enumInfo}`);
                         
                         send(msg);
                         done && done();
@@ -384,8 +567,8 @@ module.exports = function(RED) {
                         setStatus("red", "ring", "Error");
                         node.error(`Error processing input: ${error.message}`);
                         
-                        // Send error message with details - formatOutput now always returns a valid object
-                        const result = formatOutput(null, objectIdOrPattern, 'single');
+                        // Send error message with details
+                        const result = formatOutput(null, objectIdOrPattern, 'single', enumData);
                         result.error = error.message;
                         result.errorType = error.message.includes('timeout') ? 'timeout' : 'unknown';
                         Object.assign(msg, result);
