@@ -1,4 +1,4 @@
-const connectionManager = require('./lib/manager/websocket-manager');
+const connectionManager = require('../lib/manager/websocket-manager');
 
 module.exports = function (RED) {
     function iobhistory(config) {

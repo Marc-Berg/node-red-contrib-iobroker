@@ -50,7 +50,7 @@ function setupAPIEndpoints(RED) {
     if (apiEndpointsSetup) return true;
 
     try {
-        const connectionManager = require('./lib/manager/websocket-manager');
+        const connectionManager = require('../lib/manager/websocket-manager');
 
         RED.httpAdmin.get('/iobroker/ws/states/:serverId', async (req, res) => {
             try {
@@ -91,7 +91,7 @@ function setupAPIEndpoints(RED) {
         RED.httpAdmin.get('/iobroker/ws/adapters/:serverId', async (req, res) => {
             try {
                 const serverId = decodeURIComponent(req.params.serverId);
-                const connectionManager = require('./lib/manager/websocket-manager');
+                const connectionManager = require('../lib/manager/websocket-manager');
 
                 // Use the same method as TreeView - get all states
                 const states = await connectionManager.getStates(serverId);
