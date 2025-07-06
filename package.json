@@ -26,23 +26,32 @@
     "node": ">=14.0.0"
   },
   "dependencies": {
-    "express": "^5.1.0",
-    "ws": "^8.18.3"
+    "express": "^4.19.0",
+    "ws": "^8.18.0"
   },
   "peerDependencies": {
     "node-red": ">=2.0.0"
   },
+  "files": [
+    "nodes/*.js",
+    "nodes/*.html",
+    "lib/**/*.js",
+    "shared/*.js",
+    "icons/*.svg",
+    "README.md",
+    "LICENSE"
+  ],
   "node-red": {
     "version": ">=2.0.0",
     "nodes": {
-      "iobin": "iob-in.js",
-      "iobout": "iob-out.js",
-      "iobinobject": "iob-inobject.js",
-      "iobget": "iob-get.js",
-      "iobgetobject": "iob-getobject.js",
-      "iobhistory": "iob-history.js",
-      "ioblog": "iob-log.js",
-      "iob-config": "iob-config.js"
+      "iobin": "nodes/iob-in.js",
+      "iobout": "nodes/iob-out.js",
+      "iobinobject": "nodes/iob-inobject.js",
+      "iobget": "nodes/iob-get.js",
+      "iobgetobject": "nodes/iob-getobject.js",
+      "iobhistory": "nodes/iob-history.js",
+      "ioblog": "nodes/iob-log.js",
+      "iob-config": "nodes/iob-config.js"
     },
     "examples": [
       "examples/iob-in.json",
@@ -50,15 +59,6 @@
       "examples/iob-out.json",
       "examples/iob-get.json",
       "examples/iob-getobject.json"
-    ],
-    "files": [
-      "*.js",
-      "*.html",
-      "lib/*.js",
-      "shared/*.js",
-      "icons/*.svg",
-      "README.md",
-      "LICENSE"
     ]
   }
 }
