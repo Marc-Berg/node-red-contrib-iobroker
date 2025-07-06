@@ -67,13 +67,19 @@ RED.nodes.registerType('iobsendto', {
             }
         });
         
-        // Set initial state
+        // Set initial state based on current adapter value
         const currentAdapter = this.adapter;
-        if (currentAdapter && !isCommonAdapter(currentAdapter)) {
-            adapterSelect.val('__custom__');
-            customAdapterInput.val(currentAdapter).show();
+        if (currentAdapter && currentAdapter.trim() !== '') {
+            if (isCommonAdapter(currentAdapter)) {
+                adapterSelect.val(currentAdapter);
+                customAdapterInput.hide();
+            } else {
+                adapterSelect.val('__custom__');
+                customAdapterInput.val(currentAdapter).show();
+                customAdapterInput.attr('required', true);
+            }
         } else {
-            adapterSelect.val(currentAdapter || '');
+            adapterSelect.val('');
             customAdapterInput.hide();
         }
         

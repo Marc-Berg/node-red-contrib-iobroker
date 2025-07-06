@@ -1,16 +1,36 @@
 [
     {
-        "id": "sendto-example",
+        "id": "sendto-examples-tab",
         "type": "tab",
         "label": "ioBroker SendTo Examples",
         "disabled": false,
-        "info": "Examples demonstrating various sendTo operations with ioBroker adapters"
+        "info": "Comprehensive examples demonstrating various sendTo operations with different ioBroker adapters including notifications, database operations, script execution, and media control."
     },
     {
-        "id": "telegram-notification",
+        "id": "iobroker-config",
+        "type": "iob-config",
+        "name": "ioBroker Server",
+        "iobhost": "localhost",
+        "iobport": 8081,
+        "user": "",
+        "password": "",
+        "usessl": false
+    },
+    {
+        "id": "comment.title",
+        "type": "comment",
+        "z": "sendto-examples-tab",
+        "name": "ioBroker SendTo Command Examples",
+        "info": "This flow demonstrates various sendTo patterns:\n\n**Notification Services:**\n- Telegram messages with user targeting\n- Email alerts with attachments\n- Push notifications with priority levels\n\n**Database Operations:**\n- SQL queries with response handling\n- Data insertion and updates\n- Complex aggregation queries\n\n**Script Execution:**\n- JavaScript adapter integration\n- Custom script execution with parameters\n- Data processing and transformation\n\n**Media Control:**\n- Spotify playlist control\n- Volume and device management\n- Dynamic content selection\n\n**System Operations:**\n- Backup trigger commands\n- System status queries\n- Configuration updates\n\n**Response Modes:**\n- Fire-and-forget for simple notifications\n- Response mode for data queries\n- Error handling and timeouts\n\n**Dynamic Configuration:**\n- Adapter selection via message properties\n- Command parameter injection\n- Conditional message routing",
+        "x": 200,
+        "y": 40,
+        "wires": []
+    },
+    {
+        "id": "telegram.notification",
         "type": "iobsendto",
-        "z": "sendto-example",
-        "name": "Telegram Notification",
+        "z": "sendto-examples-tab",
+        "name": "Telegram Alert",
         "adapter": "telegram.0",
         "command": "send",
         "message": "",
@@ -18,13 +38,13 @@
         "responseTimeout": 10000,
         "server": "iobroker-config",
         "x": 300,
-        "y": 100,
+        "y": 120,
         "wires": []
     },
     {
-        "id": "email-alert",
+        "id": "email.alert",
         "type": "iobsendto",
-        "z": "sendto-example",
+        "z": "sendto-examples-tab",
         "name": "Email Alert",
         "adapter": "email",
         "command": "",
@@ -33,14 +53,14 @@
         "responseTimeout": 10000,
         "server": "iobroker-config",
         "x": 300,
-        "y": 160,
+        "y": 180,
         "wires": []
     },
     {
-        "id": "sql-query",
+        "id": "sql.query",
         "type": "iobsendto",
-        "z": "sendto-example",
-        "name": "SQL Query",
+        "z": "sendto-examples-tab",
+        "name": "SQL Database Query",
         "adapter": "sql.0",
         "command": "query",
         "message": "",
@@ -48,14 +68,14 @@
         "responseTimeout": 15000,
         "server": "iobroker-config",
         "x": 300,
-        "y": 220,
-        "wires": [["query-result"]]
+        "y": 240,
+        "wires": [["query.result"]]
     },
     {
-        "id": "javascript-execution",
+        "id": "javascript.execution",
         "type": "iobsendto",
-        "z": "sendto-example",
-        "name": "Execute Script",
+        "z": "sendto-examples-tab",
+        "name": "Execute JavaScript",
         "adapter": "javascript.0",
         "command": "toScript",
         "message": "",
@@ -63,18 +83,48 @@
         "responseTimeout": 10000,
         "server": "iobroker-config",
         "x": 300,
-        "y": 280,
-        "wires": [["script-result"]]
+        "y": 300,
+        "wires": [["script.result"]]
     },
     {
-        "id": "inject-telegram",
+        "id": "spotify.control",
+        "type": "iobsendto",
+        "z": "sendto-examples-tab",
+        "name": "Spotify Control",
+        "adapter": "spotify-premium.0",
+        "command": "play",
+        "message": "",
+        "waitForResponse": true,
+        "responseTimeout": 8000,
+        "server": "iobroker-config",
+        "x": 300,
+        "y": 360,
+        "wires": [["spotify.result"]]
+    },
+    {
+        "id": "backup.trigger",
+        "type": "iobsendto",
+        "z": "sendto-examples-tab",
+        "name": "Backup Trigger",
+        "adapter": "backitup.0",
+        "command": "send",
+        "message": "",
+        "waitForResponse": true,
+        "responseTimeout": 30000,
+        "server": "iobroker-config",
+        "x": 300,
+        "y": 420,
+        "wires": [["backup.result"]]
+    },
+    {
+        "id": "inject.telegram",
         "type": "inject",
-        "z": "sendto-example",
-        "name": "Trigger Telegram",
+        "z": "sendto-examples-tab",
+        "name": "Motion Alert",
         "props": [
             {
                 "p": "payload",
-                "v": "{\"text\":\"Motion detected in living room!\",\"user\":\"admin\"}",
+                "v": "{\"text\":\"🚨 Motion detected in Living Room!\\n📅 Time: {{timestamp}}\\n🏠 Location: Front Door\",\"user\":\"admin\",\"parse_mode\":\"HTML\"}",
                 "vt": "json"
             }
         ],
@@ -84,18 +134,18 @@
         "onceDelay": 0.1,
         "topic": "",
         "x": 100,
-        "y": 100,
-        "wires": [["telegram-notification"]]
+        "y": 120,
+        "wires": [["telegram.notification"]]
     },
     {
-        "id": "inject-email",
+        "id": "inject.email",
         "type": "inject",
-        "z": "sendto-example",
-        "name": "Trigger Email",
+        "z": "sendto-examples-tab",
+        "name": "System Alert",
         "props": [
             {
                 "p": "payload",
-                "v": "{\"to\":\"admin@home.com\",\"subject\":\"System Alert\",\"text\":\"Temperature critical: 85°C\"}",
+                "v": "{\"to\":\"admin@smarthome.local\",\"subject\":\"🔥 Critical Temperature Alert\",\"text\":\"Temperature in server room has reached critical level:\\n\\nCurrent: 85°C\\nThreshold: 80°C\\nTime: {{timestamp}}\\n\\nImmediate action required!\",\"html\":\"<h2>🔥 Critical Temperature Alert</h2><p><strong>Current:</strong> 85°C</p><p><strong>Threshold:</strong> 80°C</p><p><strong>Time:</strong> {{timestamp}}</p><p style='color:red;'><strong>Immediate action required!</strong></p>\"}",
                 "vt": "json"
             }
         ],
@@ -105,18 +155,18 @@
         "onceDelay": 0.1,
         "topic": "",
         "x": 100,
-        "y": 160,
-        "wires": [["email-alert"]]
+        "y": 180,
+        "wires": [["email.alert"]]
     },
     {
-        "id": "inject-sql",
+        "id": "inject.sql",
         "type": "inject",
-        "z": "sendto-example",
-        "name": "Trigger SQL",
+        "z": "sendto-examples-tab",
+        "name": "Energy Report",
         "props": [
             {
                 "p": "payload",
-                "v": "SELECT * FROM datapoints WHERE ts > NOW() - INTERVAL 1 HOUR",
+                "v": "SELECT DATE(ts) as date, ROUND(AVG(val), 2) as avg_consumption, ROUND(MAX(val), 2) as peak_consumption FROM ts_number WHERE id = 'energy.total.consumption' AND ts >= DATE_SUB(NOW(), INTERVAL 7 DAY) GROUP BY DATE(ts) ORDER BY date DESC",
                 "vt": "str"
             }
         ],
@@ -126,18 +176,18 @@
         "onceDelay": 0.1,
         "topic": "",
         "x": 100,
-        "y": 220,
-        "wires": [["sql-query"]]
+        "y": 240,
+        "wires": [["sql.query"]]
     },
     {
-        "id": "inject-script",
+        "id": "inject.script",
         "type": "inject",
-        "z": "sendto-example",
-        "name": "Trigger Script",
+        "z": "sendto-examples-tab",
+        "name": "Data Processing",
         "props": [
             {
                 "p": "payload",
-                "v": "{\"script\":\"myScript\",\"message\":{\"action\":\"cleanup\",\"data\":[1,2,3]}}",
+                "v": "{\"script\":\"sensorDataProcessor\",\"message\":{\"action\":\"analyzeDaily\",\"sensors\":[\"temperature.living\",\"humidity.kitchen\",\"energy.total\"],\"timeframe\":\"24h\",\"outputFormat\":\"dashboard\"}}",
                 "vt": "json"
             }
         ],
@@ -147,41 +197,185 @@
         "onceDelay": 0.1,
         "topic": "",
         "x": 100,
-        "y": 280,
-        "wires": [["javascript-execution"]]
+        "y": 300,
+        "wires": [["javascript.execution"]]
     },
     {
-        "id": "query-result",
+        "id": "inject.spotify",
+        "type": "inject",
+        "z": "sendto-examples-tab",
+        "name": "Morning Routine",
+        "props": [
+            {
+                "p": "payload",
+                "v": "{\"device\":\"Living Room Speaker\",\"playlist\":\"Morning Motivation\",\"volume\":45,\"shuffle\":true,\"repeat\":\"playlist\"}",
+                "vt": "json"
+            }
+        ],
+        "repeat": "",
+        "crontab": "",
+        "once": false,
+        "onceDelay": 0.1,
+        "topic": "",
+        "x": 100,
+        "y": 360,
+        "wires": [["spotify.control"]]
+    },
+    {
+        "id": "inject.backup",
+        "type": "inject",
+        "z": "sendto-examples-tab",
+        "name": "Weekly Backup",
+        "props": [
+            {
+                "p": "payload",
+                "v": "{\"command\":\"start\",\"type\":\"complete\",\"ccuOption\":\"yes\",\"mysqlOption\":\"yes\",\"redisOption\":\"yes\"}",
+                "vt": "json"
+            }
+        ],
+        "repeat": "",
+        "crontab": "",
+        "once": false,
+        "onceDelay": 0.1,
+        "topic": "",
+        "x": 100,
+        "y": 420,
+        "wires": [["backup.trigger"]]
+    },
+    {
+        "id": "query.result",
         "type": "debug",
-        "z": "sendto-example",
+        "z": "sendto-examples-tab",
         "name": "SQL Results",
         "active": true,
         "tosidebar": true,
         "console": false,
         "tostatus": false,
-        "complete": "payload",
-        "targetType": "msg",
+        "complete": "true",
+        "targetType": "full",
         "statusVal": "",
         "statusType": "auto",
-        "x": 500,
-        "y": 220,
+        "x": 530,
+        "y": 240,
         "wires": []
     },
     {
-        "id": "script-result",
+        "id": "script.result",
         "type": "debug",
-        "z": "sendto-example",
+        "z": "sendto-examples-tab",
         "name": "Script Results",
         "active": true,
         "tosidebar": true,
         "console": false,
         "tostatus": false,
-        "complete": "payload",
-        "targetType": "msg",
+        "complete": "true",
+        "targetType": "full",
         "statusVal": "",
         "statusType": "auto",
-        "x": 500,
-        "y": 280,
+        "x": 540,
+        "y": 300,
+        "wires": []
+    },
+    {
+        "id": "spotify.result",
+        "type": "debug",
+        "z": "sendto-examples-tab",
+        "name": "Spotify Response",
+        "active": true,
+        "tosidebar": true,
+        "console": false,
+        "tostatus": false,
+        "complete": "true",
+        "targetType": "full",
+        "statusVal": "",
+        "statusType": "auto",
+        "x": 550,
+        "y": 360,
+        "wires": []
+    },
+    {
+        "id": "backup.result",
+        "type": "debug",
+        "z": "sendto-examples-tab",
+        "name": "Backup Status",
+        "active": true,
+        "tosidebar": true,
+        "console": false,
+        "tostatus": false,
+        "complete": "true",
+        "targetType": "full",
+        "statusVal": "",
+        "statusType": "auto",
+        "x": 540,
+        "y": 420,
+        "wires": []
+    },
+    {
+        "id": "dynamic.example",
+        "type": "iobsendto",
+        "z": "sendto-examples-tab",
+        "name": "Dynamic SendTo",
+        "adapter": "",
+        "command": "",
+        "message": "",
+        "waitForResponse": true,
+        "responseTimeout": 10000,
+        "server": "iobroker-config",
+        "x": 300,
+        "y": 500,
+        "wires": [["dynamic.result"]]
+    },
+    {
+        "id": "inject.dynamic",
+        "type": "inject",
+        "z": "sendto-examples-tab",
+        "name": "Dynamic Config",
+        "props": [
+            {
+                "p": "adapter",
+                "v": "telegram.0",
+                "vt": "str"
+            },
+            {
+                "p": "command",
+                "v": "send",
+                "vt": "str"
+            },
+            {
+                "p": "payload",
+                "v": "{\"text\":\"Dynamic message sent via runtime configuration!\",\"user\":\"admin\"}",
+                "vt": "json"
+            },
+            {
+                "p": "timeout",
+                "v": 5000,
+                "vt": "num"
+            }
+        ],
+        "repeat": "",
+        "crontab": "",
+        "once": false,
+        "onceDelay": 0.1,
+        "topic": "",
+        "x": 100,
+        "y": 500,
+        "wires": [["dynamic.example"]]
+    },
+    {
+        "id": "dynamic.result",
+        "type": "debug",
+        "z": "sendto-examples-tab",
+        "name": "Dynamic Result",
+        "active": true,
+        "tosidebar": true,
+        "console": false,
+        "tostatus": false,
+        "complete": "true",
+        "targetType": "full",
+        "statusVal": "",
+        "statusType": "auto",
+        "x": 540,
+        "y": 500,
         "wires": []
     }
 ]
