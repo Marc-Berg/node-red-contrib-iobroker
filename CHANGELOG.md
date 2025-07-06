@@ -3,11 +3,11 @@
 ## [0.11.0] - 2025-07-06
 
 ### Added
-- **New node "iobsendto"** - Adapter-to-adapter communication via sendTo commands
+- **New node "iobsendto"** - Send commands to ioBroker adapters via sendTo functionality
   - Support for fire-and-forget and response modes
   - Configurable timeout for response operations
   - Dynamic adapter, command, and message override via input messages
-  - Common adapter examples (telegram, email, sql, javascript)
+  - Adapters supporting sendTo commands (telegram, email, sql, javascript)
 
 ## [0.10.0] - 2025-07-06
 
