@@ -1,0 +1,187 @@
+[
+    {
+        "id": "sendto-example",
+        "type": "tab",
+        "label": "ioBroker SendTo Examples",
+        "disabled": false,
+        "info": "Examples demonstrating various sendTo operations with ioBroker adapters"
+    },
+    {
+        "id": "telegram-notification",
+        "type": "iobsendto",
+        "z": "sendto-example",
+        "name": "Telegram Notification",
+        "adapter": "telegram.0",
+        "command": "send",
+        "message": "",
+        "waitForResponse": false,
+        "responseTimeout": 10000,
+        "server": "iobroker-config",
+        "x": 300,
+        "y": 100,
+        "wires": []
+    },
+    {
+        "id": "email-alert",
+        "type": "iobsendto",
+        "z": "sendto-example",
+        "name": "Email Alert",
+        "adapter": "email",
+        "command": "",
+        "message": "",
+        "waitForResponse": false,
+        "responseTimeout": 10000,
+        "server": "iobroker-config",
+        "x": 300,
+        "y": 160,
+        "wires": []
+    },
+    {
+        "id": "sql-query",
+        "type": "iobsendto",
+        "z": "sendto-example",
+        "name": "SQL Query",
+        "adapter": "sql.0",
+        "command": "query",
+        "message": "",
+        "waitForResponse": true,
+        "responseTimeout": 15000,
+        "server": "iobroker-config",
+        "x": 300,
+        "y": 220,
+        "wires": [["query-result"]]
+    },
+    {
+        "id": "javascript-execution",
+        "type": "iobsendto",
+        "z": "sendto-example",
+        "name": "Execute Script",
+        "adapter": "javascript.0",
+        "command": "toScript",
+        "message": "",
+        "waitForResponse": true,
+        "responseTimeout": 10000,
+        "server": "iobroker-config",
+        "x": 300,
+        "y": 280,
+        "wires": [["script-result"]]
+    },
+    {
+        "id": "inject-telegram",
+        "type": "inject",
+        "z": "sendto-example",
+        "name": "Trigger Telegram",
+        "props": [
+            {
+                "p": "payload",
+                "v": "{\"text\":\"Motion detected in living room!\",\"user\":\"admin\"}",
+                "vt": "json"
+            }
+        ],
+        "repeat": "",
+        "crontab": "",
+        "once": false,
+        "onceDelay": 0.1,
+        "topic": "",
+        "x": 100,
+        "y": 100,
+        "wires": [["telegram-notification"]]
+    },
+    {
+        "id": "inject-email",
+        "type": "inject",
+        "z": "sendto-example",
+        "name": "Trigger Email",
+        "props": [
+            {
+                "p": "payload",
+                "v": "{\"to\":\"admin@home.com\",\"subject\":\"System Alert\",\"text\":\"Temperature critical: 85°C\"}",
+                "vt": "json"
+            }
+        ],
+        "repeat": "",
+        "crontab": "",
+        "once": false,
+        "onceDelay": 0.1,
+        "topic": "",
+        "x": 100,
+        "y": 160,
+        "wires": [["email-alert"]]
+    },
+    {
+        "id": "inject-sql",
+        "type": "inject",
+        "z": "sendto-example",
+        "name": "Trigger SQL",
+        "props": [
+            {
+                "p": "payload",
+                "v": "SELECT * FROM datapoints WHERE ts > NOW() - INTERVAL 1 HOUR",
+                "vt": "str"
+            }
+        ],
+        "repeat": "",
+        "crontab": "",
+        "once": false,
+        "onceDelay": 0.1,
+        "topic": "",
+        "x": 100,
+        "y": 220,
+        "wires": [["sql-query"]]
+    },
+    {
+        "id": "inject-script",
+        "type": "inject",
+        "z": "sendto-example",
+        "name": "Trigger Script",
+        "props": [
+            {
+                "p": "payload",
+                "v": "{\"script\":\"myScript\",\"message\":{\"action\":\"cleanup\",\"data\":[1,2,3]}}",
+                "vt": "json"
+            }
+        ],
+        "repeat": "",
+        "crontab": "",
+        "once": false,
+        "onceDelay": 0.1,
+        "topic": "",
+        "x": 100,
+        "y": 280,
+        "wires": [["javascript-execution"]]
+    },
+    {
+        "id": "query-result",
+        "type": "debug",
+        "z": "sendto-example",
+        "name": "SQL Results",
+        "active": true,
+        "tosidebar": true,
+        "console": false,
+        "tostatus": false,
+        "complete": "payload",
+        "targetType": "msg",
+        "statusVal": "",
+        "statusType": "auto",
+        "x": 500,
+        "y": 220,
+        "wires": []
+    },
+    {
+        "id": "script-result",
+        "type": "debug",
+        "z": "sendto-example",
+        "name": "Script Results",
+        "active": true,
+        "tosidebar": true,
+        "console": false,
+        "tostatus": false,
+        "complete": "payload",
+        "targetType": "msg",
+        "statusVal": "",
+        "statusType": "auto",
+        "x": 500,
+        "y": 280,
+        "wires": []
+    }
+]

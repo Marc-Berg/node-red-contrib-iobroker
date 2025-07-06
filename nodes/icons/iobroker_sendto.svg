@@ -1,0 +1,82 @@
+<?xml version="1.0" encoding="UTF-8" standalone="no"?>
+<svg
+   version="1.1"
+   id="Layer_2"
+   x="0px"
+   y="0px"
+   width="648.5px"
+   height="652.8px"
+   viewBox="0 0 648.5 652.8"
+   style="enable-background:new 0 0 648.5 652.8;"
+   xml:space="preserve"
+   xmlns="http://www.w3.org/2000/svg">
+<style
+   type="text/css"
+   id="style1">
+   .st0{fill:#164477;}
+   .st1{fill:#3399CC;}
+   .st2{fill:#ffffff;}
+   .st3{fill:#e67e00;stroke:#d06a00;stroke-width:4;}
+   .st4{fill:#ffffff;stroke:#d06a00;stroke-width:3;}
+</style>
+
+<!-- EXAKT IDENTISCH ZU IOBROKER BASIS: Komplettes Original Design -->
+<g id="g4">
+   <g id="g1">
+      <path
+   class="st0"
+   d="m 386,91 v 68.6 c 68.2,25.1 117,90.5 117,167 0,98.1 -80.2,177.9 -178.7,177.9 -98.5,0 -178.7,-79.8 -178.7,-177.9 0,-76.5 48.8,-141.9 117,-167 V 91 C 159.2,118.5 8.0147517,473.20662 8.0147517,586.20662 8.0147517,720.80662 191,570.2 324.2,570.2 c 133.2,0 315.30189,148.83991 315.30189,14.23991 C 639.50189,496.17387 489.2,118.5 386,91 Z"
+   id="path1" />
+   </g>
+   <path
+   class="st1"
+   d="M324.2,148.6c12.4,0,24.5,1.3,36.3,3.7V85.6c-11.8-1.8-23.9-2.7-36.3-2.7s-24.4,0.9-36.3,2.7v66.7   C299.7,149.9,311.8,148.6,324.2,148.6z"
+   id="path2" />
+   <g id="g3">
+      <path
+   class="st1"
+   d="M324.2,175.3c-12.5,0-24.6,1.5-36.2,4.4v291c11.6,2.9,23.8,4.4,36.2,4.4c12.5,0,24.6-1.5,36.3-4.4v-291    C348.9,176.9,336.7,175.3,324.2,175.3z"
+   id="path3" />
+   </g>
+</g>
+
+<!-- ZUSÄTZLICH: Orange SendTo-Symbol mit Pfeil -->
+<g transform="translate(520,520)">
+  <!-- Kommunikations-Hub (oranges Rechteck) -->
+  <rect x="-70" y="-40" width="140" height="80" rx="15" ry="15" class="st3"/>
+  
+  <!-- SendTo Text im Hub -->
+  <text x="0" y="-10" text-anchor="middle" fill="white" font-family="Arial, sans-serif" font-size="24" font-weight="bold">send</text>
+  <text x="0" y="15" text-anchor="middle" fill="white" font-family="Arial, sans-serif" font-size="24" font-weight="bold">To</text>
+  
+  <!-- Ausgehender Pfeil (von Hub weg) -->
+  <g transform="translate(70,0)">
+    <!-- Pfeil-Linie -->
+    <line x1="0" y1="0" x2="50" y2="0" stroke="#e67e00" stroke-width="8" stroke-linecap="round"/>
+    <!-- Pfeilspitze -->
+    <polygon points="50,-15 50,15 75,0" fill="#e67e00"/>
+  </g>
+  
+  <!-- Ziel-Adapter (kleines weißes Rechteck) -->
+  <g transform="translate(80,0)">
+    <rect x="0" y="-25" width="50" height="50" rx="8" ry="8" class="st4"/>
+    <!-- Adapter Symbol (kleines Zahnrad) -->
+    <circle cx="25" cy="0" r="15" fill="#e67e00"/>
+    <circle cx="25" cy="0" r="8" fill="white"/>
+    <!-- Kleine Zähne -->
+    <rect x="23" y="-20" width="4" height="8" fill="#e67e00"/>
+    <rect x="23" y="12" width="4" height="8" fill="#e67e00"/>
+    <rect x="12" y="-2" width="8" height="4" fill="#e67e00"/>
+    <rect x="30" y="-2" width="8" height="4" fill="#e67e00"/>
+  </g>
+  
+  <!-- Antwort-Pfeil (gestrichelt, zurück zum Hub) -->
+  <g transform="translate(75,-60)">
+    <line x1="0" y1="0" x2="-50" y2="0" stroke="#3399CC" stroke-width="4" stroke-dasharray="8,4" stroke-linecap="round"/>
+    <polygon points="-50,-8 -50,8 -65,0" fill="#3399CC"/>
+    <!-- Response Label -->
+    <text x="-25" y="-15" text-anchor="middle" fill="#3399CC" font-family="Arial, sans-serif" font-size="12" font-weight="bold">response</text>
+  </g>
+</g>
+
+</svg>

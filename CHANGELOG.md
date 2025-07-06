@@ -1,5 +1,14 @@
 # Changelog
 
+## [0.11.0] - 2025-07-06
+
+### Added
+- **New node "iobsendto"** - Adapter-to-adapter communication via sendTo commands
+  - Support for fire-and-forget and response modes
+  - Configurable timeout for response operations
+  - Dynamic adapter, command, and message override via input messages
+  - Common adapter examples (telegram, email, sql, javascript)
+
 ## [0.10.0] - 2025-07-06
 
 ### Added

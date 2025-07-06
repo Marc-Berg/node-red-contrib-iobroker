@@ -54,6 +54,7 @@
       "iobgetobject": "nodes/iob-getobject.js",
       "iobhistory": "nodes/iob-history.js",
       "ioblog": "nodes/iob-log.js",
+      "iobsendto": "nodes/iob-sendto.js",
       "iob-config": "nodes/iob-config.js"
     },
     "examples": [
@@ -63,7 +64,8 @@
       "examples/iob-in.json",
       "examples/iob-inobject.json",
       "examples/iob-log.json",
-      "examples/iob-out.json"
+      "examples/iob-out.json",
+      "examples/iob-sendto.json"
     ]
   }
 }
