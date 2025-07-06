@@ -9,7 +9,7 @@ function setupStaticResources(RED) {
     if (staticResourcesSetup) return true;
 
     try {
-        const sharedPath = path.join(__dirname, 'shared');
+        const sharedPath = path.join(__dirname, '..', 'shared');
 
         if (!fs.existsSync(sharedPath)) {
             console.warn('[ioBroker] Shared directory not found:', sharedPath);
