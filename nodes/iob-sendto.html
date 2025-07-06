@@ -66,21 +66,191 @@ RED.nodes.registerType('iobsendto', {
         $('#response-info').toggle(waitForResponseChecked);
         $('#no-response-info').toggle(!waitForResponseChecked);
         
-        $('#add-common-example').on('click', function() {
-            const examples = [
-                { adapter: 'telegram.0', command: 'send', desc: 'Telegram notification' },
-                { adapter: 'email', command: '', desc: 'Email notification' },
-                { adapter: 'sql.0', command: 'query', desc: 'SQL database query' },
-                { adapter: 'javascript.0', command: 'toScript', desc: 'Execute JavaScript' },
-                { adapter: 'spotify-premium.0', command: 'play', desc: 'Spotify control' },
-                { adapter: 'pushover.0', command: '', desc: 'Pushover notification' }
-            ];
+        // Initialize adapter suggestions - reused from history node
+        initializeAdapterSuggestions();
+        
+        function initializeAdapterSuggestions() {
+            showDefaultAdapterSuggestions();
+            setTimeout(() => {
+                loadAvailableAdapters();
+            }, 1000);
+        }
+        
+        function showDefaultAdapterSuggestions() {
+            $('.adapter-list').html('<span style="color: #6c757d; font-style: italic;">Loading available adapters...</span>');
+            $('.adapter-suggestions').show();
+        }
+        
+        function loadAvailableAdapters() {
+            const serverNode = RED.nodes.node(serverInput.val());
+            if (!serverNode) {
+                console.log('No server node selected for adapter discovery');
+                return;
+            }
             
-            const randomExample = examples[Math.floor(Math.random() * examples.length)];
-            $('#node-input-adapter').val(randomExample.adapter);
-            $('#node-input-command').val(randomExample.command);
+            const serverId = `${serverNode.iobhost}:${serverNode.iobport}`;
+            console.log('Loading adapters from:', serverId);
             
-            RED.notify(`Example: ${randomExample.desc}`, { type: "info", timeout: 2000 });
+            // Use states API to get all adapter information
+            $.ajax({
+                url: `/iobroker/ws/states/${encodeURIComponent(serverId)}`,
+                method: 'GET',
+                timeout: 15000,
+                dataType: 'json',
+                cache: false
+            }).done(function(response) {
+                console.log('Adapter states response:', response);
+                
+                if (response && typeof response === 'object') {
+                    const adapters = extractAdaptersFromStates(response);
+                    
+                    if (adapters.length > 0) {
+                        // Create buttons with status indicators
+                        const adapterButtons = adapters.map(adapter => {
+                            const statusClass = adapter.alive ? 'alive' : (adapter.enabled ? 'enabled' : 'disabled');
+                            const statusIcon = adapter.alive ? '🟢' : (adapter.enabled ? '🟡' : '🔴');
+                            const title = `${adapter.name} - ${adapter.alive ? 'Running' : adapter.enabled ? 'Enabled but not running' : 'Disabled'}`;
+                            
+                            return `<a href="#" data-adapter="${adapter.name}" class="${statusClass}" title="${title}">${statusIcon} ${adapter.name}</a>`;
+                        }).join('');
+                        
+                        // Add common adapters that might not be installed yet
+                        const commonAdapters = ['telegram.0', 'email', 'pushover.0', 'javascript.0', 'sql.0', 'influxdb.0', 'spotify-premium.0'];
+                        const fallbacks = commonAdapters.filter(name => 
+                            !adapters.find(a => a.name === name)
+                        ).map(name => 
+                            `<a href="#" data-adapter="${name}" class="fallback" title="Common adapter (not verified)">${name}</a>`
+                        ).join('');
+                        
+                        $('.adapter-list').html(adapterButtons + fallbacks);
+                        
+                        // Re-add click handlers
+                        $('.adapter-list a').on('click', function(e) {
+                            e.preventDefault();
+                            const adapter = $(this).data('adapter');
+                            $('#node-input-adapter').val(adapter);
+                            $(this).addClass('selected').siblings().removeClass('selected');
+                            return false;
+                        });
+                        
+                        // Highlight current selection
+                        const currentAdapter = $('#node-input-adapter').val();
+                        $(`.adapter-list a[data-adapter="${currentAdapter}"]`).addClass('selected');
+                        
+                        $('.adapter-suggestions').show();
+                        
+                        console.log(`Found ${adapters.length} adapters on ${serverId}`);
+                    } else {
+                        showFallbackAdapters();
+                    }
+                } else {
+                    showFallbackAdapters();
+                }
+            }).fail(function(xhr, status, error) {
+                console.error('Failed to load adapters:', status, error);
+                showFallbackAdapters();
+            });
+        }
+        
+        function extractAdaptersFromStates(states) {
+            const adapterConfigs = new Map();
+            
+            // Extract adapter information from states
+            Object.keys(states).forEach(stateId => {
+                // Look for alive states of adapters
+                const aliveMatch = stateId.match(/^system\.adapter\.([^.]+)\.(\d+)\.alive$/);
+                if (aliveMatch) {
+                    const adapterType = aliveMatch[1];
+                    const instance = parseInt(aliveMatch[2]);
+                    const adapterName = `${adapterType}.${instance}`;
+                    
+                    const state = states[stateId];
+                    const isAlive = state && typeof state.val === 'boolean' ? state.val : Boolean(state?.val);
+                    
+                    if (!adapterConfigs.has(adapterName)) {
+                        adapterConfigs.set(adapterName, {
+                            name: adapterName,
+                            type: adapterType,
+                            instance: instance,
+                            enabled: false,
+                            alive: isAlive
+                        });
+                    } else {
+                        adapterConfigs.get(adapterName).alive = isAlive;
+                    }
+                }
+                
+                // Look for enabled states of adapters
+                const enabledMatch = stateId.match(/^system\.adapter\.([^.]+)\.(\d+)\.enabled$/);
+                if (enabledMatch) {
+                    const adapterType = enabledMatch[1];
+                    const instance = parseInt(enabledMatch[2]);
+                    const adapterName = `${adapterType}.${instance}`;
+                    
+                    const state = states[stateId];
+                    const isEnabled = state && typeof state.val === 'boolean' ? state.val : Boolean(state?.val);
+                    
+                    if (!adapterConfigs.has(adapterName)) {
+                        adapterConfigs.set(adapterName, {
+                            name: adapterName,
+                            type: adapterType,
+                            instance: instance,
+                            enabled: isEnabled,
+                            alive: false
+                        });
+                    } else {
+                        adapterConfigs.get(adapterName).enabled = isEnabled;
+                    }
+                }
+            });
+
+            // Convert map to array and filter relevant adapters
+            const adapters = [];
+            for (const config of adapterConfigs.values()) {
+                // Exclude admin and system adapters from sendTo suggestions
+                if (!['admin', 'discovery', 'backitup', 'objects', 'states', 'web'].includes(config.type)) {
+                    adapters.push(config);
+                }
+            }
+
+            // Sort by type and instance
+            adapters.sort((a, b) => {
+                if (a.type !== b.type) return a.type.localeCompare(b.type);
+                return a.instance - b.instance;
+            });
+
+            return adapters;
+        }
+        
+        function showFallbackAdapters() {
+            console.log('No adapters found or error occurred, showing fallback options');
+            
+            const fallbackAdapters = ['telegram.0', 'email', 'pushover.0', 'javascript.0', 'sql.0', 'influxdb.0', 'spotify-premium.0', 'sonos.0', 'kodi.0'];
+            $('.adapter-list').html(
+                '<span style="color: #dc3545; margin-right: 10px;">⚠️ Could not load from server</span>' +
+                fallbackAdapters.map(adapter => 
+                    `<a href="#" data-adapter="${adapter}" class="fallback" title="Common adapter (not verified)">${adapter}</a>`
+                ).join('')
+            );
+            
+            // Add click handlers for fallback
+            $('.adapter-list a').on('click', function(e) {
+                e.preventDefault();
+                const adapter = $(this).data('adapter');
+                $('#node-input-adapter').val(adapter);
+                $(this).addClass('selected').siblings().removeClass('selected');
+                return false;
+            });
+        }
+        
+        // Reload adapters when server changes
+        serverInput.on('change', function() {
+            console.log('Server changed, reloading adapters...');
+            $('.adapter-suggestions').hide();
+            setTimeout(() => {
+                showDefaultAdapterSuggestions();
+                setTimeout(loadAvailableAdapters, 500);
+            }, 100);
         });
     },
     
@@ -98,9 +268,65 @@ RED.nodes.registerType('iobsendto', {
     <div class="form-row">
         <label for="node-input-adapter"><i class="icon-tag"></i> Target Adapter</label>
         <input type="text" id="node-input-adapter" placeholder="e.g. telegram.0, email, sql.0 (if empty, msg.adapter is used)">
-        <button type="button" id="add-common-example" class="editor-button editor-button-small" style="margin-top: 5px;">
-            <i class="fa fa-lightbulb-o"></i> Add common example
-        </button>
+        <div class="adapter-suggestions" style="margin-top: 5px; display: none;">
+            <span style="font-size: 12px; color: #666;">Available adapters: </span>
+            <span class="adapter-list" style="font-size: 12px;"></span>
+        </div>
+        <style>
+            .adapter-suggestions {
+                margin-top: 8px;
+                padding: 8px;
+                background-color: #f8f9fa;
+                border: 1px solid #dee2e6;
+                border-radius: 4px;
+                font-size: 12px;
+            }
+            .adapter-suggestions a {
+                display: inline-block;
+                margin: 2px 8px 2px 0;
+                padding: 4px 8px;
+                background-color: #e9ecef;
+                border: 1px solid #ced4da;
+                border-radius: 3px;
+                text-decoration: none;
+                color: #495057;
+                font-size: 11px;
+                cursor: pointer;
+                transition: all 0.2s ease;
+            }
+            .adapter-suggestions a:hover {
+                background-color: #007bff;
+                border-color: #007bff;
+                color: white;
+            }
+            .adapter-suggestions a.selected {
+                background-color: #28a745;
+                border-color: #28a745;
+                color: white;
+            }
+            .adapter-suggestions a.alive {
+                background-color: #d4edda;
+                border-color: #c3e6cb;
+                color: #155724;
+            }
+            .adapter-suggestions a.enabled {
+                background-color: #fff3cd;
+                border-color: #ffeaa7;
+                color: #856404;
+            }
+            .adapter-suggestions a.disabled {
+                background-color: #f8d7da;
+                border-color: #f5c6cb;
+                color: #721c24;
+                opacity: 0.7;
+            }
+            .adapter-suggestions a.fallback {
+                background-color: #f8f9fa;
+                border-color: #dee2e6;
+                color: #6c757d;
+                border-style: dashed;
+            }
+        </style>
     </div>
     
     <div class="form-row">
