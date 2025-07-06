@@ -96,22 +96,12 @@ RED.nodes.registerType('iobgetobject', {
         $('#node-input-objectType').on('change', function() {
             const objectType = $(this).val();
             
-            if (objectType) {
-                $('#type-filter-info').show();
-            } else {
-                $('#type-filter-info').hide();
-            }
-            
             if (objectType === 'enum') {
-                $('#enum-helper').show();
-                
                 const currentPattern = $('#node-input-objectId').val().trim();
                 if (!currentPattern || !currentPattern.startsWith('enum.')) {
                     $('#node-input-objectId').val('enum.*');
                     $('input[name="enumQuickSelect"][value="enum.*"]').prop('checked', true);
                 }
-            } else {
-                $('#enum-helper').hide();
             }
         });
         
@@ -148,12 +138,7 @@ RED.nodes.registerType('iobgetobject', {
         $('#node-input-includeEnums').on('change', function() {
             const isChecked = $(this).prop('checked');
             $('#enum-options').toggle(isChecked);
-            
-            if (isChecked) {
-                $('#enum-assignment-info').show();
-            } else {
-                $('#enum-assignment-info').hide();
-            }
+            $('#enum-assignment-info').toggle(isChecked);
             
             validatePatternCompatibility();
         });
@@ -193,15 +178,7 @@ RED.nodes.registerType('iobgetobject', {
                 warningType = 'info';
             }
             
-            if (includeEnums && isPattern) {
-                if (warningMessage) warningMessage += '<br><br>';
-                warningMessage += '<strong>Enum Assignment:</strong> Enum assignments will be resolved for each matching object. This may take longer for large result sets.';
-                warningType = warningType || 'info';
-            } else if (includeEnums && !isPattern) {
-                if (warningMessage) warningMessage += '<br><br>';
-                warningMessage += '<strong>Enum Assignment:</strong> The object will be enriched with its enum assignments (rooms, functions, etc.).';
-                warningType = warningType || 'info';
-            }
+
             
             if (warningMessage) {
                 const warningClass = warningType === 'warning' ? 'warning' : 'info';
@@ -220,19 +197,14 @@ RED.nodes.registerType('iobgetobject', {
         $(`.output-mode-info.${currentOutputMode}`).show();
         
         const currentObjectType = $('#node-input-objectType').val();
-        if (currentObjectType) {
-            $('#type-filter-info').show();
-            if (currentObjectType === 'enum') {
-                $('#enum-helper').show();
-                
-                const currentPattern = $('#node-input-objectId').val().trim();
-                if (currentPattern) {
-                    const matchingRadio = $(`input[name="enumQuickSelect"][value="${currentPattern}"]`);
-                    if (matchingRadio.length) {
-                        matchingRadio.prop('checked', true);
-                    } else {
-                        $('input[name="enumQuickSelect"][value="custom"]').prop('checked', true);
-                    }
+        if (currentObjectType === 'enum') {
+            const currentPattern = $('#node-input-objectId').val().trim();
+            if (currentPattern) {
+                const matchingRadio = $(`input[name="enumQuickSelect"][value="${currentPattern}"]`);
+                if (matchingRadio.length) {
+                    matchingRadio.prop('checked', true);
+                } else {
+                    $('input[name="enumQuickSelect"][value="custom"]').prop('checked', true);
                 }
             }
         }
@@ -371,18 +343,6 @@ RED.nodes.registerType('iobgetobject', {
         </label>
     </div>
     
-    <div id="enum-options" style="display: none;">
-        <div class="form-row">
-            <label for="node-input-enumTypes"><i class="icon-tag"></i> Enum Types</label>
-            <select id="node-input-enumTypes" style="width:100%">
-                <option value="all">All Types (rooms, functions, custom)</option>
-                <option value="rooms">Rooms only</option>
-                <option value="functions">Functions only</option>
-                <option value="rooms,functions">Rooms and Functions</option>
-            </select>
-        </div>
-    </div>
-    
     <div id="enum-assignment-info" style="display: none; margin-top: 5px; padding: 8px; background-color: #e8f4fd; border: 1px solid #bee5eb; border-radius: 4px; font-size: 12px; color: #0c5460;">
         <i class="fa fa-info-circle"></i> <strong>Enum Assignment:</strong><br>
         Each returned object will include an <code>enumAssignments</code> property containing:
@@ -396,40 +356,18 @@ RED.nodes.registerType('iobgetobject', {
         <strong>Note:</strong> This feature requires additional queries and may increase response time.
     </div>
     
-    <div class="output-mode-info single" style="display: none; margin-top: 5px; padding: 8px; background-color: #e8f4fd; border: 1px solid #bee5eb; border-radius: 4px; font-size: 12px; color: #0c5460;">
-        <i class="fa fa-info-circle"></i> <strong>Single Object Mode:</strong> Returns the object directly in the output property. Best for single object IDs. Wildcard patterns will return only the first match.
-    </div>
-    
-    <div class="output-mode-info array" style="display: none; margin-top: 5px; padding: 8px; background-color: #e8f4fd; border: 1px solid #bee5eb; border-radius: 4px; font-size: 12px; color: #0c5460;">
-        <i class="fa fa-info-circle"></i> <strong>Array Mode:</strong> Returns an array of objects. Ideal for wildcard patterns that match multiple objects.
-    </div>
-    
-    <div class="output-mode-info object" style="display: none; margin-top: 5px; padding: 8px; background-color: #e8f4fd; border: 1px solid #bee5eb; border-radius: 4px; font-size: 12px; color: #0c5460;">
-        <i class="fa fa-info-circle"></i> <strong>Object Map Mode:</strong> Returns an object where keys are object IDs and values are the object definitions. Useful for processing multiple objects while preserving their IDs.
-    </div>
-    
-    <div id="type-filter-info" style="display: none; margin-top: 5px; padding: 8px; background-color: #f8f9fa; border: 1px solid #dee2e6; border-radius: 4px; font-size: 12px; color: #495057;">
-        <i class="fa fa-filter"></i> <strong>Type Filter:</strong> Only objects of the selected type will be returned. Leave empty to include all object types.
-    </div>
-    
-    <div id="enum-helper" style="display: none; margin-top: 5px; padding: 8px; background-color: #e8f4fd; border: 1px solid #bee5eb; border-radius: 4px; font-size: 12px; color: #0c5460;">
-        <i class="fa fa-info-circle"></i> <strong>Enum Helper:</strong><br>
-        <div style="margin-top: 5px;">
-            <label style="font-weight: normal; display: block; margin-bottom: 3px;">
-                <input type="radio" name="enumQuickSelect" value="enum.*" style="margin-right: 5px;"> All Enums
-            </label>
-            <label style="font-weight: normal; display: block; margin-bottom: 3px;">
-                <input type="radio" name="enumQuickSelect" value="enum.rooms.*" style="margin-right: 5px;"> Rooms (enum.rooms.*)
-            </label>
-            <label style="font-weight: normal; display: block; margin-bottom: 3px;">
-                <input type="radio" name="enumQuickSelect" value="enum.functions.*" style="margin-right: 5px;"> Functions (enum.functions.*)
-            </label>
-            <label style="font-weight: normal; display: block;">
-                <input type="radio" name="enumQuickSelect" value="custom" style="margin-right: 5px;"> Custom Pattern
-            </label>
+    <div id="enum-options" style="display: none;">
+        <div class="form-row">
+            <label for="node-input-enumTypes"><i class="icon-tag"></i> Enum Types</label>
+            <select id="node-input-enumTypes" style="width:100%">
+                <option value="all">All Types (rooms, functions, custom)</option>
+                <option value="rooms">Rooms only</option>
+                <option value="functions">Functions only</option>
+                <option value="rooms,functions">Rooms and Functions</option>
+            </select>
         </div>
     </div>
-    
+     
     <div class="form-row">
         <label for="node-input-server"><i class="icon-tag"></i> Server</label>
         <input type="text" id="node-input-server">
@@ -553,7 +491,7 @@ RED.nodes.registerType('iobgetobject', {
     <ul>
         <li>Single object retrieval is very fast</li>
         <li>Wildcard patterns may take longer depending on scope</li>
-        <li>Enum assignments add minimal overhead (cached for 5 minutes)</li>
+        <li>Enum assignments add minimal overhead</li>
         <li>Avoid overly broad patterns like <code>*</code> for performance</li>
         <li>Use specific patterns when possible (e.g., <code>system.adapter.*</code> instead of <code>*</code>)</li>
         <li>Type filtering can improve performance by reducing result sets</li>
