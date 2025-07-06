@@ -378,22 +378,24 @@ module.exports = function (RED) {
                 node.expectedInitialValues = stateList.length;
                 node.initialValueCount = 0;
 
-                for (const stateId of stateList) {
-                    try {
-                        await connectionManager.subscribe(
-                            settings.nodeId,
-                            settings.serverId,
-                            stateId,
-                            callback,
-                            globalConfig
-                        );
+                try {
+                    const successfulStates = await connectionManager.subscribeMultiple(
+                        settings.nodeId,
+                        settings.serverId,
+                        stateList,
+                        callback,
+                        globalConfig
+                    );
+                    
+                    successfulStates.forEach(stateId => {
                         node.subscribedStates.add(stateId);
-                    } catch (error) {
-                        node.error(`Failed to subscribe to state ${stateId}: ${error.message}`);
-                        node.expectedInitialValues--;
-                    }
+                    });
+                    
+                    node.log(`Successfully subscribed to ${node.subscribedStates.size} states in ${settings.outputMode} mode`);
+                } catch (error) {
+                    node.error(`Failed to subscribe to multiple states: ${error.message}`);
+                    throw error;
                 }
-                node.log(`Successfully subscribed to ${node.subscribedStates.size} states in ${settings.outputMode} mode`);
             } else {
                 await connectionManager.subscribe(
                     settings.nodeId,
@@ -481,18 +483,12 @@ module.exports = function (RED) {
 
             try {
                 if (isMultipleStates) {
-                    for (const stateId of stateList) {
-                        try {
-                            await connectionManager.unsubscribe(
-                                settings.nodeId,
-                                settings.serverId,
-                                stateId
-                            );
-                        } catch (error) {
-                            node.warn(`Cleanup error for state ${stateId}: ${error.message}`);
-                        }
-                    }
-                    node.log(`Successfully unsubscribed from ${stateList.length} states`);
+                    await connectionManager.unsubscribeMultiple(
+                        settings.nodeId,
+                        settings.serverId,
+                        Array.from(node.subscribedStates)
+                    );
+                    node.log(`Successfully unsubscribed from ${node.subscribedStates.size} states`);
                 } else {
                     await connectionManager.unsubscribe(
                         settings.nodeId,

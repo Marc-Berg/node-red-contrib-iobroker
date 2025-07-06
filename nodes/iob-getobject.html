@@ -34,11 +34,21 @@ RED.nodes.registerType('iobgetobject', {
     color: '#a6bbcf',
     defaults: {
         name: { value: "" },
-        objectId: { value: "" },
+        objectId: { 
+            value: "",
+            validate: function(v) {
+                if (this.inputMode === 'single') {
+                    return v && v.trim().length > 0;
+                }
+                return true;
+            }
+        },
         outputProperty: { value: "payload" },
         outputMode: { value: "single" },
         objectType: { value: "" },
         useWildcard: { value: false },
+        includeEnums: { value: false },
+        enumTypes: { value: "all" },
         server: { value: "", type: "iob-config" }
     },
     inputs: 1,
@@ -48,17 +58,20 @@ RED.nodes.registerType('iobgetobject', {
     label: function() {
         if (this.name) return this.name;
         
+        let label = this.objectId || "iob-getobject";
         if (this.objectId && this.objectId.includes('*')) {
-            return `${this.objectId} (pattern)`;
+            label = `${this.objectId} (pattern)`;
         }
-        
-        return this.objectId || "iob-getobject";
+        if (this.includeEnums) {
+            label += " +enums";
+        }
+        return label;
     },
     
     oneditprepare: function() {
+        const node = this;
         const serverInput = $('#node-input-server');
         
-        // Auto-select server configuration
         if (!this.server || this.server === '') {
             const configNodes = [];
             RED.nodes.eachConfig(function(config) {
@@ -80,28 +93,78 @@ RED.nodes.registerType('iobgetobject', {
             }
         }
         
-        // Output mode change handler
+        $('#node-input-objectType').on('change', function() {
+            const objectType = $(this).val();
+            
+            if (objectType === 'enum') {
+                const currentPattern = $('#node-input-objectId').val().trim();
+                if (!currentPattern || !currentPattern.startsWith('enum.')) {
+                    $('#node-input-objectId').val('enum.*');
+                    $('input[name="enumQuickSelect"][value="enum.*"]').prop('checked', true);
+                }
+            }
+        });
+        
+        $('input[name="enumQuickSelect"]').on('change', function() {
+            const selectedValue = $(this).val();
+            if (selectedValue !== 'custom') {
+                $('#node-input-objectId').val(selectedValue);
+            } else {
+                $('#node-input-objectId').focus();
+            }
+        });
+        
+        $('#node-input-objectId').on('input', function() {
+            const pattern = $(this).val().trim();
+            
+            if ($('#node-input-objectType').val() === 'enum') {
+                const enumRadios = $('input[name="enumQuickSelect"]');
+                let matched = false;
+                
+                enumRadios.each(function() {
+                    if ($(this).val() === pattern) {
+                        $(this).prop('checked', true);
+                        matched = true;
+                        return false;
+                    }
+                });
+                
+                if (!matched) {
+                    $('input[name="enumQuickSelect"][value="custom"]').prop('checked', true);
+                }
+            }
+        });
+        
+        $('#node-input-includeEnums').on('change', function() {
+            const isChecked = $(this).prop('checked');
+            $('#enum-options').toggle(isChecked);
+            $('#enum-assignment-info').toggle(isChecked);
+            
+            validatePatternCompatibility();
+        });
+        
+        const includeEnumsChecked = $('#node-input-includeEnums').prop('checked');
+        $('#enum-options').toggle(includeEnumsChecked);
+        $('#enum-assignment-info').toggle(includeEnumsChecked);
+        
         $('#node-input-outputMode').on('change', function() {
             const outputMode = $(this).val();
             $('.output-mode-info').hide();
             $(`.output-mode-info.${outputMode}`).show();
             
-            // Validate pattern compatibility with output mode
             validatePatternCompatibility();
         });
         
-        // Object ID input change handler for pattern validation
         $('#node-input-objectId').on('input keyup change', function() {
             validatePatternCompatibility();
         });
         
-        // Validation function for pattern and output mode compatibility
         function validatePatternCompatibility() {
             const objectId = $('#node-input-objectId').val().trim();
             const outputMode = $('#node-input-outputMode').val();
+            const includeEnums = $('#node-input-includeEnums').prop('checked');
             const isPattern = objectId.includes('*');
             
-            // Remove existing validation messages
             $('#pattern-validation-warning').remove();
             
             let warningMessage = '';
@@ -115,6 +178,8 @@ RED.nodes.registerType('iobgetobject', {
                 warningType = 'info';
             }
             
+
+            
             if (warningMessage) {
                 const warningClass = warningType === 'warning' ? 'warning' : 'info';
                 const iconClass = warningType === 'warning' ? 'fa-exclamation-triangle' : 'fa-info-circle';
@@ -127,28 +192,23 @@ RED.nodes.registerType('iobgetobject', {
             }
         }
         
-        // Initialize output mode visibility
         const currentOutputMode = $('#node-input-outputMode').val() || 'single';
         $('.output-mode-info').hide();
         $(`.output-mode-info.${currentOutputMode}`).show();
         
-        // Object type change handler
-        $('#node-input-objectType').on('change', function() {
-            const objectType = $(this).val();
-            if (objectType) {
-                $('#type-filter-info').show();
-            } else {
-                $('#type-filter-info').hide();
-            }
-        });
-        
-        // Initialize type filter info visibility
         const currentObjectType = $('#node-input-objectType').val();
-        if (currentObjectType) {
-            $('#type-filter-info').show();
+        if (currentObjectType === 'enum') {
+            const currentPattern = $('#node-input-objectId').val().trim();
+            if (currentPattern) {
+                const matchingRadio = $(`input[name="enumQuickSelect"][value="${currentPattern}"]`);
+                if (matchingRadio.length) {
+                    matchingRadio.prop('checked', true);
+                } else {
+                    $('input[name="enumQuickSelect"][value="custom"]').prop('checked', true);
+                }
+            }
         }
         
-        // Load and initialize TreeView component for objects with wildcard detection
         loadSharedTreeView().then(() => {
             this.treeController = window.ioBrokerSharedTreeView.setup({
                 nodeType: 'iobgetobject',
@@ -156,14 +216,13 @@ RED.nodes.registerType('iobgetobject', {
                 serverInputId: 'node-input-server',
                 searchPlaceholder: 'Search objects (supports wildcards)...',
                 itemType: 'objects',
-                dataEndpoint: '/iobroker/ws/states', // Same endpoint, different context
+                dataEndpoint: '/iobroker/ws/states',
                 enableWildcardDetection: true,
-                wildcardInputId: null // No special wildcard input for this node
+                wildcardInputId: null
             });
         }).catch(error => {
             console.error('Failed to load TreeView component:', error);
             
-            // Show fallback message and implement basic wildcard detection
             const fallbackMessage = $(`
                 <div style="margin-top: 5px; padding: 8px; background-color: #fff3cd; border: 1px solid #ffeaa7; border-radius: 4px; font-size: 12px; color: #856404;">
                     <i class="fa fa-exclamation-triangle"></i> TreeView component not available. Manual input with wildcard detection.
@@ -171,13 +230,11 @@ RED.nodes.registerType('iobgetobject', {
             `);
             $('#node-input-objectId').after(fallbackMessage);
             
-            // Fallback wildcard detection
             $('#node-input-objectId').on('input keyup change', function() {
                 const pattern = $(this).val();
                 const hasWildcardChars = pattern.includes('*');
                 
                 if (hasWildcardChars) {
-                    // Show wildcard info
                     let wildcardWarning = $('#basic-wildcard-warning-getobj');
                     if (wildcardWarning.length === 0) {
                         wildcardWarning = $(`
@@ -193,20 +250,20 @@ RED.nodes.registerType('iobgetobject', {
                 }
             });
         });
+        
+        setTimeout(() => {
+            validatePatternCompatibility();
+        }, 100);
     },
 
     oneditsave: function() {
-        // Auto-detect and save wildcard mode based on pattern
         const objectIdValue = $('#node-input-objectId').val();
         const hasWildcardChars = objectIdValue.includes('*');
         
-        // Automatically set useWildcard based on pattern detection
         this.useWildcard = hasWildcardChars;
         
-        // Auto-adjust output mode for wildcards
         const currentOutputMode = $('#node-input-outputMode').val();
         if (hasWildcardChars && currentOutputMode === 'single') {
-            // Warn user about potential issue but don't force change
             if (typeof RED !== 'undefined' && RED.notify) {
                 RED.notify('Warning: Wildcard pattern with Single Object mode will return only the first match', { 
                     type: "warning", 
@@ -215,18 +272,24 @@ RED.nodes.registerType('iobgetobject', {
             }
         }
         
-        // Validate and save object type filter
         const objectType = $('#node-input-objectType').val();
         this.objectType = objectType;
+        
+        const includeEnums = $('#node-input-includeEnums').prop('checked');
+        this.includeEnums = includeEnums;
+        
+        const enumTypes = $('#node-input-enumTypes').val();
+        this.enumTypes = enumTypes;
         
         console.log('Saved configuration:', {
             objectId: objectIdValue,
             useWildcard: this.useWildcard,
             outputMode: currentOutputMode,
-            objectType: this.objectType
+            objectType: this.objectType,
+            includeEnums: this.includeEnums,
+            enumTypes: this.enumTypes
         });
         
-        // Cleanup tree controller
         if (this.treeController) {
             this.treeController.cleanup();
         }
@@ -269,27 +332,42 @@ RED.nodes.registerType('iobgetobject', {
             <option value="group">Group</option>
             <option value="user">User</option>
             <option value="config">Config</option>
+            <option value="enum">Enum</option>
         </select>
     </div>
     
-    <!-- Output Mode Information -->
-    <div class="output-mode-info single" style="display: none; margin-top: 5px; padding: 8px; background-color: #e8f4fd; border: 1px solid #bee5eb; border-radius: 4px; font-size: 12px; color: #0c5460;">
-        <i class="fa fa-info-circle"></i> <strong>Single Object Mode:</strong> Returns the object directly in the output property. Best for single object IDs. Wildcard patterns will return only the first match.
+    <div class="form-row">
+        <label for="node-input-includeEnums" style="width: auto;">
+            <input type="checkbox" id="node-input-includeEnums" style="width: auto; margin-right: 5px;">
+            <i class="icon-tag"></i> Include assigned Enums
+        </label>
     </div>
     
-    <div class="output-mode-info array" style="display: none; margin-top: 5px; padding: 8px; background-color: #e8f4fd; border: 1px solid #bee5eb; border-radius: 4px; font-size: 12px; color: #0c5460;">
-        <i class="fa fa-info-circle"></i> <strong>Array Mode:</strong> Returns an array of objects. Ideal for wildcard patterns that match multiple objects.
+    <div id="enum-assignment-info" style="display: none; margin-top: 5px; padding: 8px; background-color: #e8f4fd; border: 1px solid #bee5eb; border-radius: 4px; font-size: 12px; color: #0c5460;">
+        <i class="fa fa-info-circle"></i> <strong>Enum Assignment:</strong><br>
+        Each returned object will include an <code>enumAssignments</code> property containing:
+        <ul style="margin: 5px 0 0 20px; padding: 0;">
+            <li><code>rooms</code> - Array of assigned room enums</li>
+            <li><code>functions</code> - Array of assigned function enums</li>
+            <li><code>other</code> - Array of other enum assignments</li>
+            <li><code>totalEnums</code> - Total number of enum assignments</li>
+            <li><code>roomName</code>, <code>functionName</code> - Convenience properties</li>
+        </ul>
+        <strong>Note:</strong> This feature requires additional queries and may increase response time.
     </div>
     
-    <div class="output-mode-info object" style="display: none; margin-top: 5px; padding: 8px; background-color: #e8f4fd; border: 1px solid #bee5eb; border-radius: 4px; font-size: 12px; color: #0c5460;">
-        <i class="fa fa-info-circle"></i> <strong>Object Map Mode:</strong> Returns an object where keys are object IDs and values are the object definitions. Useful for processing multiple objects while preserving their IDs.
+    <div id="enum-options" style="display: none;">
+        <div class="form-row">
+            <label for="node-input-enumTypes"><i class="icon-tag"></i> Enum Types</label>
+            <select id="node-input-enumTypes" style="width:100%">
+                <option value="all">All Types (rooms, functions, custom)</option>
+                <option value="rooms">Rooms only</option>
+                <option value="functions">Functions only</option>
+                <option value="rooms,functions">Rooms and Functions</option>
+            </select>
+        </div>
     </div>
-    
-    <!-- Type Filter Information -->
-    <div id="type-filter-info" style="display: none; margin-top: 5px; padding: 8px; background-color: #f8f9fa; border: 1px solid #dee2e6; border-radius: 4px; font-size: 12px; color: #495057;">
-        <i class="fa fa-filter"></i> <strong>Type Filter:</strong> Only objects of the selected type will be returned. Leave empty to include all object types.
-    </div>
-    
+     
     <div class="form-row">
         <label for="node-input-server"><i class="icon-tag"></i> Server</label>
         <input type="text" id="node-input-server">
@@ -297,7 +375,7 @@ RED.nodes.registerType('iobgetobject', {
 </script>
 
 <script type="text/html" data-help-name="iobgetobject">
-    <p>ioBroker object retrieval via WebSocket with wildcard pattern support</p>
+    <p>ioBroker object retrieval via WebSocket with wildcard pattern support and optional enum assignments</p>
     
     <h3>Input Modes</h3>
     <ul>
@@ -317,8 +395,33 @@ RED.nodes.registerType('iobgetobject', {
             </ul>
         </li>
         <li><b>Object Type Filter:</b> Filter objects by type (state, channel, device, etc.). Leave empty to include all types.</li>
+        <li><b>Include assigned Enums:</b> Automatically adds enum assignment information to each object.</li>
+        <li><b>Enum Types:</b> Filter which enum types to include (all, rooms only, functions only, etc.).</li>
         <li><b>Server:</b> The ioBroker server configuration.</li>
     </ul>
+    
+    <h3>Enum Assignments</h3>
+    <p>When "Include assigned Enums" is enabled, each object gets an <code>enumAssignments</code> property:</p>
+    <pre>{
+  "enumAssignments": {
+    "rooms": [
+      {
+        "id": "enum.rooms.living_room",
+        "name": "Living Room",
+        "type": "rooms",
+        "icon": "home",
+        "color": "#ff6600"
+      }
+    ],
+    "functions": [...],
+    "other": [...],
+    "totalEnums": 2,
+    "hasRoom": true,
+    "hasFunction": true,
+    "roomName": "Living Room",
+    "functionName": "Lighting"
+  }
+}</pre>
     
     <h3>Pattern and Mode Compatibility</h3>
     <ul>
@@ -329,7 +432,7 @@ RED.nodes.registerType('iobgetobject', {
     
     <h3>Object Type Filtering</h3>
     <ul>
-        <li><b>Available Types:</b> state, channel, device, folder, adapter, instance, host, group, user, config</li>
+        <li><b>Available Types:</b> state, channel, device, folder, adapter, instance, host, group, user, config, enum</li>
         <li><b>Performance:</b> Type filtering is applied at the ioBroker level when possible</li>
         <li><b>Compatibility:</b> Works with all ioBroker adapters (Admin, WebSocket, Web)</li>
     </ul>
@@ -344,16 +447,10 @@ RED.nodes.registerType('iobgetobject', {
                 <li><code>system.adapter.admin.*</code> - all admin adapter objects</li>
                 <li><code>*.info.*</code> - all info objects</li>
                 <li><code>0_userdata.0.*</code> - all user data objects</li>
+                <li><code>enum.rooms.*</code> - all room enums</li>
             </ul>
         </li>
         <li><strong>Note:</strong> Wildcard mode is automatically detected when * is present in the pattern</li>
-    </ul>
-    
-    <h3>Object Selection</h3>
-    <ul>
-        <li><b>Manual input:</b> Type the object ID or pattern directly</li>
-        <li><b>Tree browser:</b> Browse and select from available objects</li>
-        <li><b>Auto-detection:</b> Wildcard mode is enabled automatically when * is detected in the pattern</li>
     </ul>
     
     <h3>Output</h3>
@@ -362,42 +459,21 @@ RED.nodes.registerType('iobgetobject', {
         <li>Object metadata is available in <code>msg.objects</code> (for compatibility)</li>
         <li>Object ID or pattern is included in <code>msg.objectId</code></li>
         <li>Count information in <code>msg.count</code> (for wildcard results)</li>
+        <li>Enum inclusion flag in <code>msg.includesEnums</code></li>
+        <li>Enum statistics in <code>msg.enumStatistics</code> (when enums enabled)</li>
         <li>Timestamp information is included in the response</li>
     </ul>
     
-    <h3>Output Formats</h3>
-    
-    <h4>Single Object Mode</h4>
-    <pre>msg.payload = {
-    "_id": "system.adapter.admin.0",
-    "type": "adapter",
-    "common": { ... },
-    "native": { ... }
+    <h3>Enum Statistics (when enabled)</h3>
+    <p>Additional statistics about enum coverage:</p>
+    <pre>{
+  "enumStatistics": {
+    "objectsWithRooms": 15,
+    "objectsWithFunctions": 12,
+    "objectsWithAnyEnum": 18,
+    "totalEnumAssignments": 32
+  }
 }</pre>
-    
-    <h4>Array Mode</h4>
-    <pre>msg.payload = [
-    { "_id": "system.adapter.admin.0", ... },
-    { "_id": "system.adapter.web.0", ... },
-    ...
-]</pre>
-    
-    <h4>Object Map Mode</h4>
-    <pre>msg.payload = {
-    "system.adapter.admin.0": { "_id": "system.adapter.admin.0", ... },
-    "system.adapter.web.0": { "_id": "system.adapter.web.0", ... },
-    ...
-}</pre>
-    
-    <h3>Object Structure</h3>
-    <p>Retrieved objects contain standard ioBroker object properties:</p>
-    <ul>
-        <li><b>_id:</b> Object identifier</li>
-        <li><b>type:</b> Object type (state, channel, device, adapter, etc.)</li>
-        <li><b>common:</b> Common properties like names and roles</li>
-        <li><b>native:</b> Adapter-specific properties</li>
-        <li><b>acl:</b> Access control list</li>
-    </ul>
     
     <h3>Use Cases</h3>
     <ul>
@@ -406,20 +482,16 @@ RED.nodes.registerType('iobgetobject', {
         <li>Analyze object structures for configuration purposes</li>
         <li>Bulk object processing and analysis</li>
         <li>System health and configuration auditing</li>
-    </ul>
-    
-    <h3>Advanced Features</h3>
-    <ul>
-        <li><b>Hierarchical Search:</b> Search preserves tree structure and shows path to matches</li>
-        <li><b>Multi-word Search:</b> Search multiple terms simultaneously</li>
-        <li><b>Search Highlighting:</b> Visual highlighting of matched terms in results</li>
-        <li><b>Auto-detection:</b> Wildcard mode automatically enabled based on pattern</li>
+        <li>Smart home dashboards with automatic room/function grouping</li>
+        <li>Find uncategorized objects without enum assignments</li>
+        <li>Generate UI based on ioBroker's enum structure</li>
     </ul>
     
     <h3>Performance Notes</h3>
     <ul>
         <li>Single object retrieval is very fast</li>
         <li>Wildcard patterns may take longer depending on scope</li>
+        <li>Enum assignments add minimal overhead</li>
         <li>Avoid overly broad patterns like <code>*</code> for performance</li>
         <li>Use specific patterns when possible (e.g., <code>system.adapter.*</code> instead of <code>*</code>)</li>
         <li>Type filtering can improve performance by reducing result sets</li>

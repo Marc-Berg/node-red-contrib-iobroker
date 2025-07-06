@@ -1,5 +1,28 @@
 # Changelog
 
+## [0.10.0] - 2025-07-06
+
+### Added
+- **Enum functionality for iobgetobject node**
+  - New "Include assigned Enums" option for automatic enum assignment retrieval
+  - Enum type filtering: all types, rooms only, functions only, or combinations
+  - Enum data in output including room/function names, icons, and colors
+  - Enum statistics showing coverage across retrieved objects
+
+### Changed
+- **Project structure reorganization**
+  - Moved all node files (*.js, *.html) to `/nodes` directory for better organization
+- **Node-RED palette organization**
+  - Reorganized nodes into logical categories: "ioBroker WS" for all WebSocket-based nodes
+- **Dependency management**
+  - Downgraded Express from 5.x to 4.x (^4.19.0) for Node-RED compatibility
+  - Fixed potential conflicts with Node-RED's internal Express usage
+
+### Fixed
+- **Race conditions in Multiple States subscriptions**
+  - Implemented batch subscriptions replacing individual state subscriptions
+  - Improved stability and performance for multiple states feature
+
 ## [0.9.5] - 2025-07-03
 ### Added
 - **Multiple States mode for WS ioB in node**
