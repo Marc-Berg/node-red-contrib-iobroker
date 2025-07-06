@@ -37,6 +37,7 @@
     "nodes/*.html",
     "lib/**/*.js",
     "shared/*.js",
+    "examples/*.json",
     "icons/*.svg",
     "README.md",
     "LICENSE"
@@ -54,11 +55,13 @@
       "iob-config": "nodes/iob-config.js"
     },
     "examples": [
+      "examples/iob-get.json",
+      "examples/iob-getobject.json",
+      "examples/iob-history.json",
       "examples/iob-in.json",
       "examples/iob-inobject.json",
-      "examples/iob-out.json",
-      "examples/iob-get.json",
-      "examples/iob-getobject.json"
+      "examples/iob-log.json",
+      "examples/iob-out.json"
     ]
   }
 }
