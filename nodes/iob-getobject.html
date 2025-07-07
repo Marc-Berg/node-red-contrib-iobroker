@@ -49,6 +49,8 @@
             useWildcard: { value: false },
             includeEnums: { value: false },
             enumTypes: { value: "all" },
+            includeAliases: { value: false },
+            aliasResolution: { value: "both" },
             server: { value: "", type: "iob-config" }
         },
         inputs: 1,
@@ -64,6 +66,9 @@
             }
             if (this.includeEnums) {
                 label += " +enums";
+            }
+            if (this.includeAliases) {
+                label += " +aliases";
             }
             return label;
         },
@@ -143,9 +148,21 @@
                 validatePatternCompatibility();
             });
 
+            $('#node-input-includeAliases').on('change', function () {
+                const isChecked = $(this).prop('checked');
+                $('#alias-options').toggle(isChecked);
+                $('#alias-assignment-info').toggle(isChecked);
+
+                validatePatternCompatibility();
+            });
+
             const includeEnumsChecked = $('#node-input-includeEnums').prop('checked');
             $('#enum-options').toggle(includeEnumsChecked);
             $('#enum-assignment-info').toggle(includeEnumsChecked);
+
+            const includeAliasesChecked = $('#node-input-includeAliases').prop('checked');
+            $('#alias-options').toggle(includeAliasesChecked);
+            $('#alias-assignment-info').toggle(includeAliasesChecked);
 
             $('#node-input-outputMode').on('change', function () {
                 const outputMode = $(this).val();
@@ -163,6 +180,7 @@
                 const objectId = $('#node-input-objectId').val().trim();
                 const outputMode = $('#node-input-outputMode').val();
                 const includeEnums = $('#node-input-includeEnums').prop('checked');
+                const includeAliases = $('#node-input-includeAliases').prop('checked');
                 const isPattern = objectId.includes('*');
 
                 $('#pattern-validation-warning').remove();
@@ -177,8 +195,6 @@
                     warningMessage = '<strong>Info:</strong> Single object ID with "' + (outputMode === 'array' ? 'Array' : 'Object Map') + '" mode. The result will be wrapped in an ' + (outputMode === 'array' ? 'array' : 'object') + '.';
                     warningType = 'info';
                 }
-
-
 
                 if (warningMessage) {
                     const warningClass = warningType === 'warning' ? 'warning' : 'info';
@@ -281,13 +297,21 @@
             const enumTypes = $('#node-input-enumTypes').val();
             this.enumTypes = enumTypes;
 
+            const includeAliases = $('#node-input-includeAliases').prop('checked');
+            this.includeAliases = includeAliases;
+
+            const aliasResolution = $('#node-input-aliasResolution').val();
+            this.aliasResolution = aliasResolution;
+
             console.log('Saved configuration:', {
                 objectId: objectIdValue,
                 useWildcard: this.useWildcard,
                 outputMode: currentOutputMode,
                 objectType: this.objectType,
                 includeEnums: this.includeEnums,
-                enumTypes: this.enumTypes
+                enumTypes: this.enumTypes,
+                includeAliases: this.includeAliases,
+                aliasResolution: this.aliasResolution
             });
 
             if (this.treeController) {
@@ -367,6 +391,35 @@
             </select>
         </div>
     </div>
+    
+    <div class="form-row">
+        <label for="node-input-includeAliases" style="width: auto;">
+            <input type="checkbox" id="node-input-includeAliases" style="width: auto; margin-right: 5px;">
+            <i class="icon-tag"></i> Include alias information
+        </label>
+    </div>
+    
+    <div id="alias-assignment-info" style="display: none; margin-top: 5px; padding: 8px; background-color: #fff3cd; border: 1px solid #ffeaa7; border-radius: 4px; font-size: 12px; color: #856404;">
+        <i class="fa fa-info-circle"></i> <strong>Alias Information:</strong><br>
+        Each returned object will include an <code>aliasInfo</code> property containing:
+        <ul style="margin: 5px 0 0 20px; padding: 0;">
+            <li><code>isAlias</code> - Boolean: Is this object an alias?</li>
+            <li><code>aliasTarget</code> - Object: Target object if this is an alias</li>
+            <li><code>aliasedBy</code> - Array: Objects that alias this object</li>
+        </ul>
+        <strong>Note:</strong> This feature requires additional queries and may increase response time.
+    </div>
+    
+    <div id="alias-options" style="display: none;">
+        <div class="form-row">
+            <label for="node-input-aliasResolution"><i class="icon-tag"></i> Alias Resolution</label>
+            <select id="node-input-aliasResolution" style="width:100%">
+                <option value="both">Both directions (aliases → targets and targets → aliases)</option>
+                <option value="target">Target resolution only (aliases → targets)</option>
+                <option value="reverse">Reverse lookup only (targets → aliases)</option>
+            </select>
+        </div>
+    </div>
      
     <div class="form-row">
         <label for="node-input-server"><i class="icon-tag"></i> Server</label>
@@ -375,7 +428,7 @@
 </script>
 
 <script type="text/html" data-help-name="iobgetobject">
-    <p>ioBroker object retrieval via WebSocket with wildcard pattern support and optional enum assignments</p>
+    <p>ioBroker object retrieval via WebSocket with wildcard pattern support, optional enum assignments, and alias resolution</p>
     
     <h3>Input Modes</h3>
     <ul>
@@ -397,22 +450,44 @@
         <li><b>Object Type Filter:</b> Filter objects by type (state, channel, device, etc.). Leave empty to include all types.</li>
         <li><b>Include assigned Enums:</b> Automatically adds enum assignment information to each object.</li>
         <li><b>Enum Types:</b> Filter which enum types to include (all, rooms only, functions only, etc.).</li>
+        <li><b>Include alias information:</b> Automatically resolves alias relationships and adds target information.</li>
+        <li><b>Alias Resolution:</b> Direction of alias resolution (both, target only, reverse only).</li>
         <li><b>Server:</b> The ioBroker server configuration.</li>
+    </ul>
+    
+    <h3>Alias Information</h3>
+    <p>When "Include alias information" is enabled, each object gets an <code>aliasInfo</code> property:</p>
+    <pre>{
+  "aliasInfo": {
+    "isAlias": true,
+    "aliasTarget": {
+      "_id": "hue.0.lights.1.state",
+      "type": "state",
+      "common": {...},
+      "native": {...}
+    },
+    "aliasedBy": [
+      {
+        "_id": "alias.0.Wohnzimmer.Licht.switch",
+        "type": "state",
+        "common": {...}
+      }
+    ]
+  }
+}</pre>
+    
+    <h3>Alias Resolution Modes</h3>
+    <ul>
+        <li><b>Both directions:</b> For aliases, resolves target objects. For regular objects, finds what aliases point to them.</li>
+        <li><b>Target resolution only:</b> Only resolves alias targets (alias → target object)</li>
+        <li><b>Reverse lookup only:</b> Only finds aliases that point to objects (target → alias objects)</li>
     </ul>
     
     <h3>Enum Assignments</h3>
     <p>When "Include assigned Enums" is enabled, each object gets an <code>enumAssignments</code> property:</p>
     <pre>{
   "enumAssignments": {
-    "rooms": [
-      {
-        "id": "enum.rooms.living_room",
-        "name": "Living Room",
-        "type": "rooms",
-        "icon": "home",
-        "color": "#ff6600"
-      }
-    ],
+    "rooms": [...],
     "functions": [...],
     "other": [...],
     "totalEnums": 2,
@@ -423,78 +498,23 @@
   }
 }</pre>
     
-    <h3>Pattern and Mode Compatibility</h3>
+    <h3>Use Cases with Aliases</h3>
     <ul>
-        <li><b>Single Mode + Pattern:</b> Returns only the first matching object (warning shown)</li>
-        <li><b>Array/Object Mode + Single ID:</b> Wraps single result in array/object (info shown)</li>
-        <li><b>Recommended:</b> Use Array/Object modes with wildcard patterns for best results</li>
-    </ul>
-    
-    <h3>Object Type Filtering</h3>
-    <ul>
-        <li><b>Available Types:</b> state, channel, device, folder, adapter, instance, host, group, user, config, enum</li>
-        <li><b>Performance:</b> Type filtering is applied at the ioBroker level when possible</li>
-        <li><b>Compatibility:</b> Works with all ioBroker adapters (Admin, WebSocket, Web)</li>
-    </ul>
-    
-    <h3>Wildcard Patterns</h3>
-    <ul>
-        <li><code>*</code> matches any number of characters</li>
-        <li><code>?</code> is <strong>not supported</strong> by ioBroker</li>
-        <li>Examples:
-            <ul>
-                <li><code>system.adapter.*</code> - all adapter objects</li>
-                <li><code>system.adapter.admin.*</code> - all admin adapter objects</li>
-                <li><code>*.info.*</code> - all info objects</li>
-                <li><code>0_userdata.0.*</code> - all user data objects</li>
-                <li><code>enum.rooms.*</code> - all room enums</li>
-            </ul>
-        </li>
-        <li><strong>Note:</strong> Wildcard mode is automatically detected when * is present in the pattern</li>
-    </ul>
-    
-    <h3>Output</h3>
-    <ul>
-        <li>Object data is stored in <code>msg.[outputProperty]</code> (default: <code>msg.payload</code>)</li>
-        <li>Object metadata is available in <code>msg.objects</code> (for compatibility)</li>
-        <li>Object ID or pattern is included in <code>msg.objectId</code></li>
-        <li>Applied filter in <code>msg.appliedFilter</code> (null if no filter)</li>
-        <li>Count information in <code>msg.count</code> (for wildcard results)</li>
-        <li>Enum inclusion flag in <code>msg.includesEnums</code></li>
-        <li>Enum statistics in <code>msg.enumStatistics</code> (when enums enabled)</li>
-        <li>Timestamp information is included in the response</li>
-    </ul>
-    
-    <h3>Enum Statistics (when enabled)</h3>
-    <p>Additional statistics about enum coverage:</p>
-    <pre>{
-  "enumStatistics": {
-    "objectsWithRooms": 15,
-    "objectsWithFunctions": 12,
-    "objectsWithAnyEnum": 18,
-    "totalEnumAssignments": 32
-  }
-}</pre>
-    
-    <h3>Use Cases</h3>
-    <ul>
-        <li>Retrieve single object definitions for inspection</li>
-        <li>Get all adapter objects for system monitoring</li>
-        <li>Analyze object structures for configuration purposes</li>
-        <li>Bulk object processing and analysis</li>
-        <li>System health and configuration auditing</li>
-        <li>Smart home dashboards with automatic room/function grouping</li>
-        <li>Find uncategorized objects without enum assignments</li>
-        <li>Generate UI based on ioBroker's enum structure</li>
+        <li>Automatically resolve alias targets without additional nodes</li>
+        <li>Find all aliases pointing to a specific object</li>
+        <li>Build comprehensive object mappings including alias relationships</li>
+        <li>Simplify flows that work with both aliases and regular objects</li>
+        <li>Audit alias configurations and detect orphaned aliases</li>
+        <li>Get target object information directly from alias objects</li>
     </ul>
     
     <h3>Performance Notes</h3>
     <ul>
-        <li>Single object retrieval is very fast</li>
-        <li>Wildcard patterns may take longer depending on scope</li>
-        <li>Enum assignments add minimal overhead</li>
-        <li>Avoid overly broad patterns like <code>*</code> for performance</li>
-        <li>Use specific patterns when possible (e.g., <code>system.adapter.*</code> instead of <code>*</code>)</li>
-        <li>Type filtering can improve performance by reducing result sets</li>
+        <li>Alias resolution requires additional object queries (but no state queries)</li>
+        <li>Use specific alias resolution modes to optimize performance</li>
+        <li>Target resolution is faster than reverse lookup</li>
+        <li>Both enum and alias features can be used together</li>
+        <li>Large alias networks may increase response time</li>
+        <li>For state values: use separate getState() calls with target IDs as needed</li>
     </ul>
 </script>

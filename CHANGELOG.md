@@ -10,14 +10,25 @@
   - Queue status display in node status indicator
   - Enhanced output with queryId, queryMode, and dropped properties
 
+### Added
+- **Alias resolution for iobgetobject node**
+  - New "Include alias information" option for automatic alias resolution
+  - Three resolution modes: both directions, target-only, reverse-only
+  - aliasInfo property with isAlias, aliasTarget, and aliasedBy fields
+  - Alias statistics for wildcard patterns showing relationship counts
+
+### Changed
+- **Simplified output format for iobgetobject node**
+  - Removed redundant fields from output
+  - Added conditional pattern field (only for wildcard queries)
+  - Added conditional properties (appliedFilter, includesEnums, includesAliases)
+  - Statistics now only included when data is available
+
 ### Changed
 - **iobhistory node UI improvements**
   - Reorganized configuration into tabbed interface: Data Source, Time Range, Processing, Output
   - Improved visual structure and user experience
   - Better grouping of related settings
-
-### Fixed
-- Clean up and standardize output properties for iobgetobject node
 
 ## [0.11.0] - 2025-07-06
 
