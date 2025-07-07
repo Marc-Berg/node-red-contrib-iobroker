@@ -16,6 +16,9 @@
   - Improved visual structure and user experience
   - Better grouping of related settings
 
+### Fixed
+- Clean up and standardize output properties for iobgetobject node
+
 ## [0.11.0] - 2025-07-06
 
 ### Added

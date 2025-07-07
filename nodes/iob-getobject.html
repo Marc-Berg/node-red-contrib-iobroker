@@ -1,300 +1,300 @@
 <script type="text/javascript">
-// Shared TreeView loader with robust error handling
-function loadSharedTreeView() {
-    return new Promise((resolve, reject) => {
-        if (window.ioBrokerSharedTreeView && window.ioBrokerSharedTreeView.initialized) {
-            resolve();
-            return;
-        }
-        
-        const script = document.createElement('script');
-        script.src = 'iobroker/shared/iobroker-treeview.js?v=1.0.0';
-        script.async = true;
-        
-        script.onload = () => {
+    // Shared TreeView loader with robust error handling
+    function loadSharedTreeView() {
+        return new Promise((resolve, reject) => {
             if (window.ioBrokerSharedTreeView && window.ioBrokerSharedTreeView.initialized) {
-                console.log('TreeView component loaded successfully');
                 resolve();
-            } else {
-                reject(new Error('TreeView component failed to initialize'));
+                return;
             }
-        };
-        
-        script.onerror = () => {
-            console.error('TreeView component script not found');
-            reject(new Error('TreeView component script not found'));
-        };
-        
-        document.head.appendChild(script);
-    });
-}
 
-RED.nodes.registerType('iobgetobject', {
-    category: 'ioBroker WS',
-    color: '#a6bbcf',
-    defaults: {
-        name: { value: "" },
-        objectId: { 
-            value: "",
-            validate: function(v) {
-                if (this.inputMode === 'single') {
-                    return v && v.trim().length > 0;
+            const script = document.createElement('script');
+            script.src = 'iobroker/shared/iobroker-treeview.js?v=1.0.0';
+            script.async = true;
+
+            script.onload = () => {
+                if (window.ioBrokerSharedTreeView && window.ioBrokerSharedTreeView.initialized) {
+                    console.log('TreeView component loaded successfully');
+                    resolve();
+                } else {
+                    reject(new Error('TreeView component failed to initialize'));
                 }
-                return true;
-            }
+            };
+
+            script.onerror = () => {
+                console.error('TreeView component script not found');
+                reject(new Error('TreeView component script not found'));
+            };
+
+            document.head.appendChild(script);
+        });
+    }
+
+    RED.nodes.registerType('iobgetobject', {
+        category: 'ioBroker WS',
+        color: '#a6bbcf',
+        defaults: {
+            name: { value: "" },
+            objectId: {
+                value: "",
+                validate: function (v) {
+                    if (this.inputMode === 'single') {
+                        return v && v.trim().length > 0;
+                    }
+                    return true;
+                }
+            },
+            outputProperty: { value: "payload" },
+            outputMode: { value: "single" },
+            objectType: { value: "" },
+            useWildcard: { value: false },
+            includeEnums: { value: false },
+            enumTypes: { value: "all" },
+            server: { value: "", type: "iob-config" }
         },
-        outputProperty: { value: "payload" },
-        outputMode: { value: "single" },
-        objectType: { value: "" },
-        useWildcard: { value: false },
-        includeEnums: { value: false },
-        enumTypes: { value: "all" },
-        server: { value: "", type: "iob-config" }
-    },
-    inputs: 1,
-    outputs: 1,
-    icon: "iobroker_getobject.svg",
-    paletteLabel: "WS ioB getObj",
-    label: function() {
-        if (this.name) return this.name;
-        
-        let label = this.objectId || "iob-getobject";
-        if (this.objectId && this.objectId.includes('*')) {
-            label = `${this.objectId} (pattern)`;
-        }
-        if (this.includeEnums) {
-            label += " +enums";
-        }
-        return label;
-    },
-    
-    oneditprepare: function() {
-        const node = this;
-        const serverInput = $('#node-input-server');
-        
-        if (!this.server || this.server === '') {
-            const configNodes = [];
-            RED.nodes.eachConfig(function(config) {
-                if (config.type === 'iob-config') {
-                    configNodes.push(config);
-                }
-            });
-            
-            if (configNodes.length === 1) {
-                this.server = configNodes[0].id;
-                serverInput.val(this.server);
-                
-                setTimeout(() => {
-                    RED.notify(`Automatically selected server: ${configNodes[0].name || configNodes[0].iobhost}`, {
-                        type: "info",
-                        timeout: 1500
-                    });
-                }, 500);
+        inputs: 1,
+        outputs: 1,
+        icon: "iobroker_getobject.svg",
+        paletteLabel: "WS ioB getObj",
+        label: function () {
+            if (this.name) return this.name;
+
+            let label = this.objectId || "iob-getobject";
+            if (this.objectId && this.objectId.includes('*')) {
+                label = `${this.objectId} (pattern)`;
             }
-        }
-        
-        $('#node-input-objectType').on('change', function() {
-            const objectType = $(this).val();
-            
-            if (objectType === 'enum') {
-                const currentPattern = $('#node-input-objectId').val().trim();
-                if (!currentPattern || !currentPattern.startsWith('enum.')) {
-                    $('#node-input-objectId').val('enum.*');
-                    $('input[name="enumQuickSelect"][value="enum.*"]').prop('checked', true);
-                }
+            if (this.includeEnums) {
+                label += " +enums";
             }
-        });
-        
-        $('input[name="enumQuickSelect"]').on('change', function() {
-            const selectedValue = $(this).val();
-            if (selectedValue !== 'custom') {
-                $('#node-input-objectId').val(selectedValue);
-            } else {
-                $('#node-input-objectId').focus();
-            }
-        });
-        
-        $('#node-input-objectId').on('input', function() {
-            const pattern = $(this).val().trim();
-            
-            if ($('#node-input-objectType').val() === 'enum') {
-                const enumRadios = $('input[name="enumQuickSelect"]');
-                let matched = false;
-                
-                enumRadios.each(function() {
-                    if ($(this).val() === pattern) {
-                        $(this).prop('checked', true);
-                        matched = true;
-                        return false;
+            return label;
+        },
+
+        oneditprepare: function () {
+            const node = this;
+            const serverInput = $('#node-input-server');
+
+            if (!this.server || this.server === '') {
+                const configNodes = [];
+                RED.nodes.eachConfig(function (config) {
+                    if (config.type === 'iob-config') {
+                        configNodes.push(config);
                     }
                 });
-                
-                if (!matched) {
-                    $('input[name="enumQuickSelect"][value="custom"]').prop('checked', true);
+
+                if (configNodes.length === 1) {
+                    this.server = configNodes[0].id;
+                    serverInput.val(this.server);
+
+                    setTimeout(() => {
+                        RED.notify(`Automatically selected server: ${configNodes[0].name || configNodes[0].iobhost}`, {
+                            type: "info",
+                            timeout: 1500
+                        });
+                    }, 500);
                 }
             }
-        });
-        
-        $('#node-input-includeEnums').on('change', function() {
-            const isChecked = $(this).prop('checked');
-            $('#enum-options').toggle(isChecked);
-            $('#enum-assignment-info').toggle(isChecked);
-            
-            validatePatternCompatibility();
-        });
-        
-        const includeEnumsChecked = $('#node-input-includeEnums').prop('checked');
-        $('#enum-options').toggle(includeEnumsChecked);
-        $('#enum-assignment-info').toggle(includeEnumsChecked);
-        
-        $('#node-input-outputMode').on('change', function() {
-            const outputMode = $(this).val();
-            $('.output-mode-info').hide();
-            $(`.output-mode-info.${outputMode}`).show();
-            
-            validatePatternCompatibility();
-        });
-        
-        $('#node-input-objectId').on('input keyup change', function() {
-            validatePatternCompatibility();
-        });
-        
-        function validatePatternCompatibility() {
-            const objectId = $('#node-input-objectId').val().trim();
-            const outputMode = $('#node-input-outputMode').val();
-            const includeEnums = $('#node-input-includeEnums').prop('checked');
-            const isPattern = objectId.includes('*');
-            
-            $('#pattern-validation-warning').remove();
-            
-            let warningMessage = '';
-            let warningType = '';
-            
-            if (isPattern && outputMode === 'single') {
-                warningMessage = '<strong>Warning:</strong> Wildcard pattern detected but "Single Object" mode selected. This will return only the first matching object. Consider using "Array" or "Object Map" mode.';
-                warningType = 'warning';
-            } else if (!isPattern && (outputMode === 'array' || outputMode === 'object')) {
-                warningMessage = '<strong>Info:</strong> Single object ID with "' + (outputMode === 'array' ? 'Array' : 'Object Map') + '" mode. The result will be wrapped in an ' + (outputMode === 'array' ? 'array' : 'object') + '.';
-                warningType = 'info';
-            }
-            
 
-            
-            if (warningMessage) {
-                const warningClass = warningType === 'warning' ? 'warning' : 'info';
-                const iconClass = warningType === 'warning' ? 'fa-exclamation-triangle' : 'fa-info-circle';
-                const warningDiv = $(`
+            $('#node-input-objectType').on('change', function () {
+                const objectType = $(this).val();
+
+                if (objectType === 'enum') {
+                    const currentPattern = $('#node-input-objectId').val().trim();
+                    if (!currentPattern || !currentPattern.startsWith('enum.')) {
+                        $('#node-input-objectId').val('enum.*');
+                        $('input[name="enumQuickSelect"][value="enum.*"]').prop('checked', true);
+                    }
+                }
+            });
+
+            $('input[name="enumQuickSelect"]').on('change', function () {
+                const selectedValue = $(this).val();
+                if (selectedValue !== 'custom') {
+                    $('#node-input-objectId').val(selectedValue);
+                } else {
+                    $('#node-input-objectId').focus();
+                }
+            });
+
+            $('#node-input-objectId').on('input', function () {
+                const pattern = $(this).val().trim();
+
+                if ($('#node-input-objectType').val() === 'enum') {
+                    const enumRadios = $('input[name="enumQuickSelect"]');
+                    let matched = false;
+
+                    enumRadios.each(function () {
+                        if ($(this).val() === pattern) {
+                            $(this).prop('checked', true);
+                            matched = true;
+                            return false;
+                        }
+                    });
+
+                    if (!matched) {
+                        $('input[name="enumQuickSelect"][value="custom"]').prop('checked', true);
+                    }
+                }
+            });
+
+            $('#node-input-includeEnums').on('change', function () {
+                const isChecked = $(this).prop('checked');
+                $('#enum-options').toggle(isChecked);
+                $('#enum-assignment-info').toggle(isChecked);
+
+                validatePatternCompatibility();
+            });
+
+            const includeEnumsChecked = $('#node-input-includeEnums').prop('checked');
+            $('#enum-options').toggle(includeEnumsChecked);
+            $('#enum-assignment-info').toggle(includeEnumsChecked);
+
+            $('#node-input-outputMode').on('change', function () {
+                const outputMode = $(this).val();
+                $('.output-mode-info').hide();
+                $(`.output-mode-info.${outputMode}`).show();
+
+                validatePatternCompatibility();
+            });
+
+            $('#node-input-objectId').on('input keyup change', function () {
+                validatePatternCompatibility();
+            });
+
+            function validatePatternCompatibility() {
+                const objectId = $('#node-input-objectId').val().trim();
+                const outputMode = $('#node-input-outputMode').val();
+                const includeEnums = $('#node-input-includeEnums').prop('checked');
+                const isPattern = objectId.includes('*');
+
+                $('#pattern-validation-warning').remove();
+
+                let warningMessage = '';
+                let warningType = '';
+
+                if (isPattern && outputMode === 'single') {
+                    warningMessage = '<strong>Warning:</strong> Wildcard pattern detected but "Single Object" mode selected. This will return only the first matching object. Consider using "Array" or "Object Map" mode.';
+                    warningType = 'warning';
+                } else if (!isPattern && (outputMode === 'array' || outputMode === 'object')) {
+                    warningMessage = '<strong>Info:</strong> Single object ID with "' + (outputMode === 'array' ? 'Array' : 'Object Map') + '" mode. The result will be wrapped in an ' + (outputMode === 'array' ? 'array' : 'object') + '.';
+                    warningType = 'info';
+                }
+
+
+
+                if (warningMessage) {
+                    const warningClass = warningType === 'warning' ? 'warning' : 'info';
+                    const iconClass = warningType === 'warning' ? 'fa-exclamation-triangle' : 'fa-info-circle';
+                    const warningDiv = $(`
                     <div id="pattern-validation-warning" style="margin-top: 8px; padding: 8px; background-color: ${warningType === 'warning' ? '#fff3cd' : '#d1ecf1'}; border: 1px solid ${warningType === 'warning' ? '#ffeaa7' : '#bee5eb'}; border-radius: 4px; font-size: 12px; color: ${warningType === 'warning' ? '#856404' : '#0c5460'};">
                         <i class="fa ${iconClass}"></i> ${warningMessage}
                     </div>
                 `);
-                $('#node-input-outputMode').closest('.form-row').after(warningDiv);
-            }
-        }
-        
-        const currentOutputMode = $('#node-input-outputMode').val() || 'single';
-        $('.output-mode-info').hide();
-        $(`.output-mode-info.${currentOutputMode}`).show();
-        
-        const currentObjectType = $('#node-input-objectType').val();
-        if (currentObjectType === 'enum') {
-            const currentPattern = $('#node-input-objectId').val().trim();
-            if (currentPattern) {
-                const matchingRadio = $(`input[name="enumQuickSelect"][value="${currentPattern}"]`);
-                if (matchingRadio.length) {
-                    matchingRadio.prop('checked', true);
-                } else {
-                    $('input[name="enumQuickSelect"][value="custom"]').prop('checked', true);
+                    $('#node-input-outputMode').closest('.form-row').after(warningDiv);
                 }
             }
-        }
-        
-        loadSharedTreeView().then(() => {
-            this.treeController = window.ioBrokerSharedTreeView.setup({
-                nodeType: 'iobgetobject',
-                inputId: 'node-input-objectId',
-                serverInputId: 'node-input-server',
-                searchPlaceholder: 'Search objects (supports wildcards)...',
-                itemType: 'objects',
-                dataEndpoint: '/iobroker/ws/states',
-                enableWildcardDetection: true,
-                wildcardInputId: null
-            });
-        }).catch(error => {
-            console.error('Failed to load TreeView component:', error);
-            
-            const fallbackMessage = $(`
+
+            const currentOutputMode = $('#node-input-outputMode').val() || 'single';
+            $('.output-mode-info').hide();
+            $(`.output-mode-info.${currentOutputMode}`).show();
+
+            const currentObjectType = $('#node-input-objectType').val();
+            if (currentObjectType === 'enum') {
+                const currentPattern = $('#node-input-objectId').val().trim();
+                if (currentPattern) {
+                    const matchingRadio = $(`input[name="enumQuickSelect"][value="${currentPattern}"]`);
+                    if (matchingRadio.length) {
+                        matchingRadio.prop('checked', true);
+                    } else {
+                        $('input[name="enumQuickSelect"][value="custom"]').prop('checked', true);
+                    }
+                }
+            }
+
+            loadSharedTreeView().then(() => {
+                this.treeController = window.ioBrokerSharedTreeView.setup({
+                    nodeType: 'iobgetobject',
+                    inputId: 'node-input-objectId',
+                    serverInputId: 'node-input-server',
+                    searchPlaceholder: 'Search objects (supports wildcards)...',
+                    itemType: 'objects',
+                    dataEndpoint: '/iobroker/ws/states',
+                    enableWildcardDetection: true,
+                    wildcardInputId: null
+                });
+            }).catch(error => {
+                console.error('Failed to load TreeView component:', error);
+
+                const fallbackMessage = $(`
                 <div style="margin-top: 5px; padding: 8px; background-color: #fff3cd; border: 1px solid #ffeaa7; border-radius: 4px; font-size: 12px; color: #856404;">
                     <i class="fa fa-exclamation-triangle"></i> TreeView component not available. Manual input with wildcard detection.
                 </div>
             `);
-            $('#node-input-objectId').after(fallbackMessage);
-            
-            $('#node-input-objectId').on('input keyup change', function() {
-                const pattern = $(this).val();
-                const hasWildcardChars = pattern.includes('*');
-                
-                if (hasWildcardChars) {
-                    let wildcardWarning = $('#basic-wildcard-warning-getobj');
-                    if (wildcardWarning.length === 0) {
-                        wildcardWarning = $(`
+                $('#node-input-objectId').after(fallbackMessage);
+
+                $('#node-input-objectId').on('input keyup change', function () {
+                    const pattern = $(this).val();
+                    const hasWildcardChars = pattern.includes('*');
+
+                    if (hasWildcardChars) {
+                        let wildcardWarning = $('#basic-wildcard-warning-getobj');
+                        if (wildcardWarning.length === 0) {
+                            wildcardWarning = $(`
                             <div id="basic-wildcard-warning-getobj" style="margin-top: 5px; padding: 8px; background-color: #e8f4fd; border: 1px solid #bee5eb; border-radius: 4px; font-size: 12px; color: #0c5460;">
                                 <i class="fa fa-info-circle"></i> Wildcard pattern detected - will return multiple objects.
                             </div>
                         `);
-                        $(this).after(wildcardWarning);
+                            $(this).after(wildcardWarning);
+                        }
+                        wildcardWarning.show();
+                    } else {
+                        $('#basic-wildcard-warning-getobj').hide();
                     }
-                    wildcardWarning.show();
-                } else {
-                    $('#basic-wildcard-warning-getobj').hide();
-                }
-            });
-        });
-        
-        setTimeout(() => {
-            validatePatternCompatibility();
-        }, 100);
-    },
-
-    oneditsave: function() {
-        const objectIdValue = $('#node-input-objectId').val();
-        const hasWildcardChars = objectIdValue.includes('*');
-        
-        this.useWildcard = hasWildcardChars;
-        
-        const currentOutputMode = $('#node-input-outputMode').val();
-        if (hasWildcardChars && currentOutputMode === 'single') {
-            if (typeof RED !== 'undefined' && RED.notify) {
-                RED.notify('Warning: Wildcard pattern with Single Object mode will return only the first match', { 
-                    type: "warning", 
-                    timeout: 4000 
                 });
+            });
+
+            setTimeout(() => {
+                validatePatternCompatibility();
+            }, 100);
+        },
+
+        oneditsave: function () {
+            const objectIdValue = $('#node-input-objectId').val();
+            const hasWildcardChars = objectIdValue.includes('*');
+
+            this.useWildcard = hasWildcardChars;
+
+            const currentOutputMode = $('#node-input-outputMode').val();
+            if (hasWildcardChars && currentOutputMode === 'single') {
+                if (typeof RED !== 'undefined' && RED.notify) {
+                    RED.notify('Warning: Wildcard pattern with Single Object mode will return only the first match', {
+                        type: "warning",
+                        timeout: 4000
+                    });
+                }
+            }
+
+            const objectType = $('#node-input-objectType').val();
+            this.objectType = objectType;
+
+            const includeEnums = $('#node-input-includeEnums').prop('checked');
+            this.includeEnums = includeEnums;
+
+            const enumTypes = $('#node-input-enumTypes').val();
+            this.enumTypes = enumTypes;
+
+            console.log('Saved configuration:', {
+                objectId: objectIdValue,
+                useWildcard: this.useWildcard,
+                outputMode: currentOutputMode,
+                objectType: this.objectType,
+                includeEnums: this.includeEnums,
+                enumTypes: this.enumTypes
+            });
+
+            if (this.treeController) {
+                this.treeController.cleanup();
             }
         }
-        
-        const objectType = $('#node-input-objectType').val();
-        this.objectType = objectType;
-        
-        const includeEnums = $('#node-input-includeEnums').prop('checked');
-        this.includeEnums = includeEnums;
-        
-        const enumTypes = $('#node-input-enumTypes').val();
-        this.enumTypes = enumTypes;
-        
-        console.log('Saved configuration:', {
-            objectId: objectIdValue,
-            useWildcard: this.useWildcard,
-            outputMode: currentOutputMode,
-            objectType: this.objectType,
-            includeEnums: this.includeEnums,
-            enumTypes: this.enumTypes
-        });
-        
-        if (this.treeController) {
-            this.treeController.cleanup();
-        }
-    }
-});
+    });
 </script>
 
 <script type="text/html" data-template-name="iobgetobject">
@@ -458,6 +458,7 @@ RED.nodes.registerType('iobgetobject', {
         <li>Object data is stored in <code>msg.[outputProperty]</code> (default: <code>msg.payload</code>)</li>
         <li>Object metadata is available in <code>msg.objects</code> (for compatibility)</li>
         <li>Object ID or pattern is included in <code>msg.objectId</code></li>
+        <li>Applied filter in <code>msg.appliedFilter</code> (null if no filter)</li>
         <li>Count information in <code>msg.count</code> (for wildcard results)</li>
         <li>Enum inclusion flag in <code>msg.includesEnums</code></li>
         <li>Enum statistics in <code>msg.enumStatistics</code> (when enums enabled)</li>

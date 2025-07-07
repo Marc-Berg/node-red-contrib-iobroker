@@ -193,13 +193,13 @@ module.exports = function(RED) {
             return objects;
         }
 
-        function formatOutput(objects, objectIdOrPattern, outputMode, enumData = null) {
+        function formatOutput(objects, objectIdOrPattern, outputMode, appliedObjectType, enumData = null) {
             // Always return a valid result object, even if objects is null/empty
             const baseResult = {
                 [settings.outputProperty]: null,
                 objects: null,
                 objectId: objectIdOrPattern,
-                objectType: settings.objectType || 'any',
+                appliedFilter: appliedObjectType || null,
                 count: 0,
                 timestamp: Date.now(),
                 includesEnums: settings.includeEnums
@@ -220,15 +220,17 @@ module.exports = function(RED) {
                     ? { ...objects, enumAssignments: getEnumAssignments(objects._id, enumData) }
                     : objects;
 
-                return {
+                const result = {
                     [settings.outputProperty]: enrichedObject,
                     objects: enrichedObject,
                     objectId: objectIdOrPattern,
-                    objectType: settings.objectType || 'any',
+                    appliedFilter: appliedObjectType || null,
                     count: 1,
                     timestamp: Date.now(),
                     includesEnums: settings.includeEnums
                 };
+
+                return result;
             }
 
             // Handle multiple objects (from wildcard pattern)
@@ -273,7 +275,7 @@ module.exports = function(RED) {
                 [settings.outputProperty]: outputData,
                 objects: objectMap,
                 objectId: objectIdOrPattern,
-                objectType: settings.objectType || 'any',
+                appliedFilter: appliedObjectType || null,
                 count: enrichedArray.length,
                 timestamp: Date.now(),
                 includesEnums: settings.includeEnums
@@ -476,7 +478,7 @@ module.exports = function(RED) {
                             node.warn(`No objects found for pattern: ${objectIdOrPattern}${typeInfo}`);
                             
                             // Send message with empty result
-                            const result = formatOutput(currentOutputMode === 'array' ? [] : {}, objectIdOrPattern, currentOutputMode, enumData);
+                            const result = formatOutput(currentOutputMode === 'array' ? [] : {}, objectIdOrPattern, currentOutputMode, currentObjectType, enumData);
                             Object.assign(msg, result);
                             
                             send(msg);
@@ -485,7 +487,7 @@ module.exports = function(RED) {
                         }
                         
                         // Format output according to configured mode (including enum enrichment)
-                        const result = formatOutput(objects, objectIdOrPattern, currentOutputMode, enumData);
+                        const result = formatOutput(objects, objectIdOrPattern, currentOutputMode, currentObjectType, enumData);
                         Object.assign(msg, result);
                         
                         const readyText = isWildcardPattern ? "Ready (Pattern)" : "Ready";
@@ -504,7 +506,7 @@ module.exports = function(RED) {
                         node.error(`Error retrieving objects for pattern ${objectIdOrPattern}: ${error.message}`);
                         
                         // Send error message with details
-                        const result = formatOutput(null, objectIdOrPattern, currentOutputMode, enumData);
+                        const result = formatOutput(null, objectIdOrPattern, currentOutputMode, currentObjectType, enumData);
                         result.error = error.message;
                         result.errorType = error.message.includes('timeout') ? 'timeout' : 'unknown';
                         Object.assign(msg, result);
@@ -532,7 +534,7 @@ module.exports = function(RED) {
                             node.warn(`Object not found: ${objectIdOrPattern}${typeInfo}`);
                             
                             // Send message with null payload but include object ID for reference
-                            const result = formatOutput(null, objectIdOrPattern, 'single', enumData);
+                            const result = formatOutput(null, objectIdOrPattern, 'single', currentObjectType, enumData);
                             result.error = currentObjectType ? "Object not found or type mismatch" : "Object not found";
                             Object.assign(msg, result);
                             
@@ -542,15 +544,9 @@ module.exports = function(RED) {
                         }
                         
                         // Format single object output (including enum enrichment)
-                        const result = formatOutput(objectData, objectIdOrPattern, 'single', enumData);
+                        const result = formatOutput(objectData, objectIdOrPattern, 'single', currentObjectType, enumData);
                         
-                        // Add some useful metadata for single objects
-                        if (objectData.common) {
-                            result.objectTypeName = objectData.type || 'unknown';
-                            result.objectName = objectData.common.name || objectIdOrPattern;
-                            result.objectRole = objectData.common.role || 'unknown';
-                        }
-                        
+                        // Object metadata is already included in the complete object data
                         Object.assign(msg, result);
                         
                         const enumText = settings.includeEnums ? " +enums" : "";
@@ -568,7 +564,7 @@ module.exports = function(RED) {
                         node.error(`Error processing input: ${error.message}`);
                         
                         // Send error message with details
-                        const result = formatOutput(null, objectIdOrPattern, 'single', enumData);
+                        const result = formatOutput(null, objectIdOrPattern, 'single', currentObjectType, enumData);
                         result.error = error.message;
                         result.errorType = error.message.includes('timeout') ? 'timeout' : 'unknown';
                         Object.assign(msg, result);
