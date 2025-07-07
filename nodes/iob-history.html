@@ -31,17 +31,18 @@ RED.nodes.registerType('iobhistory', {
         name: { value: "" },
         stateId: { value: "" },
         historyAdapter: { value: "history.0" },
-        timeRange: { value: "duration" }, // duration, absolute, message
-        duration: { value: 24 }, // hours
+        timeRange: { value: "duration" },
+        duration: { value: 24 },
         durationUnit: { value: "hours" },
         startTime: { value: "" },
         endTime: { value: "" },
         aggregate: { value: "onchange" },
-        step: { value: 300 }, // seconds
+        step: { value: 300 },
         stepUnit: { value: "seconds" },
         maxEntries: { value: 2000 },
+        queryMode: { value: "parallel" }, // parallel, sequential, drop
         outputProperty: { value: "payload" },
-        outputFormat: { value: "array" }, // array, chart, dashboard2, statistics
+        outputFormat: { value: "array" },
         percentile: { value: 50 },
         quantile: { value: 0.5 },
         integralUnit: { value: 3600 },
@@ -62,10 +63,133 @@ RED.nodes.registerType('iobhistory', {
     },
     
     oneditprepare: function() {
+        const node = this;
         const serverInput = $('#node-input-server');
         
+        // Tab switching functionality
+        function initializeTabs() {
+            $('.node-config-tabs li').on('click', function() {
+                const tabId = $(this).data('tab');
+                
+                // Update active tab
+                $('.node-config-tabs li').removeClass('active');
+                $(this).addClass('active');
+                
+                // Show corresponding tab content
+                $('.tab-content .tab-pane').removeClass('active');
+                $(`.tab-content .tab-pane[data-tab="${tabId}"]`).addClass('active');
+            });
+            
+            // Activate first tab by default
+            $('.node-config-tabs li:first').addClass('active');
+            $('.tab-content .tab-pane:first').addClass('active');
+        }
+        
+        function showDefaultAdapterSuggestions() {
+            $('.adapter-list').html('<span style="color: #6c757d; font-style: italic;">Loading available adapters...</span>');
+            $('.adapter-suggestions').show();
+        }
+        
+        function loadHistoryAdapters() {
+            const serverNode = RED.nodes.node(serverInput.val());
+            if (!serverNode) {
+                console.log('No server node selected for history adapter discovery');
+                return;
+            }
+            
+            const serverId = `${serverNode.iobhost}:${serverNode.iobport}`;
+            console.log('Loading history adapters from:', serverId);
+            
+            $.ajax({
+                url: `/iobroker/ws/adapters/${encodeURIComponent(serverId)}`,
+                method: 'GET',
+                timeout: 15000,
+                dataType: 'json',
+                cache: false
+            }).done((response) => {
+                console.log('History adapters response:', response);
+                
+                if (response.adapters && response.adapters.length > 0) {
+                    const adapters = response.adapters;
+                    
+                    const adapterButtons = adapters.map(adapter => {
+                        const statusClass = adapter.alive ? 'alive' : (adapter.enabled ? 'enabled' : 'disabled');
+                        const statusIcon = adapter.alive ? '🟢' : (adapter.enabled ? '🟡' : '🔴');
+                        const title = `${adapter.title || adapter.name} - ${adapter.alive ? 'Running' : adapter.enabled ? 'Enabled but not running' : 'Disabled'}`;
+                        
+                        return `<a href="#" data-adapter="${adapter.name}" class="${statusClass}" title="${title}">${statusIcon} ${adapter.name}</a>`;
+                    }).join('');
+                    
+                    const fallbacks = ['history.0', 'sql.0', 'influxdb.0'].filter(name => 
+                        !adapters.find(a => a.name === name)
+                    ).map(name => 
+                        `<a href="#" data-adapter="${name}" class="fallback" title="Common adapter (not verified)">${name}</a>`
+                    ).join('');
+                    
+                    $('.adapter-list').html(adapterButtons + fallbacks);
+                    
+                    $('.adapter-list a').on('click', function(e) {
+                        e.preventDefault();
+                        const adapter = $(this).data('adapter');
+                        $('#node-input-historyAdapter').val(adapter);
+                        $(this).addClass('selected').siblings().removeClass('selected');
+                        return false;
+                    });
+                    
+                    const currentAdapter = $('#node-input-historyAdapter').val();
+                    $(`.adapter-list a[data-adapter="${currentAdapter}"]`).addClass('selected');
+                    
+                    $('.adapter-suggestions').show();
+                    console.log(`Found ${adapters.length} history adapters on ${serverId}`);
+                } else {
+                    console.log('No history adapters found, keeping default suggestions');
+                }
+            }).fail((xhr, status, error) => {
+                console.error('Failed to load history adapters:', status, error);
+                
+                const fallbackAdapters = ['history.0', 'sql.0', 'influxdb.0', 'history.1', 'sql.1', 'influxdb.1'];
+                $('.adapter-list').html(
+                    '<span style="color: #dc3545; margin-right: 10px;">⚠️ Could not load from server</span>' +
+                    fallbackAdapters.map(adapter => 
+                        `<a href="#" data-adapter="${adapter}" class="fallback" title="Common adapter (not verified)">${adapter}</a>`
+                    ).join('')
+                );
+                
+                $('.adapter-list a').on('click', function(e) {
+                    e.preventDefault();
+                    const adapter = $(this).data('adapter');
+                    $('#node-input-historyAdapter').val(adapter);
+                    $(this).addClass('selected').siblings().removeClass('selected');
+                    return false;
+                });
+            });
+        }
+        
+        function initializeHistoryAdapterSuggestions() {
+            // Show default suggestions immediately
+            showDefaultAdapterSuggestions();
+            
+            // Try to load from server if available
+            setTimeout(() => {
+                loadHistoryAdapters();
+            }, 1000);
+            
+            // Reload adapters when server changes
+            serverInput.on('change', () => {
+                console.log('Server changed, reloading history adapters...');
+                $('.adapter-suggestions').hide();
+                setTimeout(() => {
+                    showDefaultAdapterSuggestions();
+                    setTimeout(loadHistoryAdapters, 500);
+                }, 100);
+            });
+        }
+        
+        // Initialize tabs
+        initializeTabs();
+        
         // Auto-select server configuration
-        if (!this.server || this.server === '') {
+        if (!node.server || node.server === '') {
             const configNodes = [];
             RED.nodes.eachConfig(function(config) {
                 if (config.type === 'iob-config') {
@@ -74,8 +198,8 @@ RED.nodes.registerType('iobhistory', {
             });
             
             if (configNodes.length === 1) {
-                this.server = configNodes[0].id;
-                serverInput.val(this.server);
+                node.server = configNodes[0].id;
+                serverInput.val(node.server);
                 
                 setTimeout(() => {
                     RED.notify(`Automatically selected server: ${configNodes[0].name || configNodes[0].iobhost}`, {
@@ -95,7 +219,7 @@ RED.nodes.registerType('iobhistory', {
         });
         
         // Initialize time range mode
-        const currentMode = this.timeRange || 'duration';
+        const currentMode = node.timeRange || 'duration';
         $(`input[name="timeRangeMode"][value="${currentMode}"]`).prop('checked', true);
         $('.time-config-section').hide();
         $(`.time-config-section.${currentMode}`).show();
@@ -133,124 +257,46 @@ RED.nodes.registerType('iobhistory', {
             $(`.output-format-info.${format}`).show();
         });
         
+        // Output format change handler
+        $('#node-input-outputFormat').on('change', function() {
+            const format = $(this).val();
+            $('.output-format-info').hide();
+            $(`.output-format-info.${format}`).show();
+        });
+        
+        // Query mode change handler
+        $('#node-input-queryMode').on('change', function() {
+            const mode = $(this).val();
+            const infoElement = $('#query-mode-info');
+            let infoText = '';
+            
+            switch(mode) {
+                case 'parallel':
+                    infoText = '<i class="fa fa-info-circle"></i> <strong>Parallel:</strong> Multiple queries can run simultaneously. Fast but may overload the history adapter with many requests.';
+                    break;
+                case 'sequential':
+                    infoText = '<i class="fa fa-clock-o"></i> <strong>Sequential:</strong> Queries are processed one after another in order. Slower but ensures reliable processing of all requests.';
+                    break;
+                case 'drop':
+                    infoText = '<i class="fa fa-filter"></i> <strong>Drop:</strong> New queries are discarded while one is running. Best for UI updates where only the latest result matters.';
+                    break;
+            }
+            
+            infoElement.html(infoText);
+        });
+        
         // Initialize output format
         $('#node-input-outputFormat').trigger('change');
         
-        // History adapter suggestions - improved implementation
+        // Initialize query mode
+        $('#node-input-queryMode').trigger('change');
+        
+        // History adapter suggestions
         initializeHistoryAdapterSuggestions();
-        
-        function initializeHistoryAdapterSuggestions() {
-            // Show default suggestions immediately
-            showDefaultAdapterSuggestions();
-            
-            // Try to load from server if available
-            setTimeout(() => {
-                loadHistoryAdapters();
-            }, 1000);
-        }
-        
-        function showDefaultAdapterSuggestions() {
-            $('.adapter-list').html('<span style="color: #6c757d; font-style: italic;">Loading available adapters...</span>');
-            $('.adapter-suggestions').show();
-        }
-        
-        function loadHistoryAdapters() {
-            const serverNode = RED.nodes.node(serverInput.val());
-            if (!serverNode) {
-                console.log('No server node selected for history adapter discovery');
-                return;
-            }
-            
-            const serverId = `${serverNode.iobhost}:${serverNode.iobport}`;
-            console.log('Loading history adapters from:', serverId);
-            
-            // Use dedicated adapters API
-            $.ajax({
-                url: `/iobroker/ws/adapters/${encodeURIComponent(serverId)}`,
-                method: 'GET',
-                timeout: 15000,
-                dataType: 'json',
-                cache: false
-            }).done(function(response) {
-                console.log('History adapters response:', response);
-                
-                if (response.adapters && response.adapters.length > 0) {
-                    const adapters = response.adapters;
-                    
-                    // Create buttons with status indicators
-                    const adapterButtons = adapters.map(adapter => {
-                        const statusClass = adapter.alive ? 'alive' : (adapter.enabled ? 'enabled' : 'disabled');
-                        const statusIcon = adapter.alive ? '🟢' : (adapter.enabled ? '🟡' : '🔴');
-                        const title = `${adapter.title || adapter.name} - ${adapter.alive ? 'Running' : adapter.enabled ? 'Enabled but not running' : 'Disabled'}`;
-                        
-                        return `<a href="#" data-adapter="${adapter.name}" class="${statusClass}" title="${title}">${statusIcon} ${adapter.name}</a>`;
-                    }).join('');
-                    
-                    // Add fallback options for common instances
-                    const fallbacks = ['history.0', 'sql.0', 'influxdb.0'].filter(name => 
-                        !adapters.find(a => a.name === name)
-                    ).map(name => 
-                        `<a href="#" data-adapter="${name}" class="fallback" title="Common adapter (not verified)">${name}</a>`
-                    ).join('');
-                    
-                    $('.adapter-list').html(adapterButtons + fallbacks);
-                    
-                    // Re-add click handlers
-                    $('.adapter-list a').on('click', function(e) {
-                        e.preventDefault();
-                        const adapter = $(this).data('adapter');
-                        $('#node-input-historyAdapter').val(adapter);
-                        $(this).addClass('selected').siblings().removeClass('selected');
-                        return false;
-                    });
-                    
-                    // Highlight current selection
-                    const currentAdapter = $('#node-input-historyAdapter').val();
-                    $(`.adapter-list a[data-adapter="${currentAdapter}"]`).addClass('selected');
-                    
-                    $('.adapter-suggestions').show();
-                    
-                    console.log(`Found ${adapters.length} history adapters on ${serverId}`);
-                } else {
-                    console.log('No history adapters found, keeping default suggestions');
-                }
-            }).fail(function(xhr, status, error) {
-                console.error('Failed to load history adapters:', status, error);
-                console.log('Response:', xhr.responseText);
-                
-                // Show fallback options
-                const fallbackAdapters = ['history.0', 'sql.0', 'influxdb.0', 'history.1', 'sql.1', 'influxdb.1'];
-                $('.adapter-list').html(
-                    '<span style="color: #dc3545; margin-right: 10px;">⚠️ Could not load from server</span>' +
-                    fallbackAdapters.map(adapter => 
-                        `<a href="#" data-adapter="${adapter}" class="fallback" title="Common adapter (not verified)">${adapter}</a>`
-                    ).join('')
-                );
-                
-                // Add click handlers for fallback
-                $('.adapter-list a').on('click', function(e) {
-                    e.preventDefault();
-                    const adapter = $(this).data('adapter');
-                    $('#node-input-historyAdapter').val(adapter);
-                    $(this).addClass('selected').siblings().removeClass('selected');
-                    return false;
-                });
-            });
-        }
-        
-        // Reload adapters when server changes
-        serverInput.on('change', function() {
-            console.log('Server changed, reloading history adapters...');
-            $('.adapter-suggestions').hide();
-            setTimeout(() => {
-                showDefaultAdapterSuggestions();
-                setTimeout(loadHistoryAdapters, 500);
-            }, 100);
-        });
         
         // Load TreeView component
         loadSharedTreeView().then(() => {
-            this.treeController = window.ioBrokerSharedTreeView.setup({
+            node.treeController = window.ioBrokerSharedTreeView.setup({
                 nodeType: 'iobhistory',
                 inputId: 'node-input-stateId',
                 serverInputId: 'node-input-server',
@@ -265,7 +311,6 @@ RED.nodes.registerType('iobhistory', {
     },
 
     oneditsave: function() {
-        // Cleanup tree controller
         if (this.treeController) {
             this.treeController.cleanup();
         }
@@ -274,227 +319,389 @@ RED.nodes.registerType('iobhistory', {
 </script>
 
 <script type="text/html" data-template-name="iobhistory">
+    <style>
+        .node-config-tabs {
+            list-style: none;
+            padding: 0;
+            margin: 0 0 15px 0;
+            display: flex;
+            border-bottom: 2px solid #ddd;
+            background: linear-gradient(to bottom, #f8f9fa, #e9ecef);
+            border-radius: 6px 6px 0 0;
+        }
+        
+        .node-config-tabs li {
+            flex: 1;
+            text-align: center;
+            cursor: pointer;
+            padding: 12px 8px;
+            background: #f8f9fa;
+            border-right: 1px solid #ddd;
+            transition: all 0.2s ease;
+            font-weight: 500;
+            font-size: 13px;
+        }
+        
+        .node-config-tabs li:first-child {
+            border-radius: 6px 0 0 0;
+        }
+        
+        .node-config-tabs li:last-child {
+            border-right: none;
+            border-radius: 0 6px 0 0;
+        }
+        
+        .node-config-tabs li:hover {
+            background: #e2e6ea;
+        }
+        
+        .node-config-tabs li.active {
+            background: white;
+            color: #007bff;
+            border-bottom: 2px solid #007bff;
+            font-weight: 600;
+        }
+        
+        .tab-content {
+            min-height: 400px;
+        }
+        
+        .tab-pane {
+            display: none;
+        }
+        
+        .tab-pane.active {
+            display: block;
+        }
+        
+        .tab-section {
+            background: #f8f9fa;
+            border: 1px solid #dee2e6;
+            border-radius: 6px;
+            padding: 15px;
+            margin-bottom: 15px;
+        }
+        
+        .tab-section h4 {
+            margin: 0 0 12px 0;
+            color: #495057;
+            font-size: 14px;
+            font-weight: 600;
+            border-bottom: 1px solid #dee2e6;
+            padding-bottom: 6px;
+        }
+        
+        .form-row {
+            margin-bottom: 12px;
+        }
+        
+        .form-row:last-child {
+            margin-bottom: 0;
+        }
+        
+        .adapter-suggestions {
+            margin-top: 8px;
+            padding: 8px;
+            background-color: #f8f9fa;
+            border: 1px solid #dee2e6;
+            border-radius: 4px;
+            font-size: 12px;
+        }
+        .adapter-suggestions a {
+            display: inline-block;
+            margin: 2px 8px 2px 0;
+            padding: 4px 8px;
+            background-color: #e9ecef;
+            border: 1px solid #ced4da;
+            border-radius: 3px;
+            text-decoration: none;
+            color: #495057;
+            font-size: 11px;
+            cursor: pointer;
+            transition: all 0.2s ease;
+        }
+        .adapter-suggestions a:hover {
+            background-color: #007bff;
+            border-color: #007bff;
+            color: white;
+        }
+        .adapter-suggestions a.selected {
+            background-color: #28a745;
+            border-color: #28a745;
+            color: white;
+        }
+        .adapter-suggestions a.alive {
+            background-color: #d4edda;
+            border-color: #c3e6cb;
+            color: #155724;
+        }
+        .adapter-suggestions a.enabled {
+            background-color: #fff3cd;
+            border-color: #ffeaa7;
+            color: #856404;
+        }
+        .adapter-suggestions a.disabled {
+            background-color: #f8d7da;
+            border-color: #f5c6cb;
+            color: #721c24;
+            opacity: 0.7;
+        }
+        .adapter-suggestions a.fallback {
+            background-color: #f8f9fa;
+            border-color: #dee2e6;
+            color: #6c757d;
+            border-style: dashed;
+        }
+        
+        .time-range-options {
+            background: white;
+            border: 1px solid #dee2e6;
+            border-radius: 4px;
+            padding: 10px;
+            margin-top: 8px;
+        }
+        
+        .time-range-options label {
+            font-weight: normal;
+            margin-right: 15px;
+        }
+        
+        .output-format-info {
+            margin-top: 8px;
+            padding: 8px;
+            background-color: #e8f4fd;
+            border: 1px solid #bee5eb;
+            border-radius: 4px;
+            font-size: 12px;
+            color: #0c5460;
+        }
+    </style>
+
+    <!-- Basic Info -->
     <div class="form-row">
         <label for="node-input-name"><i class="icon-tag"></i> Name</label>
-        <input type="text" id="node-input-name" placeholder="Name">
+        <input type="text" id="node-input-name" placeholder="Optional node name">
     </div>
-    
-    <div class="form-row">
-        <label for="node-input-stateId"><i class="icon-tag"></i> State ID</label>
-        <input type="text" id="node-input-stateId" placeholder="e.g. system.adapter.admin.0.memRss (if empty, msg.topic is used)">
-    </div>
-    
-    <div class="form-row">
-        <label for="node-input-historyAdapter"><i class="icon-tag"></i> History Adapter</label>
-        <input type="text" id="node-input-historyAdapter" placeholder="e.g. history.0, sql.1, influxdb.2">
-        <div class="adapter-suggestions" style="margin-top: 5px; display: none;">
-            <span style="font-size: 12px; color: #666;">Available adapters: </span>
-            <span class="adapter-list" style="font-size: 12px;"></span>
+
+    <!-- Tab Navigation -->
+    <ul class="node-config-tabs">
+        <li data-tab="datasource">📊 Data Source</li>
+        <li data-tab="timerange">🕐 Time Range</li>
+        <li data-tab="processing">⚙️ Processing</li>
+        <li data-tab="output">📤 Output</li>
+    </ul>
+
+    <!-- Tab Content -->
+    <div class="tab-content">
+        <!-- Data Source Tab -->
+        <div class="tab-pane" data-tab="datasource">
+            <div class="tab-section">
+                <h4>State Configuration</h4>
+                <div class="form-row">
+                    <label for="node-input-stateId"><i class="icon-tag"></i> State ID</label>
+                    <input type="text" id="node-input-stateId" placeholder="e.g. system.adapter.admin.0.memRss (if empty, msg.topic is used)">
+                </div>
+            </div>
+            
+            <div class="tab-section">
+                <h4>History Adapter</h4>
+                <div class="form-row">
+                    <label for="node-input-historyAdapter"><i class="icon-tag"></i> Adapter Instance</label>
+                    <input type="text" id="node-input-historyAdapter" placeholder="e.g. history.0, sql.1, influxdb.2">
+                    <div class="adapter-suggestions" style="display: none;">
+                        <span style="font-size: 12px; color: #666;">Available adapters: </span>
+                        <span class="adapter-list" style="font-size: 12px;"></span>
+                    </div>
+                </div>
+            </div>
+            
+            <div class="tab-section">
+                <h4>Server Connection</h4>
+                <div class="form-row">
+                    <label for="node-input-server"><i class="icon-tag"></i> ioBroker Server</label>
+                    <input type="text" id="node-input-server">
+                </div>
+            </div>
         </div>
-        <style>
-            .adapter-suggestions {
-                margin-top: 8px;
-                padding: 8px;
-                background-color: #f8f9fa;
-                border: 1px solid #dee2e6;
-                border-radius: 4px;
-                font-size: 12px;
-            }
-            .adapter-suggestions a {
-                display: inline-block;
-                margin: 2px 8px 2px 0;
-                padding: 4px 8px;
-                background-color: #e9ecef;
-                border: 1px solid #ced4da;
-                border-radius: 3px;
-                text-decoration: none;
-                color: #495057;
-                font-size: 11px;
-                cursor: pointer;
-                transition: all 0.2s ease;
-            }
-            .adapter-suggestions a:hover {
-                background-color: #007bff;
-                border-color: #007bff;
-                color: white;
-            }
-            .adapter-suggestions a.selected {
-                background-color: #28a745;
-                border-color: #28a745;
-                color: white;
-            }
-            .adapter-suggestions a.alive {
-                background-color: #d4edda;
-                border-color: #c3e6cb;
-                color: #155724;
-            }
-            .adapter-suggestions a.enabled {
-                background-color: #fff3cd;
-                border-color: #ffeaa7;
-                color: #856404;
-            }
-            .adapter-suggestions a.disabled {
-                background-color: #f8d7da;
-                border-color: #f5c6cb;
-                color: #721c24;
-                opacity: 0.7;
-            }
-            .adapter-suggestions a.fallback {
-                background-color: #f8f9fa;
-                border-color: #dee2e6;
-                color: #6c757d;
-                border-style: dashed;
-            }
-        </style>
-    </div>
-    
-    <!-- Time Range Configuration -->
-    <div class="form-row">
-        <label><i class="icon-clock-o"></i> Time Range</label>
-        <div style="margin-left: 105px;">
-            <label style="width: auto; margin-right: 15px;">
-                <input type="radio" name="timeRangeMode" value="duration" style="width: auto; margin-right: 5px;"> Duration
-            </label>
-            <label style="width: auto; margin-right: 15px;">
-                <input type="radio" name="timeRangeMode" value="absolute" style="width: auto; margin-right: 5px;"> Absolute
-            </label>
-            <label style="width: auto;">
-                <input type="radio" name="timeRangeMode" value="message" style="width: auto; margin-right: 5px;"> From Message
-            </label>
+
+        <!-- Time Range Tab -->
+        <div class="tab-pane" data-tab="timerange">
+            <div class="tab-section">
+                <h4>Time Range Mode</h4>
+                <div class="time-range-options">
+                    <label><input type="radio" name="timeRangeMode" value="duration"> Duration from now</label>
+                    <label><input type="radio" name="timeRangeMode" value="absolute"> Absolute time period</label>
+                    <label><input type="radio" name="timeRangeMode" value="message"> From message properties</label>
+                </div>
+                <input type="hidden" id="node-input-timeRange">
+            </div>
+            
+            <!-- Duration Configuration -->
+            <div class="time-config-section duration">
+                <div class="tab-section">
+                    <h4>Duration Settings</h4>
+                    <div class="form-row">
+                        <label for="node-input-duration"><i class="icon-clock-o"></i> Duration</label>
+                        <input type="number" id="node-input-duration" style="width: 100px;" min="1">
+                        <select id="node-input-durationUnit" style="width: 100px; margin-left: 5px;">
+                            <option value="minutes">Minutes</option>
+                            <option value="hours">Hours</option>
+                            <option value="days">Days</option>
+                            <option value="weeks">Weeks</option>
+                        </select>
+                    </div>
+                </div>
+            </div>
+            
+            <!-- Absolute Time Configuration -->
+            <div class="time-config-section absolute">
+                <div class="tab-section">
+                    <h4>Absolute Time Period</h4>
+                    <div class="form-row">
+                        <label for="node-input-startTime"><i class="icon-calendar"></i> Start Time</label>
+                        <input type="datetime-local" id="node-input-startTime" style="width: 200px;">
+                    </div>
+                    <div class="form-row">
+                        <label for="node-input-endTime"><i class="icon-calendar"></i> End Time</label>
+                        <input type="datetime-local" id="node-input-endTime" style="width: 200px;">
+                    </div>
+                </div>
+            </div>
+            
+            <!-- Message Configuration Info -->
+            <div class="time-config-section message">
+                <div class="tab-section">
+                    <h4>Message Properties</h4>
+                    <div style="color: #0c5460; font-size: 13px;">
+                        <i class="fa fa-info-circle"></i> Time range will be read from message properties:
+                        <ul style="margin: 8px 0 0 20px;">
+                            <li><code>msg.start</code> - Start timestamp (ISO string or milliseconds)</li>
+                            <li><code>msg.end</code> - End timestamp (ISO string or milliseconds)</li>
+                            <li><code>msg.duration</code> - Duration in hours (alternative to end)</li>
+                        </ul>
+                    </div>
+                </div>
+            </div>
         </div>
-        <input type="hidden" id="node-input-timeRange">
-    </div>
-    
-    <!-- Duration Configuration -->
-    <div class="time-config-section duration">
-        <div class="form-row">
-            <label for="node-input-duration"><i class="icon-tag"></i> Duration</label>
-            <input type="number" id="node-input-duration" style="width: 100px;" min="1">
-            <select id="node-input-durationUnit" style="width: 100px; margin-left: 5px;">
-                <option value="minutes">Minutes</option>
-                <option value="hours">Hours</option>
-                <option value="days">Days</option>
-                <option value="weeks">Weeks</option>
-            </select>
+
+        <!-- Processing Tab -->
+        <div class="tab-pane" data-tab="processing">
+            <div class="tab-section">
+                <h4>Query Processing</h4>
+                <div class="form-row">
+                    <label for="node-input-queryMode"><i class="icon-cogs"></i> Query Mode</label>
+                    <select id="node-input-queryMode" style="width:100%">
+                        <option value="parallel">Parallel - Allow multiple simultaneous queries</option>
+                        <option value="sequential">Sequential - Queue queries and process one by one</option>
+                        <option value="drop">Drop - Discard new queries while one is running</option>
+                    </select>
+                    <div id="query-mode-info" style="margin-top: 8px; padding: 8px; background-color: #e8f4fd; border: 1px solid #bee5eb; border-radius: 4px; font-size: 12px; color: #0c5460;">
+                        <!-- Dynamic info will be populated here -->
+                    </div>
+                </div>
+            </div>
+            
+            <div class="tab-section">
+                <h4>Data Aggregation</h4>
+                <div class="form-row">
+                    <label for="node-input-aggregate"><i class="icon-cog"></i> Aggregation Method</label>
+                    <select id="node-input-aggregate" style="width:100%">
+                        <option value="none">None (Raw Data)</option>
+                        <option value="onchange">On Change</option>
+                        <option value="average">Average</option>
+                        <option value="min">Minimum</option>
+                        <option value="max">Maximum</option>
+                        <option value="minmax">Min/Max Pairs</option>
+                        <option value="total">Total/Sum</option>
+                        <option value="count">Count</option>
+                        <option value="percentile">Percentile</option>
+                        <option value="quantile">Quantile</option>
+                        <option value="integral">Integral</option>
+                    </select>
+                </div>
+                
+                <!-- Step Configuration -->
+                <div class="form-row" id="step-config" style="display: none;">
+                    <label for="node-input-step"><i class="icon-clock-o"></i> Step Interval</label>
+                    <input type="number" id="node-input-step" style="width: 100px;" min="1">
+                    <select id="node-input-stepUnit" style="width: 100px; margin-left: 5px;">
+                        <option value="seconds">Seconds</option>
+                        <option value="minutes">Minutes</option>
+                        <option value="hours">Hours</option>
+                    </select>
+                </div>
+                
+                <!-- Aggregation-specific options -->
+                <div class="form-row aggregate-option" id="percentile-config" style="display: none;">
+                    <label for="node-input-percentile"><i class="icon-tag"></i> Percentile</label>
+                    <input type="number" id="node-input-percentile" style="width: 100px;" min="0" max="100" value="50">
+                    <span style="margin-left: 5px; font-size: 12px; color: #666;">% (0-100)</span>
+                </div>
+                
+                <div class="form-row aggregate-option" id="quantile-config" style="display: none;">
+                    <label for="node-input-quantile"><i class="icon-tag"></i> Quantile</label>
+                    <input type="number" id="node-input-quantile" style="width: 100px;" min="0" max="1" step="0.01" value="0.5">
+                    <span style="margin-left: 5px; font-size: 12px; color: #666;">(0-1)</span>
+                </div>
+                
+                <div class="form-row aggregate-option" id="integral-config" style="display: none;">
+                    <label for="node-input-integralUnit"><i class="icon-tag"></i> Integral Unit</label>
+                    <select id="node-input-integralUnit" style="width: 150px;">
+                        <option value="1">Seconds</option>
+                        <option value="60">Minutes</option>
+                        <option value="3600">Hours</option>
+                        <option value="86400">Days</option>
+                    </select>
+                </div>
+            </div>
+            
+            <div class="tab-section">
+                <h4>Data Limits</h4>
+                <div class="form-row">
+                    <label for="node-input-maxEntries"><i class="icon-list"></i> Max Entries</label>
+                    <input type="number" id="node-input-maxEntries" style="width: 100px;" min="1" max="100000">
+                    <span style="margin-left: 5px; font-size: 12px; color: #666;">Default: 2000</span>
+                </div>
+            </div>
         </div>
-    </div>
-    
-    <!-- Absolute Time Configuration -->
-    <div class="time-config-section absolute">
-        <div class="form-row">
-            <label for="node-input-startTime"><i class="icon-tag"></i> Start Time</label>
-            <input type="datetime-local" id="node-input-startTime" style="width: 200px;">
+
+        <!-- Output Tab -->
+        <div class="tab-pane" data-tab="output">
+            <div class="tab-section">
+                <h4>Output Configuration</h4>
+                <div class="form-row">
+                    <label for="node-input-outputProperty"><i class="icon-tag"></i> Output Property</label>
+                    <input type="text" id="node-input-outputProperty" placeholder="payload">
+                </div>
+                
+                <div class="form-row">
+                    <label for="node-input-outputFormat"><i class="icon-list-alt"></i> Output Format</label>
+                    <select id="node-input-outputFormat" style="width:100%">
+                        <option value="array">Array of Data Points</option>
+                        <option value="chart">Chart.js Format</option>
+                        <option value="dashboard2">Dashboard 2.0 Format</option>
+                        <option value="statistics">Statistics Summary</option>
+                    </select>
+                </div>
+            </div>
+            
+            <!-- Output Format Information -->
+            <div class="output-format-info array" style="display: none;">
+                <i class="fa fa-info-circle"></i> <strong>Array Format:</strong> Returns raw data points as array: <code>[{val, ts, ack, from}, ...]</code>
+            </div>
+            
+            <div class="output-format-info chart" style="display: none;">
+                <i class="fa fa-info-circle"></i> <strong>Chart.js Format:</strong> Returns Chart.js dataset: <code>{labels: [], datasets: [{data: [], label: ""}]}</code>
+            </div>
+            
+            <div class="output-format-info dashboard2" style="display: none;">
+                <i class="fa fa-info-circle"></i> <strong>Dashboard 2.0 Format:</strong> Returns ui-chart compatible data: <code>[{x: timestamp, y: value}, ...]</code> with <code>msg.topic</code> as series name. Configure ui-chart: X="x", Y="y"
+            </div>
+            
+            <div class="output-format-info statistics" style="display: none;">
+                <i class="fa fa-info-circle"></i> <strong>Statistics Format:</strong> Returns summary: <code>{count, min, max, avg, first, last, timeRange}</code>
+            </div>
         </div>
-        <div class="form-row">
-            <label for="node-input-endTime"><i class="icon-tag"></i> End Time</label>
-            <input type="datetime-local" id="node-input-endTime" style="width: 200px;">
-        </div>
-    </div>
-    
-    <!-- Message Configuration Info -->
-    <div class="time-config-section message">
-        <div style="margin-left: 105px; padding: 8px; background-color: #e8f4fd; border: 1px solid #bee5eb; border-radius: 4px; font-size: 12px; color: #0c5460;">
-            <i class="fa fa-info-circle"></i> Time range from message properties:
-            <ul style="margin: 5px 0 0 20px; padding: 0;">
-                <li><code>msg.start</code> - Start timestamp (ISO string or milliseconds)</li>
-                <li><code>msg.end</code> - End timestamp (ISO string or milliseconds)</li>
-                <li><code>msg.duration</code> - Duration in hours (alternative to end)</li>
-            </ul>
-        </div>
-    </div>
-    
-    <div class="form-row">
-        <label for="node-input-aggregate"><i class="icon-tag"></i> Aggregation</label>
-        <select id="node-input-aggregate" style="width:100%">
-            <option value="none">None (Raw Data)</option>
-            <option value="onchange">On Change</option>
-            <option value="average">Average</option>
-            <option value="min">Minimum</option>
-            <option value="max">Maximum</option>
-            <option value="minmax">Min/Max Pairs</option>
-            <option value="total">Total/Sum</option>
-            <option value="count">Count</option>
-            <option value="percentile">Percentile</option>
-            <option value="quantile">Quantile</option>
-            <option value="integral">Integral</option>
-        </select>
-    </div>
-    
-    <!-- Step Configuration -->
-    <div class="form-row" id="step-config" style="display: none;">
-        <label for="node-input-step"><i class="icon-tag"></i> Step Interval</label>
-        <input type="number" id="node-input-step" style="width: 100px;" min="1">
-        <select id="node-input-stepUnit" style="width: 100px; margin-left: 5px;">
-            <option value="seconds">Seconds</option>
-            <option value="minutes">Minutes</option>
-            <option value="hours">Hours</option>
-        </select>
-    </div>
-    
-    <!-- Aggregation-specific options -->
-    <div class="form-row aggregate-option" id="percentile-config" style="display: none;">
-        <label for="node-input-percentile"><i class="icon-tag"></i> Percentile</label>
-        <input type="number" id="node-input-percentile" style="width: 100px;" min="0" max="100" value="50">
-        <span style="margin-left: 5px; font-size: 12px; color: #666;">% (0-100)</span>
-    </div>
-    
-    <div class="form-row aggregate-option" id="quantile-config" style="display: none;">
-        <label for="node-input-quantile"><i class="icon-tag"></i> Quantile</label>
-        <input type="number" id="node-input-quantile" style="width: 100px;" min="0" max="1" step="0.01" value="0.5">
-        <span style="margin-left: 5px; font-size: 12px; color: #666;">(0-1)</span>
-    </div>
-    
-    <div class="form-row aggregate-option" id="integral-config" style="display: none;">
-        <label for="node-input-integralUnit"><i class="icon-tag"></i> Integral Unit</label>
-        <select id="node-input-integralUnit" style="width: 150px;">
-            <option value="1">Seconds</option>
-            <option value="60">Minutes</option>
-            <option value="3600">Hours</option>
-            <option value="86400">Days</option>
-        </select>
-    </div>
-    
-    <div class="form-row">
-        <label for="node-input-maxEntries"><i class="icon-tag"></i> Max Entries</label>
-        <input type="number" id="node-input-maxEntries" style="width: 100px;" min="1" max="100000">
-        <span style="margin-left: 5px; font-size: 12px; color: #666;">Default: 2000</span>
-    </div>
-    
-    <div class="form-row">
-        <label for="node-input-outputProperty"><i class="icon-tag"></i> Output Property</label>
-        <input type="text" id="node-input-outputProperty" placeholder="e.g. payload">
-    </div>
-    
-    <div class="form-row">
-        <label for="node-input-outputFormat"><i class="icon-tag"></i> Output Format</label>
-        <select id="node-input-outputFormat" style="width:100%">
-            <option value="array">Array of Data Points</option>
-            <option value="chart">Chart.js Format</option>
-            <option value="dashboard2">Dashboard 2.0 Format</option>
-            <option value="statistics">Statistics Summary</option>
-        </select>
-    </div>
-    
-    <!-- Output Format Information -->
-    <div class="output-format-info array" style="display: none; margin-top: 5px; padding: 8px; background-color: #e8f4fd; border: 1px solid #bee5eb; border-radius: 4px; font-size: 12px; color: #0c5460;">
-        <i class="fa fa-info-circle"></i> <strong>Array Format:</strong> Returns raw data points as array: <code>[{val, ts, ack, from}, ...]</code>
-    </div>
-    
-    <div class="output-format-info chart" style="display: none; margin-top: 5px; padding: 8px; background-color: #e8f4fd; border: 1px solid #bee5eb; border-radius: 4px; font-size: 12px; color: #0c5460;">
-        <i class="fa fa-info-circle"></i> <strong>Chart.js Format:</strong> Returns Chart.js dataset: <code>{labels: [], datasets: [{data: [], label: ""}]}</code>
-    </div>
-    
-    <div class="output-format-info dashboard2" style="display: none; margin-top: 5px; padding: 8px; background-color: #e8f4fd; border: 1px solid #bee5eb; border-radius: 4px; font-size: 12px; color: #0c5460;">
-        <i class="fa fa-info-circle"></i> <strong>Dashboard 2.0 Format:</strong> Returns ui-chart compatible data: <code>[{x: timestamp, y: value}, ...]</code> with <code>msg.topic</code> as series name. Configure ui-chart: X="x", Y="y"
-    </div>
-    
-    <div class="output-format-info statistics" style="display: none; margin-top: 5px; padding: 8px; background-color: #e8f4fd; border: 1px solid #bee5eb; border-radius: 4px; font-size: 12px; color: #0c5460;">
-        <i class="fa fa-info-circle"></i> <strong>Statistics Format:</strong> Returns summary: <code>{count, min, max, avg, first, last, timeRange}</code>
-    </div>
-    
-    <div class="form-row">
-        <label for="node-input-server"><i class="icon-tag"></i> Server</label>
-        <input type="text" id="node-input-server">
     </div>
 </script>
 
@@ -502,34 +709,40 @@ RED.nodes.registerType('iobhistory', {
     <p>ioBroker historical data retrieval via WebSocket</p>
     
     <h3>Configuration</h3>
+    <p>The node configuration is organized into four main sections:</p>
+    
+    <h4>📊 Data Source</h4>
     <ul>
         <li><b>State ID:</b> The ioBroker state to query. If empty, <code>msg.topic</code> is used.</li>
-        <li><b>History Adapter:</b> Which history adapter instance to query. The node automatically discovers available history adapters from your ioBroker system with status indicators:
+        <li><b>History Adapter:</b> Which history adapter instance to query (auto-discovered with status indicators)</li>
+        <li><b>Server:</b> ioBroker server connection configuration</li>
+    </ul>
+    
+    <h4>🕐 Time Range</h4>
+    <ul>
+        <li><b>Duration:</b> Last X hours/days from now</li>
+        <li><b>Absolute:</b> Fixed start and end times</li>
+        <li><b>From Message:</b> Use msg.start, msg.end, or msg.duration</li>
+    </ul>
+    
+    <h4>⚙️ Processing</h4>
+    <ul>
+        <li><b>Query Mode:</b> How to handle multiple simultaneous queries:
             <ul>
-                <li>🟢 <b>Running:</b> Adapter is enabled and currently running</li>
-                <li>🟡 <b>Enabled:</b> Adapter is enabled but not currently running</li>
-                <li>🔴 <b>Disabled:</b> Adapter is installed but disabled</li>
+                <li><b>Parallel:</b> Allow multiple queries to run simultaneously (default)</li>
+                <li><b>Sequential:</b> Queue queries and process them one by one</li>
+                <li><b>Drop:</b> Discard new queries while one is already running</li>
             </ul>
         </li>
-        <li><b>Time Range:</b> How to specify the time period:
-            <ul>
-                <li><b>Duration:</b> Last X hours/days from now</li>
-                <li><b>Absolute:</b> Fixed start and end times</li>
-                <li><b>From Message:</b> Use msg.start, msg.end, or msg.duration</li>
-            </ul>
-        </li>
-        <li><b>Aggregation:</b> How to process the data:
-            <ul>
-                <li><b>None:</b> Raw data points</li>
-                <li><b>On Change:</b> Only changed values</li>
-                <li><b>Average/Min/Max:</b> Statistical aggregation over intervals</li>
-                <li><b>Total:</b> Sum for energy calculations</li>
-                <li><b>Count:</b> Number of data points</li>
-            </ul>
-        </li>
-        <li><b>Step Interval:</b> Time interval for aggregation (required for most aggregation types).</li>
-        <li><b>Max Entries:</b> Maximum number of data points to return (default: 2000).</li>
-        <li><b>Output Format:</b> Format of the returned data.</li>
+        <li><b>Aggregation:</b> How to process the data (none, average, min/max, etc.)</li>
+        <li><b>Step Interval:</b> Time interval for aggregation</li>
+        <li><b>Max Entries:</b> Limit number of returned data points</li>
+    </ul>
+    
+    <h4>📤 Output</h4>
+    <ul>
+        <li><b>Output Property:</b> Where to place the result in the message</li>
+        <li><b>Output Format:</b> Format of the returned data (Array, Chart.js, Dashboard 2.0, Statistics)</li>
     </ul>
     
     <h3>Input</h3>
@@ -545,52 +758,45 @@ RED.nodes.registerType('iobhistory', {
     </ul>
     
     <h3>Output</h3>
-    <p>Historical data in the specified format:</p>
-    
-    <h4>Array Format</h4>
-    <pre>msg.payload = [
-    {val: 123, ts: 1589458800000, ack: true, from: "system.adapter.admin.0"},
-    {val: 124, ts: 1589458860000, ack: true, from: "system.adapter.admin.0"},
-    ...
-]</pre>
-    
-    <h4>Chart.js Format</h4>
-    <pre>msg.payload = {
-    labels: ["2020-05-14 12:00", "2020-05-14 12:05", ...],
-    datasets: [{
-        label: "system.adapter.admin.0.memRss",
-        data: [123, 124, ...],
-        borderColor: "rgb(75, 192, 192)",
-        tension: 0.1
-    }]
-}</pre>
-    
-    <h4>Dashboard 2.0 Format</h4>
-    <pre>msg.payload = [
-    {x: 1589458800000, y: 123},
-    {x: 1589458860000, y: 124},
-    ...
-]
-msg.topic = "system.adapter.admin.0.memRss"</pre>
-    
-    <h4>Statistics Format</h4>
-    <pre>msg.payload = {
-    count: 288,
-    min: {val: 120, ts: 1589458800000},
-    max: {val: 150, ts: 1589461200000},
-    avg: 135.5,
-    first: {val: 123, ts: 1589458800000},
-    last: {val: 134, ts: 1589545140000},
-    timeRange: {start: 1589458800000, end: 1589545200000}
-}</pre>
-    
-    <h3>Additional Message Properties</h3>
+    <p>Historical data in the specified format plus additional properties:</p>
     <ul>
         <li><code>msg.stateId</code> - The queried state ID</li>
         <li><code>msg.adapter</code> - History adapter used</li>
         <li><code>msg.queryOptions</code> - Complete query options used</li>
         <li><code>msg.queryTime</code> - Time taken for the query (ms)</li>
+        <li><code>msg.count</code> - Number of data points returned</li>
+        <li><code>msg.queryId</code> - Unique ID for this query</li>
+        <li><code>msg.queryMode</code> - Query processing mode used</li>
+        <li><code>msg.dropped</code> - True if query was dropped (drop mode only)</li>
         <li><code>msg.error</code> - Error message if query failed</li>
+    </ul>
+    
+    <h3>Query Modes</h3>
+    <p>The node supports three different query processing modes:</p>
+    
+    <h4>Parallel Mode (Default)</h4>
+    <ul>
+        <li>Multiple queries can run simultaneously</li>
+        <li>Fastest processing for single queries</li>
+        <li>May overload history adapter with many concurrent requests</li>
+        <li>Best for: Low-frequency queries or powerful ioBroker systems</li>
+    </ul>
+    
+    <h4>Sequential Mode</h4>
+    <ul>
+        <li>Queries are processed one after another in order</li>
+        <li>All queries are executed, none are lost</li>
+        <li>Slower overall processing but more reliable</li>
+        <li>Queue status shown in node status</li>
+        <li>Best for: High-frequency queries or limited system resources</li>
+    </ul>
+    
+    <h4>Drop Mode</h4>
+    <ul>
+        <li>New queries are discarded while one is running</li>
+        <li>Only the currently running query completes</li>
+        <li>Dropped queries receive an error response with <code>msg.dropped = true</code></li>
+        <li>Best for: UI updates where only the latest result matters</li>
     </ul>
     
     <h3>Use Cases</h3>
@@ -598,14 +804,7 @@ msg.topic = "system.adapter.admin.0.memRss"</pre>
         <li>Energy consumption analysis and reporting</li>
         <li>Temperature trending and statistics</li>
         <li>System performance monitoring</li>
-        <li>Data visualization with Chart.js or Dashboard 2.0 ui-chart</li>
+        <li>Data visualization with Chart.js or Dashboard 2.0</li>
         <li>Historical data export and backup</li>
-        <li>Real-time dashboard creation with Node-RED Dashboard 2.0</li>
-    </ul>
-    
-    <h3>Performance Notes</h3>
-    <ul>
-        <li>Use appropriate aggregation to reduce data volume</li>
-        <li>Limit time ranges for large datasets</li>
     </ul>
 </script>

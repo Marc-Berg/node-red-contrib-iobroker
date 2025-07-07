@@ -1,5 +1,21 @@
 # Changelog
 
+## [0.12.0] - 2025-07-07
+
+### Added
+- **Query management for iobhistory node**
+  - Three query processing modes: parallel (default), sequential, drop
+  - Sequential mode: queue multiple queries for ordered processing
+  - Drop mode: discard new queries while one is running
+  - Queue status display in node status indicator
+  - Enhanced output with queryId, queryMode, and dropped properties
+
+### Changed
+- **iobhistory node UI improvements**
+  - Reorganized configuration into tabbed interface: Data Source, Time Range, Processing, Output
+  - Improved visual structure and user experience
+  - Better grouping of related settings
+
 ## [0.11.0] - 2025-07-06
 
 ### Added
