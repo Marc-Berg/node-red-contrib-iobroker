@@ -82,17 +82,17 @@ RED.nodes.registerType('iobsendto', {
             adapterSelect.find('option:contains("Loading")').remove();
             
             const emptyOption = adapterSelect.find('option[value=""]');
-            $('<option value="" disabled>Loading adapters...</option>').insertAfter(emptyOption);
+            $('<option value="" disabled>Loading instances...</option>').insertAfter(emptyOption);
             
             setTimeout(() => {
-                loadAvailableAdapters();
+                loadAvailableInstances();
             }, 1000);
         }
         
-        function loadAvailableAdapters() {
+        function loadAvailableInstances() {
             const serverNode = RED.nodes.node(serverInput.val());
             if (!serverNode) {
-                showFallbackAdapters();
+                showFallbackInstances();
                 return;
             }
             
@@ -106,197 +106,101 @@ RED.nodes.registerType('iobsendto', {
                 cache: false
             }).done(function(response) {
                 if (response && typeof response === 'object') {
-                    const adapters = extractAdaptersFromStates(response);
+                    const instances = extractInstancesFromStates(response);
                     
-                    if (adapters.length > 0) {
-                        populateAdapterDropdown(adapters);
+                    if (instances.length > 0) {
+                        populateInstanceDropdown(instances);
                     } else {
-                        showFallbackAdapters();
+                        showFallbackInstances();
                     }
                 } else {
-                    showFallbackAdapters();
+                    showFallbackInstances();
                 }
             }).fail(function(xhr, status, error) {
-                showFallbackAdapters();
+                showFallbackInstances();
             });
         }
         
-        function extractAdaptersFromStates(states) {
-            const adapterConfigs = new Map();
+        function extractInstancesFromStates(states) {
+            const instanceConfigs = new Map();
             
             Object.keys(states).forEach(stateId => {
                 const aliveMatch = stateId.match(/^system\.adapter\.([^.]+)\.(\d+)\.alive$/);
                 if (aliveMatch) {
                     const adapterType = aliveMatch[1];
                     const instance = parseInt(aliveMatch[2]);
-                    const adapterName = `${adapterType}.${instance}`;
+                    const instanceName = `${adapterType}.${instance}`;
                     
                     const state = states[stateId];
                     const isAlive = state && typeof state.val === 'boolean' ? state.val : Boolean(state?.val);
                     
-                    if (!adapterConfigs.has(adapterName)) {
-                        adapterConfigs.set(adapterName, {
-                            name: adapterName,
+                    if (!instanceConfigs.has(instanceName)) {
+                        instanceConfigs.set(instanceName, {
+                            name: instanceName,
                             type: adapterType,
                             instance: instance,
-                            enabled: false,
-                            alive: isAlive,
-                            mode: null
+                            alive: isAlive
                         });
                     } else {
-                        adapterConfigs.get(adapterName).alive = isAlive;
-                    }
-                }
-                
-                const enabledMatch = stateId.match(/^system\.adapter\.([^.]+)\.(\d+)\.enabled$/);
-                if (enabledMatch) {
-                    const adapterType = enabledMatch[1];
-                    const instance = parseInt(enabledMatch[2]);
-                    const adapterName = `${adapterType}.${instance}`;
-                    
-                    const state = states[stateId];
-                    const isEnabled = state && typeof state.val === 'boolean' ? state.val : Boolean(state?.val);
-                    
-                    if (!adapterConfigs.has(adapterName)) {
-                        adapterConfigs.set(adapterName, {
-                            name: adapterName,
-                            type: adapterType,
-                            instance: instance,
-                            enabled: isEnabled,
-                            alive: false,
-                            mode: null
-                        });
-                    } else {
-                        adapterConfigs.get(adapterName).enabled = isEnabled;
-                    }
-                }
-                
-                const modeMatch = stateId.match(/^system\.adapter\.([^.]+)\.(\d+)\.mode$/);
-                if (modeMatch) {
-                    const adapterType = modeMatch[1];
-                    const instance = parseInt(modeMatch[2]);
-                    const adapterName = `${adapterType}.${instance}`;
-                    
-                    const state = states[stateId];
-                    const mode = state && state.val ? state.val.toString() : null;
-                    
-                    if (adapterConfigs.has(adapterName)) {
-                        adapterConfigs.get(adapterName).mode = mode;
+                        instanceConfigs.get(instanceName).alive = isAlive;
                     }
                 }
             });
 
-            const adapters = [];
-            for (const config of adapterConfigs.values()) {
+            const instances = [];
+            for (const config of instanceConfigs.values()) {
                 if (!['admin', 'discovery', 'backitup', 'objects', 'states', 'web'].includes(config.type)) {
-                    adapters.push(config);
+                    instances.push(config);
                 }
             }
 
-            adapters.sort((a, b) => {
+            instances.sort((a, b) => {
                 if (a.type !== b.type) return a.type.localeCompare(b.type);
                 return a.instance - b.instance;
             });
 
-            return adapters;
+            return instances;
         }
         
-        function populateAdapterDropdown(adapters) {
-            console.log('🔍 populateAdapterDropdown called with', adapters.length, 'adapters');
+        function populateInstanceDropdown(instances) {
+            console.log('🔍 populateInstanceDropdown called with', instances.length, 'instances');
             
             adapterSelect.find('option:contains("Loading")').remove();
             adapterSelect.find('optgroup').remove();
             
-            const runningAdapters = [];
-            const scheduledAdapters = [];
-            const enabledAdapters = [];
-            const disabledAdapters = [];
-            
-            adapters.forEach(adapter => {
-                console.log('🔍 Processing adapter:', adapter.name, 'alive:', adapter.alive, 'enabled:', adapter.enabled, 'type:', adapter.type, 'mode:', adapter.mode);
-                
-                if (adapter.alive) {
-                    runningAdapters.push(adapter);
-                } else if (adapter.enabled) {
-                    if (['schedule', 'javascript', 'scenes', 'eventlist'].includes(adapter.type) || adapter.mode === 'schedule') {
-                        scheduledAdapters.push(adapter);
-                        console.log('🕐 Added to scheduled:', adapter.name);
-                    } else {
-                        enabledAdapters.push(adapter);
-                    }
-                } else {
-                    disabledAdapters.push(adapter);
-                }
-            });
-            
-            console.log('🔍 Categorized:', {
-                running: runningAdapters.length,
-                scheduled: scheduledAdapters.length,
-                enabled: enabledAdapters.length,
-                disabled: disabledAdapters.length
-            });
-            
             const emptyOption = adapterSelect.find('option[value=""]');
-            let insertAfter = emptyOption;
             
-            if (runningAdapters.length > 0) {
-                const runningGroup = $('<optgroup label="🟢 Running Adapters"></optgroup>');
-                runningAdapters.forEach(adapter => {
-                    runningGroup.append($('<option></option>').attr('value', adapter.name).text(adapter.name));
+            if (instances.length > 0) {
+                const instanceGroup = $('<optgroup label="📦 Available Instances"></optgroup>');
+                
+                instances.forEach(instance => {
+                    const statusIcon = instance.alive ? '🟢' : '🔴';
+                    const displayName = `${statusIcon} ${instance.name}`;
+                    instanceGroup.append($('<option></option>').attr('value', instance.name).text(displayName));
                 });
-                runningGroup.insertAfter(insertAfter);
-                insertAfter = runningGroup;
-                console.log('✅ Added running group with', runningAdapters.length, 'adapters');
-            }
-            
-            if (scheduledAdapters.length > 0) {
-                const scheduledGroup = $('<optgroup label="🕐 Scheduled Adapters"></optgroup>');
-                scheduledAdapters.forEach(adapter => {
-                    scheduledGroup.append($('<option></option>').attr('value', adapter.name).text(adapter.name));
-                });
-                scheduledGroup.insertAfter(insertAfter);
-                insertAfter = scheduledGroup;
-                console.log('✅ Added scheduled group with', scheduledAdapters.length, 'adapters');
-            }
-            
-            if (enabledAdapters.length > 0) {
-                const enabledGroup = $('<optgroup label="🟡 Enabled Adapters"></optgroup>');
-                enabledAdapters.forEach(adapter => {
-                    enabledGroup.append($('<option></option>').attr('value', adapter.name).text(adapter.name));
-                });
-                enabledGroup.insertAfter(insertAfter);
-                insertAfter = enabledGroup;
-                console.log('✅ Added enabled group with', enabledAdapters.length, 'adapters');
-            }
-            
-            if (disabledAdapters.length > 0) {
-                const disabledGroup = $('<optgroup label="🔴 Disabled Adapters"></optgroup>');
-                disabledAdapters.forEach(adapter => {
-                    const option = $('<option></option>').attr('value', adapter.name).text(adapter.name).css('color', '#888');
-                    disabledGroup.append(option);
-                });
-                disabledGroup.insertAfter(insertAfter);
-                console.log('✅ Added disabled group with', disabledAdapters.length, 'adapters');
+                
+                instanceGroup.insertAfter(emptyOption);
+                console.log('✅ Added instance group with', instances.length, 'instances');
             }
             
             const currentAdapter = node.adapter;
-            if (currentAdapter && adapters.find(a => a.name === currentAdapter)) {
+            if (currentAdapter && instances.find(i => i.name === currentAdapter)) {
                 adapterSelect.val(currentAdapter);
             }
         }
         
-        function showFallbackAdapters() {
+        function showFallbackInstances() {
             adapterSelect.find('option:contains("Loading")').remove();
             adapterSelect.find('optgroup').remove();
             
-            const fallbackGroup = $('<optgroup label="⚠️ Common Adapters (not verified)"></optgroup>');
-            const fallbackAdapters = [
+            const fallbackGroup = $('<optgroup label="⚠️ Common Instances (not verified)"></optgroup>');
+            const fallbackInstances = [
                 'telegram.0', 'email', 'pushover.0', 'javascript.0', 'sql.0', 
                 'influxdb.0', 'spotify-premium.0', 'sonos.0', 'kodi.0', 'slack.0'
             ];
             
-            fallbackAdapters.forEach(adapter => {
-                fallbackGroup.append(`<option value="${adapter}" style="color: #666;">${adapter}</option>`);
+            fallbackInstances.forEach(instance => {
+                fallbackGroup.append(`<option value="${instance}" style="color: #666;">🔴 ${instance}</option>`);
             });
             
             const emptyOption = adapterSelect.find('option[value=""]');
@@ -338,12 +242,12 @@ RED.nodes.registerType('iobsendto', {
     </div>
     
     <div class="form-row">
-        <label for="node-input-adapter"><i class="icon-tag"></i> Target Adapter</label>
+        <label for="node-input-adapter"><i class="icon-tag"></i> Target Instance</label>
         <select id="node-input-adapter" style="width: 100%;">
-            <option value="">-- Select adapter or use msg.adapter --</option>
+            <option value="">-- Select instance or use msg.instance --</option>
         </select>
         <div style="margin-top: 5px; font-size: 12px; color: #666;">
-            If no adapter is selected, <code>msg.adapter</code> will be used
+            If no instance is selected, <code>msg.instance</code> will be used
         </div>
     </div>
     
@@ -389,31 +293,29 @@ RED.nodes.registerType('iobsendto', {
 </script>
 
 <script type="text/html" data-help-name="iobsendto">
-    <p>Send commands and messages to ioBroker adapters via WebSocket using the sendTo functionality for service integration and automation.</p>
+    <p>Send commands and messages to ioBroker adapter instances via WebSocket using the sendTo functionality for service integration and automation.</p>
     
     <h3>Configuration</h3>
     <ul>
-        <li><b>Target Adapter:</b> Select from dropdown. If empty, <code>msg.adapter</code> is used.</li>
-        <li><b>Command:</b> Optional command parameter. Some adapters require this, others don't.</li>
+        <li><b>Target Instance:</b> Select from dropdown. If empty, <code>msg.instance</code> is used.</li>
+        <li><b>Command:</b> Optional command parameter. Some instances require this, others don't.</li>
         <li><b>Static Message:</b> Optional JSON message to send. If empty, <code>msg.payload</code> is used.</li>
-        <li><b>Wait for Response:</b> Enable to receive adapter response as output message.</li>
+        <li><b>Wait for Response:</b> Enable to receive instance response as output message.</li>
         <li><b>Response Timeout:</b> Maximum time to wait for response (1-60 seconds).</li>
         <li><b>Server:</b> The ioBroker server configuration.</li>
     </ul>
     
-    <h3>Adapter Selection</h3>
-    <p>The dropdown shows available adapters grouped by status:</p>
+    <h3>Instance Selection</h3>
+    <p>The dropdown shows all available adapter instances with their current status:</p>
     <ul>
-        <li><b>🟢 Running Adapters:</b> Currently active and ready to receive commands</li>
-        <li><b>🕐 Scheduled Adapters:</b> Enabled with schedule configuration but not currently running</li>
-        <li><b>🟡 Enabled Adapters:</b> Enabled but not currently running or scheduled</li>
-        <li><b>🔴 Disabled Adapters:</b> Available but disabled</li>
+        <li><b>🟢 Running:</b> Instance is currently active and ready to receive commands</li>
+        <li><b>🔴 Stopped:</b> Instance is installed but not currently running</li>
     </ul>
     
     <h3>Input Message</h3>
     <p>Message properties that can override node configuration:</p>
     <ul>
-        <li><code>msg.adapter</code> - Target adapter (overrides node setting)</li>
+        <li><code>msg.instance</code> - Target instance (overrides node setting)</li>
         <li><code>msg.command</code> - Command parameter (overrides node setting)</li>
         <li><code>msg.message</code> - Message content (overrides node setting and msg.payload)</li>
         <li><code>msg.payload</code> - Used as message if no static message configured</li>
@@ -423,14 +325,14 @@ RED.nodes.registerType('iobsendto', {
     <h3>Common Use Cases</h3>
     
     <h4>Telegram Notifications</h4>
-    <pre>// Node config: adapter="telegram.0", command="send"
+    <pre>// Node config: instance="telegram.0", command="send"
 msg.payload = {
     text: "Motion detected in living room!",
     user: "admin"
 }</pre>
     
     <h4>Email Alerts</h4>
-    <pre>// Node config: adapter="email", command=""
+    <pre>// Node config: instance="email", command=""
 msg.payload = {
     to: "admin@home.com",
     subject: "System Alert",
@@ -438,18 +340,18 @@ msg.payload = {
 }</pre>
     
     <h4>SQL Database Queries</h4>
-    <pre>// Node config: adapter="sql.0", command="query", waitForResponse=true
+    <pre>// Node config: instance="sql.0", command="query", waitForResponse=true
 msg.payload = "SELECT * FROM datapoints WHERE ts > NOW() - INTERVAL 1 DAY"</pre>
     
     <h4>JavaScript Execution</h4>
-    <pre>// Node config: adapter="javascript.0", command="toScript"
+    <pre>// Node config: instance="javascript.0", command="toScript"
 msg.payload = {
     script: "myScript",
     message: { action: "cleanup", data: [1,2,3] }
 }</pre>
     
     <h4>Media Control</h4>
-    <pre>// Node config: adapter="spotify-premium.0", command="play"
+    <pre>// Node config: instance="spotify-premium.0", command="play"
 msg.payload = {
     playlist: "Morning Music",
     volume: 60
@@ -458,24 +360,24 @@ msg.payload = {
     <h3>Output (Response Mode)</h3>
     <p>When "Wait for Response" is enabled:</p>
     <ul>
-        <li><code>msg.payload</code> - Adapter response data</li>
-        <li><code>msg.adapter</code> - Target adapter that was called</li>
+        <li><code>msg.payload</code> - Instance response data</li>
+        <li><code>msg.instance</code> - Target instance that was called</li>
         <li><code>msg.command</code> - Command that was sent</li>
-        <li><code>msg.originalMessage</code> - Original message sent to adapter</li>
+        <li><code>msg.originalMessage</code> - Original message sent to instance</li>
         <li><code>msg.responseTime</code> - Time taken for response (ms)</li>
         <li><code>msg.timestamp</code> - When response was received</li>
     </ul>
     
     <h3>Error Handling</h3>
     <ul>
-        <li>Missing adapter specification triggers error</li>
+        <li>Missing instance specification triggers error</li>
         <li>Response timeouts generate error messages</li>
         <li>Invalid JSON in static message triggers validation error</li>
         <li>Connection issues are handled by underlying WebSocket manager</li>
     </ul>
     
-    <h3>Adapter Compatibility</h3>
-    <p>Works with any ioBroker adapter that supports sendTo messages:</p>
+    <h3>Instance Compatibility</h3>
+    <p>Works with any ioBroker adapter instance that supports sendTo messages:</p>
     <ul>
         <li><b>Notifications:</b> telegram, pushover, email, slack</li>
         <li><b>Databases:</b> sql, influxdb, history</li>
