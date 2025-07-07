@@ -17,7 +17,6 @@
    .st1{fill:#3399CC;}
    .st2{fill:#ffffff;}
    .st3{fill:#e67e00;stroke:#d06a00;stroke-width:4;}
-   .st4{fill:#ffffff;stroke:#d06a00;stroke-width:3;}
 </style>
 
 <!-- EXAKT IDENTISCH ZU IOBROKER BASIS: Komplettes Original Design -->
@@ -40,43 +39,14 @@
    </g>
 </g>
 
-<!-- ZUSÄTZLICH: Orange SendTo-Symbol mit Pfeil -->
-<g transform="translate(520,520)">
-  <!-- Kommunikations-Hub (oranges Rechteck) -->
-  <rect x="-70" y="-40" width="140" height="80" rx="15" ry="15" class="st3"/>
+<!-- VEREINFACHTES SendTo-Symbol -->
+<g transform="translate(450,520)">
+  <!-- Kommunikations-Hub (oranges Rechteck - deutlich vergrößert für großen Text) -->
+  <rect x="-180" y="-80" width="360" height="160" rx="20" ry="20" class="st3"/>
   
-  <!-- SendTo Text im Hub -->
-  <text x="0" y="-10" text-anchor="middle" fill="white" font-family="Arial, sans-serif" font-size="24" font-weight="bold">send</text>
-  <text x="0" y="15" text-anchor="middle" fill="white" font-family="Arial, sans-serif" font-size="24" font-weight="bold">To</text>
-  
-  <!-- Ausgehender Pfeil (von Hub weg) -->
-  <g transform="translate(70,0)">
-    <!-- Pfeil-Linie -->
-    <line x1="0" y1="0" x2="50" y2="0" stroke="#e67e00" stroke-width="8" stroke-linecap="round"/>
-    <!-- Pfeilspitze -->
-    <polygon points="50,-15 50,15 75,0" fill="#e67e00"/>
-  </g>
-  
-  <!-- Ziel-Adapter (kleines weißes Rechteck) -->
-  <g transform="translate(80,0)">
-    <rect x="0" y="-25" width="50" height="50" rx="8" ry="8" class="st4"/>
-    <!-- Adapter Symbol (kleines Zahnrad) -->
-    <circle cx="25" cy="0" r="15" fill="#e67e00"/>
-    <circle cx="25" cy="0" r="8" fill="white"/>
-    <!-- Kleine Zähne -->
-    <rect x="23" y="-20" width="4" height="8" fill="#e67e00"/>
-    <rect x="23" y="12" width="4" height="8" fill="#e67e00"/>
-    <rect x="12" y="-2" width="8" height="4" fill="#e67e00"/>
-    <rect x="30" y="-2" width="8" height="4" fill="#e67e00"/>
-  </g>
-  
-  <!-- Antwort-Pfeil (gestrichelt, zurück zum Hub) -->
-  <g transform="translate(75,-60)">
-    <line x1="0" y1="0" x2="-50" y2="0" stroke="#3399CC" stroke-width="4" stroke-dasharray="8,4" stroke-linecap="round"/>
-    <polygon points="-50,-8 -50,8 -65,0" fill="#3399CC"/>
-    <!-- Response Label -->
-    <text x="-25" y="-15" text-anchor="middle" fill="#3399CC" font-family="Arial, sans-serif" font-size="12" font-weight="bold">response</text>
-  </g>
+  <!-- SendTo Text im Hub (nochmals doppelt so groß) -->
+  <text x="0" y="-20" text-anchor="middle" fill="white" font-family="Arial, sans-serif" font-size="96" font-weight="bold">send</text>
+  <text x="0" y="50" text-anchor="middle" fill="white" font-family="Arial, sans-serif" font-size="96" font-weight="bold">To</text>
 </g>
 
 </svg>
