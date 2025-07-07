@@ -40,6 +40,7 @@ RED.nodes.registerType('iobhistory', {
         step: { value: 300 },
         stepUnit: { value: "seconds" },
         maxEntries: { value: 2000 },
+        queryMode: { value: "parallel" }, // parallel, sequential, drop
         outputProperty: { value: "payload" },
         outputFormat: { value: "array" },
         percentile: { value: 50 },
@@ -256,8 +257,39 @@ RED.nodes.registerType('iobhistory', {
             $(`.output-format-info.${format}`).show();
         });
         
+        // Output format change handler
+        $('#node-input-outputFormat').on('change', function() {
+            const format = $(this).val();
+            $('.output-format-info').hide();
+            $(`.output-format-info.${format}`).show();
+        });
+        
+        // Query mode change handler
+        $('#node-input-queryMode').on('change', function() {
+            const mode = $(this).val();
+            const infoElement = $('#query-mode-info');
+            let infoText = '';
+            
+            switch(mode) {
+                case 'parallel':
+                    infoText = '<i class="fa fa-info-circle"></i> <strong>Parallel:</strong> Multiple queries can run simultaneously. Fast but may overload the history adapter with many requests.';
+                    break;
+                case 'sequential':
+                    infoText = '<i class="fa fa-clock-o"></i> <strong>Sequential:</strong> Queries are processed one after another in order. Slower but ensures reliable processing of all requests.';
+                    break;
+                case 'drop':
+                    infoText = '<i class="fa fa-filter"></i> <strong>Drop:</strong> New queries are discarded while one is running. Best for UI updates where only the latest result matters.';
+                    break;
+            }
+            
+            infoElement.html(infoText);
+        });
+        
         // Initialize output format
         $('#node-input-outputFormat').trigger('change');
+        
+        // Initialize query mode
+        $('#node-input-queryMode').trigger('change');
         
         // History adapter suggestions
         initializeHistoryAdapterSuggestions();
@@ -555,6 +587,21 @@ RED.nodes.registerType('iobhistory', {
         <!-- Processing Tab -->
         <div class="tab-pane" data-tab="processing">
             <div class="tab-section">
+                <h4>Query Processing</h4>
+                <div class="form-row">
+                    <label for="node-input-queryMode"><i class="icon-cogs"></i> Query Mode</label>
+                    <select id="node-input-queryMode" style="width:100%">
+                        <option value="parallel">Parallel - Allow multiple simultaneous queries</option>
+                        <option value="sequential">Sequential - Queue queries and process one by one</option>
+                        <option value="drop">Drop - Discard new queries while one is running</option>
+                    </select>
+                    <div id="query-mode-info" style="margin-top: 8px; padding: 8px; background-color: #e8f4fd; border: 1px solid #bee5eb; border-radius: 4px; font-size: 12px; color: #0c5460;">
+                        <!-- Dynamic info will be populated here -->
+                    </div>
+                </div>
+            </div>
+            
+            <div class="tab-section">
                 <h4>Data Aggregation</h4>
                 <div class="form-row">
                     <label for="node-input-aggregate"><i class="icon-cog"></i> Aggregation Method</label>
@@ -680,6 +727,13 @@ RED.nodes.registerType('iobhistory', {
     
     <h4>⚙️ Processing</h4>
     <ul>
+        <li><b>Query Mode:</b> How to handle multiple simultaneous queries:
+            <ul>
+                <li><b>Parallel:</b> Allow multiple queries to run simultaneously (default)</li>
+                <li><b>Sequential:</b> Queue queries and process them one by one</li>
+                <li><b>Drop:</b> Discard new queries while one is already running</li>
+            </ul>
+        </li>
         <li><b>Aggregation:</b> How to process the data (none, average, min/max, etc.)</li>
         <li><b>Step Interval:</b> Time interval for aggregation</li>
         <li><b>Max Entries:</b> Limit number of returned data points</li>
@@ -711,7 +765,38 @@ RED.nodes.registerType('iobhistory', {
         <li><code>msg.queryOptions</code> - Complete query options used</li>
         <li><code>msg.queryTime</code> - Time taken for the query (ms)</li>
         <li><code>msg.count</code> - Number of data points returned</li>
+        <li><code>msg.queryId</code> - Unique ID for this query</li>
+        <li><code>msg.queryMode</code> - Query processing mode used</li>
+        <li><code>msg.dropped</code> - True if query was dropped (drop mode only)</li>
         <li><code>msg.error</code> - Error message if query failed</li>
+    </ul>
+    
+    <h3>Query Modes</h3>
+    <p>The node supports three different query processing modes:</p>
+    
+    <h4>Parallel Mode (Default)</h4>
+    <ul>
+        <li>Multiple queries can run simultaneously</li>
+        <li>Fastest processing for single queries</li>
+        <li>May overload history adapter with many concurrent requests</li>
+        <li>Best for: Low-frequency queries or powerful ioBroker systems</li>
+    </ul>
+    
+    <h4>Sequential Mode</h4>
+    <ul>
+        <li>Queries are processed one after another in order</li>
+        <li>All queries are executed, none are lost</li>
+        <li>Slower overall processing but more reliable</li>
+        <li>Queue status shown in node status</li>
+        <li>Best for: High-frequency queries or limited system resources</li>
+    </ul>
+    
+    <h4>Drop Mode</h4>
+    <ul>
+        <li>New queries are discarded while one is running</li>
+        <li>Only the currently running query completes</li>
+        <li>Dropped queries receive an error response with <code>msg.dropped = true</code></li>
+        <li>Best for: UI updates where only the latest result matters</li>
     </ul>
     
     <h3>Use Cases</h3>

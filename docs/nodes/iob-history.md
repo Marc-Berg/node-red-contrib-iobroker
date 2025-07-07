@@ -36,6 +36,13 @@ The WS ioB history node allows you to retrieve historical data from ioBroker's h
 - **Start Time**: Specific start timestamp
 - **End Time**: Specific end timestamp
 
+### Query Management
+
+**Query Mode**
+- **Parallel** (default): Multiple queries can run simultaneously
+- **Sequential**: Queue queries and process them one by one in order
+- **Drop**: Discard new queries while one is already running
+
 ### Data Processing
 
 **Aggregation**
@@ -56,6 +63,30 @@ The WS ioB history node allows you to retrieve historical data from ioBroker's h
 - **Chart.js**: Formatted for Chart.js library
 - **Dashboard 2.0**: Formatted for Node-RED Dashboard 2.0 ui-chart components
 - **Statistics**: Summary statistics
+
+## Query Management Modes
+
+### Parallel Mode (Default)
+- **Behavior**: Multiple queries execute simultaneously
+- **Advantages**: Fastest processing for individual queries
+- **Disadvantages**: May overload history adapter with many concurrent requests
+- **Best for**: Low-frequency queries, powerful ioBroker systems
+- **Status Display**: Shows "Processing..." or "Ready"
+
+### Sequential Mode
+- **Behavior**: Queries are queued and processed one after another
+- **Advantages**: All queries are executed, reliable processing, no adapter overload
+- **Disadvantages**: Slower overall processing time
+- **Best for**: High-frequency queries, limited system resources, guaranteed execution
+- **Status Display**: Shows "Queue: X" when queries are waiting
+
+### Drop Mode
+- **Behavior**: New queries are discarded while one is running
+- **Advantages**: Always processes latest request, prevents queue buildup
+- **Disadvantages**: Some queries are lost
+- **Best for**: UI updates, dashboards where only latest data matters
+- **Status Display**: Shows "Running (dropping)" when discarding queries
+- **Output**: Dropped queries receive `msg.dropped = true` in error response
 
 ## Aggregation Types
 
@@ -139,13 +170,29 @@ Summary statistics:
 }
 ```
 
+## Enhanced Output Properties
+
+All queries include additional metadata:
+- `msg.queryId` - Unique identifier for tracking queries
+- `msg.queryMode` - Processing mode used (parallel/sequential/drop)
+- `msg.queryTime` - Time taken to execute the query (ms)
+- `msg.dropped` - True if query was dropped (drop mode only)
+- `msg.stateId` - The queried state ID
+- `msg.adapter` - History adapter instance used
+
 ## Performance Optimization
+
+### Query Mode Selection
+- **High-frequency triggers**: Use Sequential or Drop mode
+- **Periodic reports**: Use Parallel mode
+- **Real-time dashboards**: Use Drop mode
+- **Data analysis**: Use Sequential mode
 
 ### Query Efficiency
 - Use appropriate time ranges to limit data volume
 - Choose suitable aggregation levels
-- Avoid querying too frequently
-- Cache results when possible
+- Monitor queue status in Sequential mode
+- Consider using Drop mode for UI updates
 
 ### Aggregation Strategy
 - Use aggregation for large time ranges
@@ -197,10 +244,17 @@ For custom Chart.js implementations:
 4. Test with broader time range
 
 ### Poor Performance
-1. Reduce time range scope
-2. Increase aggregation step size
-3. Check adapter configuration
-4. Monitor database performance
+1. Switch to Sequential or Drop mode for high-frequency queries
+2. Reduce time range scope
+3. Increase aggregation step size
+4. Check adapter configuration
+5. Monitor queue status
+
+### Query Management Issues
+1. **Too many parallel queries**: Switch to Sequential mode
+2. **Missing queries**: Avoid Drop mode for critical data
+3. **Slow processing**: Check queue length in Sequential mode
+4. **System overload**: Use Drop mode to reduce load
 
 ### Data Quality Issues
 1. Validate adapter logging settings
