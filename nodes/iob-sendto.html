@@ -1,330 +1,334 @@
 <script type="text/javascript">
-    RED.nodes.registerType('iobsendto', {
-        category: 'ioBroker WS',
-        color: '#a6bbcf',
-        defaults: {
-            name: { value: "" },
-            adapter: { value: "" },
-            command: { value: "" },
-            message: { value: "" },
-            waitForResponse: { value: false },
-            responseTimeout: { value: 10000 },
-            server: { value: "", type: "iob-config" }
-        },
-        inputs: 1,
-        outputs: 1,
-        icon: "iobroker_sendto.svg",
-        paletteLabel: "WS ioB sendTo",
-        label: function () {
-            if (this.name) return this.name;
-
-            let label = this.adapter || "iob-sendto";
-            if (this.command) {
-                label += ` (${this.command})`;
-            }
-            return label;
-        },
-
-        oneditprepare: function () {
-            const node = this;
-            const serverInput = $('#node-input-server');
-            const adapterSelect = $('#node-input-adapter');
-            const customAdapterInput = $('#node-input-custom-adapter');
-
-            if (!this.server || this.server === '') {
-                const configNodes = [];
-                RED.nodes.eachConfig(function (config) {
-                    if (config.type === 'iob-config') {
-                        configNodes.push(config);
-                    }
-                });
-
-                if (configNodes.length === 1) {
-                    this.server = configNodes[0].id;
-                    serverInput.val(this.server);
-
-                    setTimeout(() => {
-                        RED.notify(`Automatically selected server: ${configNodes[0].name || configNodes[0].iobhost}`, {
-                            type: "info",
-                            timeout: 1500
-                        });
-                    }, 500);
-                }
-            }
-
-            initializeAdapterDropdown();
-
-            adapterSelect.on('change', function () {
-                const selectedValue = $(this).val();
-                if (selectedValue === '__custom__') {
-                    customAdapterInput.show().focus();
-                    customAdapterInput.attr('required', true);
-                } else {
-                    customAdapterInput.hide();
-                    customAdapterInput.attr('required', false);
-                    customAdapterInput.val('');
+RED.nodes.registerType('iobsendto', {
+    category: 'ioBroker WS',
+    color: '#a6bbcf',
+    defaults: {
+        name: { value: "" },
+        adapter: { value: "" },
+        command: { value: "" },
+        message: { value: "" },
+        waitForResponse: { value: false },
+        responseTimeout: { value: 10000 },
+        server: { value: "", type: "iob-config" }
+    },
+    inputs: 1,
+    outputs: 1,
+    icon: "iobroker_sendto.svg",
+    paletteLabel: "WS ioB sendTo",
+    label: function() {
+        if (this.name) return this.name;
+        
+        let label = this.adapter || "iob-sendto";
+        if (this.command) {
+            label += ` (${this.command})`;
+        }
+        return label;
+    },
+    
+    oneditprepare: function() {
+        const node = this;
+        const serverInput = $('#node-input-server');
+        const adapterSelect = $('#node-input-adapter');
+        
+        if (!this.server || this.server === '') {
+            const configNodes = [];
+            RED.nodes.eachConfig(function(config) {
+                if (config.type === 'iob-config') {
+                    configNodes.push(config);
                 }
             });
-
-            const currentAdapter = this.adapter;
-            if (currentAdapter && currentAdapter.trim() !== '') {
-                if (isCommonAdapter(currentAdapter)) {
-                    adapterSelect.val(currentAdapter);
-                    customAdapterInput.hide();
-                } else {
-                    adapterSelect.val('__custom__');
-                    customAdapterInput.val(currentAdapter).show();
-                    customAdapterInput.attr('required', true);
-                }
-            } else {
-                adapterSelect.val('');
-                customAdapterInput.hide();
-            }
-
-            $('#node-input-waitForResponse').on('change', function () {
-                const isChecked = $(this).prop('checked');
-                $('#response-timeout-container').toggle(isChecked);
-                $('#response-info').toggle(isChecked);
-
-                if (isChecked) {
-                    $('#no-response-info').hide();
-                } else {
-                    $('#no-response-info').show();
-                }
-            });
-
-            const waitForResponseChecked = $('#node-input-waitForResponse').prop('checked');
-            $('#response-timeout-container').toggle(waitForResponseChecked);
-            $('#response-info').toggle(waitForResponseChecked);
-            $('#no-response-info').toggle(!waitForResponseChecked);
-
-            function isCommonAdapter(adapterName) {
-                const commonAdapters = [
-                    '', 'telegram.0', 'email', 'pushover.0', 'javascript.0', 'sql.0',
-                    'influxdb.0', 'spotify-premium.0', 'sonos.0', 'kodi.0', 'slack.0',
-                    'whatsapp-cmb.0', 'signal.0', 'history.0'
-                ];
-                return commonAdapters.includes(adapterName);
-            }
-
-            function initializeAdapterDropdown() {
-                adapterSelect.find('optgroup').remove();
-                adapterSelect.find('option:contains("Loading")').remove();
-
-                const customOption = adapterSelect.find('option[value="__custom__"]');
-                $('<option value="" disabled>Loading adapters...</option>').insertAfter(customOption);
-
+            
+            if (configNodes.length === 1) {
+                this.server = configNodes[0].id;
+                serverInput.val(this.server);
+                
                 setTimeout(() => {
-                    loadAvailableAdapters();
-                }, 1000);
+                    RED.notify(`Automatically selected server: ${configNodes[0].name || configNodes[0].iobhost}`, {
+                        type: "info",
+                        timeout: 1500
+                    });
+                }, 500);
             }
-
-            function loadAvailableAdapters() {
-                const serverNode = RED.nodes.node(serverInput.val());
-                if (!serverNode) {
-                    console.log('No server node selected for adapter discovery');
-                    showFallbackAdapters();
-                    return;
-                }
-
-                const serverId = `${serverNode.iobhost}:${serverNode.iobport}`;
-                console.log('Loading adapters from:', serverId);
-
-                $.ajax({
-                    url: `/iobroker/ws/states/${encodeURIComponent(serverId)}`,
-                    method: 'GET',
-                    timeout: 15000,
-                    dataType: 'json',
-                    cache: false
-                }).done(function (response) {
-                    console.log('Adapter states response received');
-
-                    if (response && typeof response === 'object') {
-                        const adapters = extractAdaptersFromStates(response);
-
-                        if (adapters.length > 0) {
-                            populateAdapterDropdown(adapters);
-                            console.log(`Found ${adapters.length} adapters on ${serverId}`);
-                        } else {
-                            showFallbackAdapters();
-                        }
+        }
+        
+        initializeAdapterDropdown();
+        
+        const currentAdapter = this.adapter;
+        if (currentAdapter && currentAdapter.trim() !== '') {
+            adapterSelect.val(currentAdapter);
+        } else {
+            adapterSelect.val('');
+        }
+        
+        $('#node-input-waitForResponse').on('change', function() {
+            const isChecked = $(this).prop('checked');
+            $('#response-timeout-container').toggle(isChecked);
+            $('#response-info').toggle(isChecked);
+            
+            if (isChecked) {
+                $('#no-response-info').hide();
+            } else {
+                $('#no-response-info').show();
+            }
+        });
+        
+        const waitForResponseChecked = $('#node-input-waitForResponse').prop('checked');
+        $('#response-timeout-container').toggle(waitForResponseChecked);
+        $('#response-info').toggle(waitForResponseChecked);
+        $('#no-response-info').toggle(!waitForResponseChecked);
+        
+        function initializeAdapterDropdown() {
+            adapterSelect.find('optgroup').remove();
+            adapterSelect.find('option:contains("Loading")').remove();
+            
+            const emptyOption = adapterSelect.find('option[value=""]');
+            $('<option value="" disabled>Loading adapters...</option>').insertAfter(emptyOption);
+            
+            setTimeout(() => {
+                loadAvailableAdapters();
+            }, 1000);
+        }
+        
+        function loadAvailableAdapters() {
+            const serverNode = RED.nodes.node(serverInput.val());
+            if (!serverNode) {
+                showFallbackAdapters();
+                return;
+            }
+            
+            const serverId = `${serverNode.iobhost}:${serverNode.iobport}`;
+            
+            $.ajax({
+                url: `/iobroker/ws/states/${encodeURIComponent(serverId)}`,
+                method: 'GET',
+                timeout: 15000,
+                dataType: 'json',
+                cache: false
+            }).done(function(response) {
+                if (response && typeof response === 'object') {
+                    const adapters = extractAdaptersFromStates(response);
+                    
+                    if (adapters.length > 0) {
+                        populateAdapterDropdown(adapters);
                     } else {
                         showFallbackAdapters();
                     }
-                }).fail(function (xhr, status, error) {
-                    console.error('Failed to load adapters:', status, error);
+                } else {
                     showFallbackAdapters();
-                });
-            }
-
-            function extractAdaptersFromStates(states) {
-                const adapterConfigs = new Map();
-
-                Object.keys(states).forEach(stateId => {
-                    const aliveMatch = stateId.match(/^system\.adapter\.([^.]+)\.(\d+)\.alive$/);
-                    if (aliveMatch) {
-                        const adapterType = aliveMatch[1];
-                        const instance = parseInt(aliveMatch[2]);
-                        const adapterName = `${adapterType}.${instance}`;
-
-                        const state = states[stateId];
-                        const isAlive = state && typeof state.val === 'boolean' ? state.val : Boolean(state?.val);
-
-                        if (!adapterConfigs.has(adapterName)) {
-                            adapterConfigs.set(adapterName, {
-                                name: adapterName,
-                                type: adapterType,
-                                instance: instance,
-                                enabled: false,
-                                alive: isAlive
-                            });
-                        } else {
-                            adapterConfigs.get(adapterName).alive = isAlive;
-                        }
-                    }
-
-                    const enabledMatch = stateId.match(/^system\.adapter\.([^.]+)\.(\d+)\.enabled$/);
-                    if (enabledMatch) {
-                        const adapterType = enabledMatch[1];
-                        const instance = parseInt(enabledMatch[2]);
-                        const adapterName = `${adapterType}.${instance}`;
-
-                        const state = states[stateId];
-                        const isEnabled = state && typeof state.val === 'boolean' ? state.val : Boolean(state?.val);
-
-                        if (!adapterConfigs.has(adapterName)) {
-                            adapterConfigs.set(adapterName, {
-                                name: adapterName,
-                                type: adapterType,
-                                instance: instance,
-                                enabled: isEnabled,
-                                alive: false
-                            });
-                        } else {
-                            adapterConfigs.get(adapterName).enabled = isEnabled;
-                        }
-                    }
-                });
-
-                const adapters = [];
-                for (const config of adapterConfigs.values()) {
-                    if (!['admin', 'discovery', 'backitup', 'objects', 'states', 'web'].includes(config.type)) {
-                        adapters.push(config);
-                    }
                 }
-
-                adapters.sort((a, b) => {
-                    if (a.type !== b.type) return a.type.localeCompare(b.type);
-                    return a.instance - b.instance;
-                });
-
-                return adapters;
-            }
-
-            function populateAdapterDropdown(adapters) {
-                adapterSelect.find('option:contains("Loading")').remove();
-                adapterSelect.find('optgroup').remove();
-
-                const runningAdapters = [];
-                const enabledAdapters = [];
-                const disabledAdapters = [];
-
-                adapters.forEach(adapter => {
-                    if (adapter.alive) {
-                        runningAdapters.push(adapter);
-                    } else if (adapter.enabled) {
-                        enabledAdapters.push(adapter);
-                    } else {
-                        disabledAdapters.push(adapter);
-                    }
-                });
-
-                const customOption = adapterSelect.find('option[value="__custom__"]');
-
-                if (disabledAdapters.length > 0) {
-                    const disabledGroup = $('<optgroup label="🔴 Disabled Adapters"></optgroup>');
-                    disabledAdapters.forEach(adapter => {
-                        disabledGroup.append(`<option value="${adapter.name}" style="color: #888;">${adapter.name}</option>`);
-                    });
-                    disabledGroup.insertAfter(customOption);
-                }
-
-                if (enabledAdapters.length > 0) {
-                    const enabledGroup = $('<optgroup label="🟡 Enabled Adapters"></optgroup>');
-                    enabledAdapters.forEach(adapter => {
-                        enabledGroup.append(`<option value="${adapter.name}">${adapter.name}</option>`);
-                    });
-                    enabledGroup.insertAfter(customOption);
-                }
-
-                if (runningAdapters.length > 0) {
-                    const runningGroup = $('<optgroup label="🟢 Running Adapters"></optgroup>');
-                    runningAdapters.forEach(adapter => {
-                        runningGroup.append(`<option value="${adapter.name}">${adapter.name}</option>`);
-                    });
-                    runningGroup.insertAfter(customOption);
-                }
-
-                const currentAdapter = node.adapter;
-                if (currentAdapter && adapters.find(a => a.name === currentAdapter)) {
-                    adapterSelect.val(currentAdapter);
-                }
-            }
-
-            function showFallbackAdapters() {
-                console.log('No adapters found or error occurred, showing fallback options');
-
-                adapterSelect.find('option:contains("Loading")').remove();
-                adapterSelect.find('optgroup').remove();
-
-                const fallbackGroup = $('<optgroup label="⚠️ Common Adapters (not verified)"></optgroup>');
-                const fallbackAdapters = [
-                    'telegram.0', 'email', 'pushover.0', 'javascript.0', 'sql.0',
-                    'influxdb.0', 'spotify-premium.0', 'sonos.0', 'kodi.0', 'slack.0'
-                ];
-
-                fallbackAdapters.forEach(adapter => {
-                    fallbackGroup.append(`<option value="${adapter}" style="color: #666;">${adapter}</option>`);
-                });
-
-                const customOption = adapterSelect.find('option[value="__custom__"]');
-                fallbackGroup.insertAfter(customOption);
-            }
-
-            serverInput.on('change', function () {
-                console.log('Server changed, reloading adapters...');
-                adapterSelect.find('optgroup').remove();
-                adapterSelect.find('option:contains("Loading")').remove();
-
-                setTimeout(() => {
-                    initializeAdapterDropdown();
-                }, 100);
+            }).fail(function(xhr, status, error) {
+                showFallbackAdapters();
             });
-        },
+        }
+        
+        function extractAdaptersFromStates(states) {
+            const adapterConfigs = new Map();
+            
+            Object.keys(states).forEach(stateId => {
+                const aliveMatch = stateId.match(/^system\.adapter\.([^.]+)\.(\d+)\.alive$/);
+                if (aliveMatch) {
+                    const adapterType = aliveMatch[1];
+                    const instance = parseInt(aliveMatch[2]);
+                    const adapterName = `${adapterType}.${instance}`;
+                    
+                    const state = states[stateId];
+                    const isAlive = state && typeof state.val === 'boolean' ? state.val : Boolean(state?.val);
+                    
+                    if (!adapterConfigs.has(adapterName)) {
+                        adapterConfigs.set(adapterName, {
+                            name: adapterName,
+                            type: adapterType,
+                            instance: instance,
+                            enabled: false,
+                            alive: isAlive,
+                            mode: null
+                        });
+                    } else {
+                        adapterConfigs.get(adapterName).alive = isAlive;
+                    }
+                }
+                
+                const enabledMatch = stateId.match(/^system\.adapter\.([^.]+)\.(\d+)\.enabled$/);
+                if (enabledMatch) {
+                    const adapterType = enabledMatch[1];
+                    const instance = parseInt(enabledMatch[2]);
+                    const adapterName = `${adapterType}.${instance}`;
+                    
+                    const state = states[stateId];
+                    const isEnabled = state && typeof state.val === 'boolean' ? state.val : Boolean(state?.val);
+                    
+                    if (!adapterConfigs.has(adapterName)) {
+                        adapterConfigs.set(adapterName, {
+                            name: adapterName,
+                            type: adapterType,
+                            instance: instance,
+                            enabled: isEnabled,
+                            alive: false,
+                            mode: null
+                        });
+                    } else {
+                        adapterConfigs.get(adapterName).enabled = isEnabled;
+                    }
+                }
+                
+                const modeMatch = stateId.match(/^system\.adapter\.([^.]+)\.(\d+)\.mode$/);
+                if (modeMatch) {
+                    const adapterType = modeMatch[1];
+                    const instance = parseInt(modeMatch[2]);
+                    const adapterName = `${adapterType}.${instance}`;
+                    
+                    const state = states[stateId];
+                    const mode = state && state.val ? state.val.toString() : null;
+                    
+                    if (adapterConfigs.has(adapterName)) {
+                        adapterConfigs.get(adapterName).mode = mode;
+                    }
+                }
+            });
 
-        oneditsave: function () {
-            const selectedAdapter = $('#node-input-adapter').val();
-            const customAdapter = $('#node-input-custom-adapter').val().trim();
-
-            console.log('Saving adapter config:', { selectedAdapter, customAdapter });
-
-            if (selectedAdapter === '__custom__' && customAdapter) {
-                this.adapter = customAdapter;
-                console.log('Saved custom adapter:', customAdapter);
-            } else if (selectedAdapter && selectedAdapter !== '__custom__') {
-                this.adapter = selectedAdapter;
-                console.log('Saved selected adapter:', selectedAdapter);
-            } else {
-                this.adapter = "";
-                console.log('No adapter selected');
+            const adapters = [];
+            for (const config of adapterConfigs.values()) {
+                if (!['admin', 'discovery', 'backitup', 'objects', 'states', 'web'].includes(config.type)) {
+                    adapters.push(config);
+                }
             }
 
-            $('#node-input-custom-adapter').removeAttr('required');
-        },
+            adapters.sort((a, b) => {
+                if (a.type !== b.type) return a.type.localeCompare(b.type);
+                return a.instance - b.instance;
+            });
 
-        oneditresize: function () {
+            return adapters;
         }
-    });
+        
+        function populateAdapterDropdown(adapters) {
+            console.log('🔍 populateAdapterDropdown called with', adapters.length, 'adapters');
+            
+            adapterSelect.find('option:contains("Loading")').remove();
+            adapterSelect.find('optgroup').remove();
+            
+            const runningAdapters = [];
+            const scheduledAdapters = [];
+            const enabledAdapters = [];
+            const disabledAdapters = [];
+            
+            adapters.forEach(adapter => {
+                console.log('🔍 Processing adapter:', adapter.name, 'alive:', adapter.alive, 'enabled:', adapter.enabled, 'type:', adapter.type, 'mode:', adapter.mode);
+                
+                if (adapter.alive) {
+                    runningAdapters.push(adapter);
+                } else if (adapter.enabled) {
+                    if (['schedule', 'javascript', 'scenes', 'eventlist'].includes(adapter.type) || adapter.mode === 'schedule') {
+                        scheduledAdapters.push(adapter);
+                        console.log('🕐 Added to scheduled:', adapter.name);
+                    } else {
+                        enabledAdapters.push(adapter);
+                    }
+                } else {
+                    disabledAdapters.push(adapter);
+                }
+            });
+            
+            console.log('🔍 Categorized:', {
+                running: runningAdapters.length,
+                scheduled: scheduledAdapters.length,
+                enabled: enabledAdapters.length,
+                disabled: disabledAdapters.length
+            });
+            
+            const emptyOption = adapterSelect.find('option[value=""]');
+            let insertAfter = emptyOption;
+            
+            if (runningAdapters.length > 0) {
+                const runningGroup = $('<optgroup label="🟢 Running Adapters"></optgroup>');
+                runningAdapters.forEach(adapter => {
+                    runningGroup.append($('<option></option>').attr('value', adapter.name).text(adapter.name));
+                });
+                runningGroup.insertAfter(insertAfter);
+                insertAfter = runningGroup;
+                console.log('✅ Added running group with', runningAdapters.length, 'adapters');
+            }
+            
+            if (scheduledAdapters.length > 0) {
+                const scheduledGroup = $('<optgroup label="🕐 Scheduled Adapters"></optgroup>');
+                scheduledAdapters.forEach(adapter => {
+                    scheduledGroup.append($('<option></option>').attr('value', adapter.name).text(adapter.name));
+                });
+                scheduledGroup.insertAfter(insertAfter);
+                insertAfter = scheduledGroup;
+                console.log('✅ Added scheduled group with', scheduledAdapters.length, 'adapters');
+            }
+            
+            if (enabledAdapters.length > 0) {
+                const enabledGroup = $('<optgroup label="🟡 Enabled Adapters"></optgroup>');
+                enabledAdapters.forEach(adapter => {
+                    enabledGroup.append($('<option></option>').attr('value', adapter.name).text(adapter.name));
+                });
+                enabledGroup.insertAfter(insertAfter);
+                insertAfter = enabledGroup;
+                console.log('✅ Added enabled group with', enabledAdapters.length, 'adapters');
+            }
+            
+            if (disabledAdapters.length > 0) {
+                const disabledGroup = $('<optgroup label="🔴 Disabled Adapters"></optgroup>');
+                disabledAdapters.forEach(adapter => {
+                    const option = $('<option></option>').attr('value', adapter.name).text(adapter.name).css('color', '#888');
+                    disabledGroup.append(option);
+                });
+                disabledGroup.insertAfter(insertAfter);
+                console.log('✅ Added disabled group with', disabledAdapters.length, 'adapters');
+            }
+            
+            const currentAdapter = node.adapter;
+            if (currentAdapter && adapters.find(a => a.name === currentAdapter)) {
+                adapterSelect.val(currentAdapter);
+            }
+        }
+        
+        function showFallbackAdapters() {
+            adapterSelect.find('option:contains("Loading")').remove();
+            adapterSelect.find('optgroup').remove();
+            
+            const fallbackGroup = $('<optgroup label="⚠️ Common Adapters (not verified)"></optgroup>');
+            const fallbackAdapters = [
+                'telegram.0', 'email', 'pushover.0', 'javascript.0', 'sql.0', 
+                'influxdb.0', 'spotify-premium.0', 'sonos.0', 'kodi.0', 'slack.0'
+            ];
+            
+            fallbackAdapters.forEach(adapter => {
+                fallbackGroup.append(`<option value="${adapter}" style="color: #666;">${adapter}</option>`);
+            });
+            
+            const emptyOption = adapterSelect.find('option[value=""]');
+            fallbackGroup.insertAfter(emptyOption);
+        }
+        
+        serverInput.on('change', function() {
+            adapterSelect.find('optgroup').remove();
+            adapterSelect.find('option:contains("Loading")').remove();
+            
+            setTimeout(() => {
+                initializeAdapterDropdown();
+            }, 100);
+        });
+    },
+    
+    oneditsave: function() {
+        const selectedAdapter = $('#node-input-adapter').val();
+        
+        if (selectedAdapter && selectedAdapter !== '') {
+            this.adapter = selectedAdapter;
+        } else {
+            this.adapter = "";
+        }
+        
+        this.changed = true;
+        this.dirty = true;
+    },
+    
+    oneditresize: function() {
+    }
+});
 </script>
 
 <script type="text/html" data-template-name="iobsendto">
@@ -336,11 +340,8 @@
     <div class="form-row">
         <label for="node-input-adapter"><i class="icon-tag"></i> Target Adapter</label>
         <select id="node-input-adapter" style="width: 100%;">
-            <option value="__custom__">✏️ Custom / Manual Input</option>
             <option value="">-- Select adapter or use msg.adapter --</option>
         </select>
-        <input type="text" id="node-input-custom-adapter" placeholder="Enter custom adapter name (e.g. telegram.0)" 
-               style="width: 100%; margin-top: 5px; display: none;">
         <div style="margin-top: 5px; font-size: 12px; color: #666;">
             If no adapter is selected, <code>msg.adapter</code> will be used
         </div>
@@ -392,7 +393,7 @@
     
     <h3>Configuration</h3>
     <ul>
-        <li><b>Target Adapter:</b> Select from dropdown or choose "Custom" for manual input. If empty, <code>msg.adapter</code> is used.</li>
+        <li><b>Target Adapter:</b> Select from dropdown. If empty, <code>msg.adapter</code> is used.</li>
         <li><b>Command:</b> Optional command parameter. Some adapters require this, others don't.</li>
         <li><b>Static Message:</b> Optional JSON message to send. If empty, <code>msg.payload</code> is used.</li>
         <li><b>Wait for Response:</b> Enable to receive adapter response as output message.</li>
@@ -404,9 +405,9 @@
     <p>The dropdown shows available adapters grouped by status:</p>
     <ul>
         <li><b>🟢 Running Adapters:</b> Currently active and ready to receive commands</li>
-        <li><b>🟡 Enabled Adapters:</b> Enabled but not currently running</li>
+        <li><b>🕐 Scheduled Adapters:</b> Enabled with schedule configuration but not currently running</li>
+        <li><b>🟡 Enabled Adapters:</b> Enabled but not currently running or scheduled</li>
         <li><b>🔴 Disabled Adapters:</b> Available but disabled</li>
-        <li><b>✏️ Custom:</b> Manually enter any adapter name</li>
     </ul>
     
     <h3>Input Message</h3>
@@ -480,7 +481,7 @@ msg.payload = {
         <li><b>Databases:</b> sql, influxdb, history</li>
         <li><b>Media:</b> spotify, sonos, kodi</li>
         <li><b>Scripts:</b> javascript, node-red</li>
-        <li><b>Services:</b> weather, calendar (not backitup - use states instead)</li>
+        <li><b>Services:</b> weather, calendar</li>
     </ul>
     
     <h3>Performance Notes</h3>
