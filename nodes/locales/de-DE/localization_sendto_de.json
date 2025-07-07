@@ -1,0 +1,58 @@
+{
+    "iobsendto": {
+        "label": {
+            "name": "Name",
+            "adapter": "Ziel-Instanz",
+            "command": "Befehl",
+            "message": "Statische Nachricht",
+            "waitForResponse": "Auf Antwort warten",
+            "responseTimeout": "Antwort-Timeout",
+            "server": "Server"
+        },
+        "placeholder": {
+            "name": "Name",
+            "adapter": "-- Instanz auswählen oder msg.instance verwenden --",
+            "command": "z.B. send, query, toScript (optional, kann leer sein)",
+            "message": "Optionale JSON-Nachricht (leer lassen um msg.payload zu verwenden)",
+            "responseTimeout": "ms"
+        },
+        "options": {
+            "adapters": "Verfügbare Adapter:",
+            "commonInstances": "Häufige Instanzen (nicht verifiziert)"
+        },
+        "info": {
+            "adapterNote": "Falls keine Instanz ausgewählt ist, wird msg.instance verwendet",
+            "messageNote": "Falls leer, wird msg.payload als Nachrichten-Inhalt verwendet",
+            "responseMode": "Antwort-Modus:",
+            "responseModeDescription": "Node wartet auf Adapter-Antwort und sendet sie als Ausgabe-Nachricht. Nützlich für Abfragen und Befehle die Daten zurückgeben.",
+            "fireAndForgetMode": "Fire-and-forget-Modus:",
+            "fireAndForgetDescription": "Node sendet den Befehl und wartet nicht auf Antwort. Keine Ausgabe wird generiert."
+        },
+        "help": {
+            "title": "Befehle an ioBroker Adapter-Instanzen senden",
+            "description": "Sende Befehle und Nachrichten an ioBroker Adapter-Instanzen über WebSocket mittels sendTo-Funktionalität für Service-Integration und Automatisierung.",
+            "configuration": "Konfiguration",
+            "targetInstanceDescription": "Aus Dropdown auswählen. Falls leer, wird msg.instance verwendet.",
+            "commandDescription": "Optionaler Befehl-Parameter. Manche Instanzen benötigen diesen, andere nicht.",
+            "staticMessageDescription": "Optionale JSON-Nachricht zum Senden. Falls leer, wird msg.payload verwendet.",
+            "waitForResponseDescription": "Aktivieren um Instanz-Antwort als Ausgabe-Nachricht zu erhalten.",
+            "responseTimeoutDescription": "Maximale Zeit zum Warten auf Antwort (1-60 Sekunden).",
+            "serverDescription": "Die ioBroker Server-Konfiguration.",
+            "instanceSelection": "Instanz-Auswahl",
+            "instanceSelectionDescription": "Das Dropdown zeigt alle verfügbaren Adapter-Instanzen mit ihrem aktuellen Status:",
+            "instanceStatusList": [
+                "🟢 Läuft: Instanz ist aktuell aktiv und bereit Befehle zu empfangen",
+                "🔴 Gestoppt: Instanz ist installiert aber läuft derzeit nicht"
+            ],
+            "inputMessage": "Eingabe-Nachricht",
+            "inputMessageDescription": "Nachrichten-Eigenschaften die Node-Konfiguration überschreiben können:",
+            "inputMessageList": [
+                "msg.instance - Ziel-Instanz (überschreibt Node-Einstellung)",
+                "msg.command - Befehl-Parameter (überschreibt Node-Einstellung)",
+                "msg.message - Nachrichten-Inhalt (überschreibt Node-Einstellung und msg.payload)",
+                "msg.payload - Wird als Nachricht verwendet falls keine statische Nachricht konfiguriert",
+                "msg.timeout - Antwort-Timeout in Millisekunden (überschreibt Node-Einstellung)"
+            ]
+        }
+    }
+}

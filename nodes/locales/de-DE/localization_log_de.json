@@ -1,0 +1,62 @@
+{
+    "ioblog": {
+        "label": {
+            "name": "Name",
+            "logLevel": "Log-Level",
+            "outputProperty": "Ausgabe-Eigenschaft",
+            "includeTimestamp": "Zeitstempel in Ausgabe einschließen",
+            "includeSource": "Quell-Adapter in Ausgabe einschließen",
+            "server": "Server"
+        },
+        "placeholder": {
+            "name": "Node-Name (optional)",
+            "outputProperty": "payload"
+        },
+        "options": {
+            "logLevel": {
+                "silly": "Silly (alle Nachrichten)",
+                "debug": "Debug (debug und höher)",
+                "info": "Info (info und höher)",
+                "warn": "Warnung (warn und höher)",
+                "error": "Fehler (nur error)"
+            }
+        },
+        "info": {
+            "logLevelPreview": "Gewähltes Level:",
+            "debugWarning": "Hohe Anzahl: Debug und Silly Level können viele Nachrichten generieren"
+        },
+        "help": {
+            "title": "ioBroker Live Log-Abonnement",
+            "description": "ioBroker Live Log-Abonnement über WebSocket. Empfängt Log-Nachrichten in Echtzeit während sie auftreten.",
+            "configuration": "Konfiguration",
+            "logLevelDescription": "Minimum Log-Level zum Empfangen (höhere Level sind eingeschlossen)",
+            "outputPropertyDescription": "Nachrichten-Eigenschaft wo Log-Daten platziert werden (Standard: payload)",
+            "includeTimestampDescription": "Formatierten Zeitstempel zur Ausgabe-Nachricht hinzufügen",
+            "includeSourceDescription": "Quell-Adapter-Informationen zur Ausgabe-Nachricht hinzufügen",
+            "logLevels": "Log-Level",
+            "logLevelsList": [
+                "Silly: Alle Log-Nachrichten (höchste Anzahl)",
+                "Debug: Debug-Nachrichten und höher (hohe Anzahl)",
+                "Info: Informations-Nachrichten und höher (mittlere Anzahl)",
+                "Warnung: Warn- und Fehler-Nachrichten (niedrige Anzahl)",
+                "Fehler: Nur Fehler-Nachrichten (niedrigste Anzahl)"
+            ],
+            "outputMessage": "Ausgabe-Nachricht",
+            "outputMessageList": [
+                "Log-Nachricht in msg.[outputProperty]",
+                "Vollständiges Log-Objekt in msg.log",
+                "Log-Level in msg.level",
+                "Quell-Adapter in msg.source (falls verfügbar)",
+                "Zeitstempel in msg.timestamp (falls aktiviert)",
+                "Rohe Log-Daten in msg.raw"
+            ],
+            "useCases": "Anwendungsfälle",
+            "useCasesList": [
+                "Fehler-Überwachung: Level auf \"Fehler\" setzen um kritische Probleme zu erfassen",
+                "System-Überwachung: \"Info\" Level für allgemeine System-Aktivität verwenden",
+                "Entwicklung: \"Debug\" oder \"Silly\" für detaillierte Fehlerbehebung verwenden",
+                "Alarmierung: Nach Quell-Adapter filtern und Benachrichtigungen senden"
+            ]
+        }
+    }
+}

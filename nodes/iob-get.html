@@ -97,41 +97,44 @@ RED.nodes.registerType('iobget', {
 
 <script type="text/html" data-template-name="iobget">
     <div class="form-row">
-        <label for="node-input-name"><i class="icon-tag"></i> Name</label>
-        <input type="text" id="node-input-name" placeholder="Name">
+        <label for="node-input-name"><i class="icon-tag"></i> <span data-i18n="iobget.label.name"></span></label>
+        <input type="text" id="node-input-name" data-i18n="[placeholder]iobget.placeholder.name">
     </div>
     <div class="form-row">
-        <label for="node-input-state"><i class="icon-tag"></i> State</label>
-        <input type="text" id="node-input-state" placeholder="e.g. 0_userdata.0.test (if empty, msg.topic is used)">
+        <label for="node-input-state"><i class="icon-tag"></i> <span data-i18n="iobget.label.state"></span></label>
+        <input type="text" id="node-input-state" data-i18n="[placeholder]iobget.placeholder.state">
     </div>
     <div class="form-row">
-        <label for="node-input-outputProperty"><i class="icon-tag"></i> Output Property</label>
-        <input type="text" id="node-input-outputProperty" placeholder="e.g. payload">
+        <label for="node-input-outputProperty"><i class="icon-tag"></i> <span data-i18n="iobget.label.outputProperty"></span></label>
+        <input type="text" id="node-input-outputProperty" data-i18n="[placeholder]iobget.placeholder.outputProperty">
     </div>
     <div class="form-row">
-        <label for="node-input-server"><i class="icon-tag"></i> Server</label>
+        <label for="node-input-server"><i class="icon-tag"></i> <span data-i18n="iobget.label.server"></span></label>
         <input type="text" id="node-input-server">
     </div>
 </script>
 
 <script type="text/html" data-help-name="iobget">
-    <p>ioBroker state getter via WebSocket.</p>
-    <h3>Configuration</h3>
+    <p data-i18n="iobget.help.description"></p>
+    
+    <h3 data-i18n="iobget.help.configuration"></h3>
     <ul>
-        <li><b>State:</b> The ioBroker state ID. If empty, <code>msg.topic</code> is used as the state ID.</li>
-        <li><b>Output Property:</b> The message property to store the value (default: <code>payload</code>).</li>
-        <li><b>Server:</b> The ioBroker server configuration.</li>
+        <li><b data-i18n="iobget.label.state"></b>: <span data-i18n="iobget.help.stateDescription"></span></li>
+        <li><b data-i18n="iobget.label.outputProperty"></b>: <span data-i18n="iobget.help.outputPropertyDescription"></span></li>
+        <li><b data-i18n="iobget.label.server"></b>: <span data-i18n="iobget.help.serverDescription"></span></li>
     </ul>
-    <h3>State Selection</h3>
+    
+    <h3 data-i18n="iobget.help.stateSelection"></h3>
     <ul>
-        <li><b>Manual input:</b> Type the state ID directly</li>
-        <li><b>Tree browser:</b> Virtual scrolling tree view for large datasets</li>
-        <li><b>Intelligent search:</b> Pre-indexed search for instant results</li>
+        <li><b data-i18n="iobget.help.manualInput"></b></li>
+        <li><b data-i18n="iobget.help.treeBrowser"></b></li>
+        <li><b data-i18n="iobget.help.intelligentSearch"></b></li>
     </ul>
-    <h3>Output</h3>
+    
+    <h3 data-i18n="iobget.help.output"></h3>
     <ul>
-        <li>The value is stored in <code>msg.[outputProperty]</code> (default: <code>msg.payload</code>)</li>
-        <li>The complete state object is available in <code>msg.state</code></li>
-        <li>Timestamp information is included in the state object</li>
+        <li data-i18n="iobget.help.valueStored"></li>
+        <li data-i18n="iobget.help.completeState"></li>
+        <li data-i18n="iobget.help.timestampIncluded"></li>
     </ul>
 </script>

@@ -1,0 +1,73 @@
+{
+    "iobgetobject": {
+        "label": {
+            "name": "Name",
+            "objectId": "Object ID / Pattern",
+            "outputProperty": "Output Property",
+            "outputMode": "Output Mode",
+            "objectType": "Object Type Filter",
+            "includeEnums": "Include assigned Enums",
+            "enumTypes": "Enum Types",
+            "server": "Server"
+        },
+        "placeholder": {
+            "name": "Name",
+            "objectId": "e.g. system.adapter.admin.0 or system.adapter.* (if empty, msg.topic is used)",
+            "outputProperty": "e.g. payload"
+        },
+        "options": {
+            "outputMode": {
+                "single": "Single Object (for single object IDs)",
+                "array": "Array of Objects (for wildcard patterns)",
+                "object": "Object Map (objectId → object)"
+            },
+            "objectType": {
+                "all": "All Types",
+                "state": "State",
+                "channel": "Channel",
+                "device": "Device",
+                "folder": "Folder",
+                "adapter": "Adapter",
+                "instance": "Instance",
+                "host": "Host",
+                "group": "Group",
+                "user": "User",
+                "config": "Config",
+                "enum": "Enum"
+            },
+            "enumTypes": {
+                "all": "All Types (rooms, functions, custom)",
+                "rooms": "Rooms only",
+                "functions": "Functions only",
+                "roomsAndFunctions": "Rooms and Functions"
+            }
+        },
+        "info": {
+            "enumAssignment": "Enum Assignment:",
+            "enumAssignmentDescription": "Each returned object gets an enumAssignments property containing:",
+            "enumAssignmentList": [
+                "rooms - Array of assigned room enums",
+                "functions - Array of assigned function enums",
+                "other - Array of other enum assignments",
+                "totalEnums - Total number of enum assignments",
+                "roomName, functionName - Convenience properties"
+            ],
+            "enumNote": "Note: This feature requires additional queries and may increase response time."
+        },
+        "help": {
+            "title": "ioBroker Object Retrieval",
+            "description": "ioBroker object retrieval via WebSocket with wildcard pattern support and optional enum assignments.",
+            "inputModes": "Input Modes",
+            "singleObject": "Single Object: Retrieve one specific object by ID",
+            "wildcardPattern": "Wildcard Pattern: Retrieve multiple objects matching a pattern (auto-detected when * is present)",
+            "configuration": "Configuration",
+            "objectIdDescription": "The ioBroker object identifier or wildcard pattern. If empty, msg.topic is used as the object ID.",
+            "outputPropertyDescription": "The message property to store the object data (default: payload).",
+            "outputModeDescription": "How to format the output",
+            "objectTypeDescription": "Filter objects by type (state, channel, device, etc.). Leave empty to include all types.",
+            "includeEnumsDescription": "Automatically adds enum assignment information to each object.",
+            "enumTypesDescription": "Filter which enum types to include (all, rooms only, functions only, etc.).",
+            "serverDescription": "The ioBroker server configuration."
+        }
+    }
+}

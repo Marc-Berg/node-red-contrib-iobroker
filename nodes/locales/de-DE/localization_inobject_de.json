@@ -1,0 +1,37 @@
+{
+    "iobinobject": {
+        "label": {
+            "name": "Name",
+            "objectPattern": "Objekt-Muster",
+            "outputProperty": "Ausgabe-Eigenschaft",
+            "server": "Server"
+        },
+        "placeholder": {
+            "name": "Node-Name (optional)",
+            "objectPattern": "z.B. system.adapter.* oder spezifische Objekt-ID",
+            "outputProperty": "payload"
+        },
+        "info": {
+            "objectSubscription": "Objekt-Abonnement:",
+            "objectSubscriptionDescription": "Überwacht Änderungen an ioBroker Objekt-Definitionen (Metadaten, Konfiguration, Struktur).",
+            "objectSubscriptionList": [
+                "Am besten mit Wildcard-Mustern verwenden (z.B. system.adapter.*)",
+                "Erhält Benachrichtigungen wenn Objekte erstellt, geändert oder gelöscht werden",
+                "Nützlich für die Überwachung von Adapter-Installationen, Konfigurationsänderungen"
+            ]
+        },
+        "help": {
+            "title": "ioBroker Objekt-Abonnement",
+            "description": "ioBroker Objekt-Abonnement über WebSocket mit automatischer Wildcard-Erkennung.",
+            "purpose": "Zweck",
+            "purposeDescription": "Überwacht Änderungen an ioBroker Objekt-Definitionen, einschließlich Metadaten, Konfiguration und strukturellen Änderungen. Objekte definieren die Eigenschaften und Fähigkeiten von States, Channels, Devices und Adaptern.",
+            "inputModes": "Eingabe-Modi",
+            "singleObject": "Einzelnes Objekt: Ein spezifisches Objekt abonnieren",
+            "wildcardPattern": "Wildcard-Muster: Mehrere Objekte abonnieren, die einem Muster entsprechen (empfohlen)",
+            "configuration": "Konfiguration",
+            "objectPatternDescription": "Die ioBroker Objekt-ID oder Wildcard-Muster zur Überwachung",
+            "outputPropertyDescription": "Nachrichten-Eigenschaft zum Speichern der Objektdaten (Standard: payload)",
+            "serverDescription": "ioBroker Server-Konfiguration"
+        }
+    }
+}

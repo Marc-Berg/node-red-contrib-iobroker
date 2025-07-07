@@ -1,0 +1,73 @@
+{
+    "iobgetobject": {
+        "label": {
+            "name": "Name",
+            "objectId": "Objekt ID / Muster",
+            "outputProperty": "Ausgabe-Eigenschaft",
+            "outputMode": "Ausgabe-Modus",
+            "objectType": "Objekt-Typ Filter",
+            "includeEnums": "Zugewiesene Enums einschließen",
+            "enumTypes": "Enum-Typen",
+            "server": "Server"
+        },
+        "placeholder": {
+            "name": "Name",
+            "objectId": "z.B. system.adapter.admin.0 oder system.adapter.* (falls leer, wird msg.topic verwendet)",
+            "outputProperty": "z.B. payload"
+        },
+        "options": {
+            "outputMode": {
+                "single": "Einzelnes Objekt (für einzelne Objekt-IDs)",
+                "array": "Array von Objekten (für Wildcard-Muster)",
+                "object": "Objekt-Map (objectId → object)"
+            },
+            "objectType": {
+                "all": "Alle Typen",
+                "state": "State",
+                "channel": "Channel",
+                "device": "Device",
+                "folder": "Folder",
+                "adapter": "Adapter",
+                "instance": "Instance",
+                "host": "Host",
+                "group": "Group",
+                "user": "User",
+                "config": "Config",
+                "enum": "Enum"
+            },
+            "enumTypes": {
+                "all": "Alle Typen (Räume, Funktionen, benutzerdefiniert)",
+                "rooms": "Nur Räume",
+                "functions": "Nur Funktionen",
+                "roomsAndFunctions": "Räume und Funktionen"
+            }
+        },
+        "info": {
+            "enumAssignment": "Enum-Zuweisung:",
+            "enumAssignmentDescription": "Jedes zurückgegebene Objekt erhält eine enumAssignments-Eigenschaft mit:",
+            "enumAssignmentList": [
+                "rooms - Array zugewiesener Raum-Enums",
+                "functions - Array zugewiesener Funktions-Enums",
+                "other - Array anderer Enum-Zuweisungen",
+                "totalEnums - Gesamtanzahl der Enum-Zuweisungen",
+                "roomName, functionName - Komfort-Eigenschaften"
+            ],
+            "enumNote": "Hinweis: Diese Funktion erfordert zusätzliche Abfragen und kann die Antwortzeit erhöhen."
+        },
+        "help": {
+            "title": "ioBroker Objekt-Abruf",
+            "description": "ioBroker Objekt-Abruf über WebSocket mit Wildcard-Muster-Unterstützung und optionalen Enum-Zuweisungen.",
+            "inputModes": "Eingabe-Modi",
+            "singleObject": "Einzelnes Objekt: Ein spezifisches Objekt über ID abrufen",
+            "wildcardPattern": "Wildcard-Muster: Mehrere Objekte abrufen, die einem Muster entsprechen (automatisch erkannt wenn * vorhanden)",
+            "configuration": "Konfiguration",
+            "objectIdDescription": "Die ioBroker Objekt-Kennung oder Wildcard-Muster. Falls leer, wird msg.topic als Objekt-ID verwendet.",
+            "outputPropertyDescription": "Die Nachrichten-Eigenschaft zum Speichern der Objektdaten (Standard: payload).",
+            "outputModeDescription": "Wie die Ausgabe formatiert werden soll",
+            "objectTypeDescription": "Objekte nach Typ filtern (state, channel, device, etc.). Leer lassen, um alle Typen einzuschließen.",
+            "includeEnumsDescription": "Automatisch Enum-Zuweisungsinformationen zu jedem Objekt hinzufügen.",
+            "enumTypesDescription": "Filtern, welche Enum-Typen eingeschlossen werden (alle, nur Räume, nur Funktionen, etc.).",
+            "serverDescription": "Die ioBroker Server-Konfiguration."
+        }
+    }
+}

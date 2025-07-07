@@ -1,0 +1,37 @@
+{
+    "iobinobject": {
+        "label": {
+            "name": "Name",
+            "objectPattern": "Object Pattern",
+            "outputProperty": "Output Property",
+            "server": "Server"
+        },
+        "placeholder": {
+            "name": "Node name (optional)",
+            "objectPattern": "e.g. system.adapter.* or specific object ID",
+            "outputProperty": "payload"
+        },
+        "info": {
+            "objectSubscription": "Object Subscription:",
+            "objectSubscriptionDescription": "Monitors changes to ioBroker object definitions (metadata, configuration, structure).",
+            "objectSubscriptionList": [
+                "Best used with wildcard patterns (e.g., system.adapter.*)",
+                "Receives notifications when objects are created, modified, or deleted",
+                "Useful for monitoring adapter installations, configuration changes"
+            ]
+        },
+        "help": {
+            "title": "ioBroker Object Subscription",
+            "description": "ioBroker object subscription via WebSocket with automatic wildcard detection.",
+            "purpose": "Purpose",
+            "purposeDescription": "Monitors changes to ioBroker object definitions, including metadata, configuration, and structural changes. Objects define the properties and capabilities of states, channels, devices, and adapters.",
+            "inputModes": "Input Modes",
+            "singleObject": "Single Object: Subscribe to one specific object ID",
+            "wildcardPattern": "Wildcard Pattern: Subscribe to multiple objects matching a pattern (recommended)",
+            "configuration": "Configuration",
+            "objectPatternDescription": "The ioBroker object ID or wildcard pattern to monitor",
+            "outputPropertyDescription": "Message property to store the object data (default: payload)",
+            "serverDescription": "ioBroker server configuration"
+        }
+    }
+}

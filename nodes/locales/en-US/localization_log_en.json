@@ -1,0 +1,62 @@
+{
+    "ioblog": {
+        "label": {
+            "name": "Name",
+            "logLevel": "Log Level",
+            "outputProperty": "Output Property",
+            "includeTimestamp": "Include timestamp in output",
+            "includeSource": "Include source adapter in output",
+            "server": "Server"
+        },
+        "placeholder": {
+            "name": "Node name (optional)",
+            "outputProperty": "payload"
+        },
+        "options": {
+            "logLevel": {
+                "silly": "Silly (all messages)",
+                "debug": "Debug (debug and above)",
+                "info": "Info (info and above)",
+                "warn": "Warning (warn and above)",
+                "error": "Error (error only)"
+            }
+        },
+        "info": {
+            "logLevelPreview": "Selected level:",
+            "debugWarning": "High volume: Debug and Silly levels may generate many messages"
+        },
+        "help": {
+            "title": "ioBroker Live Log Subscription",
+            "description": "ioBroker live log subscription via WebSocket. Receives log messages in real-time as they occur.",
+            "configuration": "Configuration",
+            "logLevelDescription": "Minimum log level to receive (higher levels are included)",
+            "outputPropertyDescription": "Message property where log data will be placed (default: payload)",
+            "includeTimestampDescription": "Add formatted timestamp to output message",
+            "includeSourceDescription": "Add source adapter information to output message",
+            "logLevels": "Log Levels",
+            "logLevelsList": [
+                "Silly: All log messages (highest volume)",
+                "Debug: Debug messages and above (high volume)",
+                "Info: Information messages and above (medium volume)",
+                "Warning: Warning and error messages (low volume)",
+                "Error: Error messages only (lowest volume)"
+            ],
+            "outputMessage": "Output Message",
+            "outputMessageList": [
+                "Log message in msg.[outputProperty]",
+                "Complete log object in msg.log",
+                "Log level in msg.level",
+                "Source adapter in msg.source (if available)",
+                "Timestamp in msg.timestamp (if enabled)",
+                "Raw log data in msg.raw"
+            ],
+            "useCases": "Use Cases",
+            "useCasesList": [
+                "Error Monitoring: Set level to \"Error\" to catch critical issues",
+                "System Monitoring: Use \"Info\" level for general system activity",
+                "Development: Use \"Debug\" or \"Silly\" for detailed troubleshooting",
+                "Alerting: Filter by source adapter and send notifications"
+            ]
+        }
+    }
+}

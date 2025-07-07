@@ -1,0 +1,31 @@
+{
+    "iobget": {
+        "label": {
+            "name": "Name",
+            "state": "State",
+            "outputProperty": "Ausgabe-Eigenschaft",
+            "server": "Server"
+        },
+        "placeholder": {
+            "name": "Name",
+            "state": "z.B. 0_userdata.0.test (falls leer, wird msg.topic verwendet)",
+            "outputProperty": "z.B. payload"
+        },
+        "help": {
+            "title": "ioBroker State Abrufen",
+            "description": "ioBroker State-Getter über WebSocket.",
+            "configuration": "Konfiguration",
+            "stateDescription": "Die ioBroker State ID. Falls leer, wird msg.topic als State ID verwendet.",
+            "outputPropertyDescription": "Die Nachrichten-Eigenschaft zum Speichern des Wertes (Standard: payload).",
+            "serverDescription": "Die ioBroker Server-Konfiguration.",
+            "stateSelection": "State-Auswahl",
+            "manualInput": "Manuelle Eingabe: State ID direkt eingeben",
+            "treeBrowser": "Tree-Browser: Virtueller Scrolling-Tree-View für große Datensätze",
+            "intelligentSearch": "Intelligente Suche: Vorindizierte Suche für sofortige Ergebnisse",
+            "output": "Ausgabe",
+            "valueStored": "Der Wert wird in msg.[outputProperty] gespeichert (Standard: msg.payload)",
+            "completeState": "Das vollständige State-Objekt ist in msg.state verfügbar",
+            "timestampIncluded": "Zeitstempel-Informationen sind im State-Objekt enthalten"
+        }
+    }
+}
