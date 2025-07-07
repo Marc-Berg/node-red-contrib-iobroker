@@ -1,0 +1,41 @@
+{
+    "iob-config": {
+        "label": {
+            "name": "Name",
+            "iobhost": "Host",
+            "iobport": "Port", 
+            "user": "Username",
+            "password": "Password",
+            "usessl": "Use SSL"
+        },
+        "placeholder": {
+            "name": "ioBroker Server",
+            "iobhost": "e.g. 192.168.1.100 or iobroker.local",
+            "iobport": "8091",
+            "user": "Optional: ioBroker username",
+            "password": "Optional: ioBroker password"
+        },
+        "help": {
+            "title": "ioBroker Server Configuration",
+            "description": "<p>Configure connection to your ioBroker server.</p>",
+            "connection": {
+                "title": "Connection Settings",
+                "host": "IP address or hostname of your ioBroker server",
+                "port": "Port of the Admin adapter instance (recommended: dedicated instance on port 8091)",
+                "ssl": "Enable for HTTPS/WSS connections"
+            },
+            "authentication": {
+                "title": "Authentication",
+                "none": "Leave username and password empty for no authentication",
+                "oauth": "Enter valid ioBroker credentials for OAuth2 authentication",
+                "warning": "Session duration should be ≥3600 seconds (1 hour) in ioBroker settings"
+            },
+            "setup": {
+                "title": "Recommended Setup",
+                "dedicated": "Create a dedicated Admin adapter instance for Node-RED connections",
+                "port": "Configure on different port (e.g., 8091)",
+                "isolation": "Isolates Node-RED traffic from main admin interface"
+            }
+        }
+    }
+}

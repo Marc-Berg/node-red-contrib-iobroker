@@ -1,0 +1,70 @@
+{
+    "iobin": {
+        "label": {
+            "name": "Name",
+            "stateid": "State ID or Pattern",
+            "specificStates": "Specific States",
+            "objectName": "Object Name",
+            "initialValue": "Get Initial Value",
+            "outputMode": "Output Mode",
+            "multipleStates": "Multiple States",
+            "server": "Server"
+        },
+        "placeholder": {
+            "name": "Optional node name",
+            "stateid": "e.g. system.adapter.admin.0.alive or hm-rpc.*.alive",
+            "specificStates": "One state ID per line, e.g.:\nsystem.adapter.admin.0.alive\nsystem.adapter.history.0.alive",
+            "objectName": "Custom object name for state creation"
+        },
+        "options": {
+            "inputMode": {
+                "pattern": "Pattern/Wildcard",
+                "specific": "Specific States List"
+            },
+            "outputMode": {
+                "individual": "Individual - Separate message per state change",
+                "grouped": "Grouped - Combined message with all current values"
+            }
+        },
+        "sections": {
+            "stateInput": "State Input Configuration",
+            "multipleStates": "Multiple States Configuration",
+            "outputSettings": "Output Settings",
+            "advanced": "Advanced Options"
+        },
+        "info": {
+            "pattern": "Use * as wildcard to match multiple states. Examples:",
+            "patternExamples": [
+                "system.adapter.*.alive - All adapter alive states",
+                "hm-rpc.1.* - All states from HM-RPC adapter instance 1",
+                "0_userdata.0.* - All user data states"
+            ],
+            "specificStates": "Enter exact state IDs, one per line. No wildcards allowed.",
+            "objectName": "If specified, missing states will be created with this object name",
+            "initialValue": "Send current state value immediately after subscription",
+            "outputMode": {
+                "individual": "Each state change sends a separate message with msg.topic = state ID",
+                "grouped": "All state changes trigger a message with current values of all subscribed states"
+            },
+            "groupedOutput": "Grouped output includes:",
+            "groupedOutputList": [
+                "msg.topic = 'grouped_states'",
+                "msg.payload = {stateId: currentValue, ...}",
+                "msg.changedState = ID of the state that triggered the message",
+                "msg.changedValue = new value of the changed state"
+            ]
+        },
+        "help": {
+            "title": "State Change Monitoring",
+            "description": "Monitor ioBroker state changes with support for wildcards and multiple states."
+        },
+        "status": {
+            "ready": "Ready",
+            "connecting": "Connecting...",
+            "disconnected": "Disconnected",
+            "retrying": "Retrying...",
+            "failed": "Auth failed",
+            "subscribed": "Subscribed"
+        }
+    }
+}

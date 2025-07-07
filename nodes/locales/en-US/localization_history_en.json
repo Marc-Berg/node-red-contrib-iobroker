@@ -1,0 +1,128 @@
+{
+    "iobhistory": {
+        "label": {
+            "name": "Name",
+            "stateId": "State ID",
+            "historyAdapter": "History Adapter",
+            "timeRange": "Time Range",
+            "duration": "Duration",
+            "durationUnit": "Duration Unit",
+            "startTime": "Start Time",
+            "endTime": "End Time",
+            "aggregate": "Aggregation",
+            "step": "Step Interval",
+            "stepUnit": "Step Unit",
+            "maxEntries": "Max Entries",
+            "queryMode": "Query Mode",
+            "outputProperty": "Output Property",
+            "outputFormat": "Output Format",
+            "percentile": "Percentile",
+            "quantile": "Quantile",
+            "integralUnit": "Integral Unit",
+            "server": "Server"
+        },
+        "placeholder": {
+            "name": "Optional node name",
+            "stateId": "e.g. system.adapter.admin.0.memRss (if empty, msg.topic is used)",
+            "historyAdapter": "e.g. history.0, sql.1, influxdb.2",
+            "outputProperty": "payload"
+        },
+        "tabs": {
+            "datasource": "Data Source",
+            "timerange": "Time Range",
+            "processing": "Processing",
+            "output": "Output"
+        },
+        "sections": {
+            "stateConfig": "State Configuration",
+            "historyAdapterConfig": "History Adapter",
+            "serverConnection": "Server Connection",
+            "timeRangeMode": "Time Range Mode",
+            "durationSettings": "Duration Settings",
+            "absoluteTime": "Absolute Time Period",
+            "messageProperties": "Message Properties",
+            "queryProcessing": "Query Processing",
+            "dataAggregation": "Data Aggregation",
+            "dataLimits": "Data Limits",
+            "outputConfig": "Output Configuration"
+        },
+        "options": {
+            "timeRange": {
+                "duration": "Duration from now",
+                "absolute": "Absolute time period", 
+                "message": "From message properties"
+            },
+            "durationUnit": {
+                "minutes": "Minutes",
+                "hours": "Hours",
+                "days": "Days",
+                "weeks": "Weeks"
+            },
+            "aggregate": {
+                "none": "None (Raw Data)",
+                "onchange": "On Change",
+                "average": "Average",
+                "min": "Minimum",
+                "max": "Maximum",
+                "minmax": "Min/Max Pairs",
+                "total": "Total/Sum",
+                "count": "Count",
+                "percentile": "Percentile",
+                "quantile": "Quantile",
+                "integral": "Integral"
+            },
+            "stepUnit": {
+                "seconds": "Seconds",
+                "minutes": "Minutes", 
+                "hours": "Hours"
+            },
+            "queryMode": {
+                "parallel": "Parallel - Allow multiple simultaneous queries",
+                "sequential": "Sequential - Queue queries and process one by one",
+                "drop": "Drop - Discard new queries while one is running"
+            },
+            "outputFormat": {
+                "array": "Array of Data Points",
+                "chart": "Chart.js Format",
+                "dashboard2": "Dashboard 2.0 Format",
+                "statistics": "Statistics Summary"
+            },
+            "integralUnit": {
+                "seconds": "Seconds",
+                "minutes": "Minutes",
+                "hours": "Hours", 
+                "days": "Days"
+            }
+        },
+        "info": {
+            "messageProperties": "Time range will be read from message properties:",
+            "messagePropertiesList": [
+                "msg.start - Start timestamp (ISO string or milliseconds)",
+                "msg.end - End timestamp (ISO string or milliseconds)", 
+                "msg.duration - Duration in hours (alternative to end)"
+            ],
+            "adapters": "Available adapters:",
+            "adapterError": "Could not load from server",
+            "queryMode": {
+                "parallel": "Multiple queries can run simultaneously. Fast but may overload the history adapter with many requests.",
+                "sequential": "Queries are processed one after another in order. Slower but ensures reliable processing of all requests.",
+                "drop": "New queries are discarded while one is running. Best for UI updates where only the latest result matters."
+            },
+            "outputFormat": {
+                "array": "Returns raw data points as array: [{val, ts, ack, from}, ...]",
+                "chart": "Returns Chart.js dataset: {labels: [], datasets: [{data: [], label: \"\"}]}",
+                "dashboard2": "Returns ui-chart compatible data: [{x: timestamp, y: value}, ...] with msg.topic as series name. Configure ui-chart: X=\"x\", Y=\"y\"",
+                "statistics": "Returns summary: {count, min, max, avg, first, last, timeRange}"
+            }
+        },
+        "units": {
+            "percent": "% (0-100)",
+            "decimal": "(0-1)",
+            "default": "Default: 2000"
+        },
+        "help": {
+            "title": "Historical Data Retrieval",
+            "description": "Access historical data from ioBroker history adapters with flexible time ranges, aggregation options, and multiple output formats."
+        }
+    }
+}

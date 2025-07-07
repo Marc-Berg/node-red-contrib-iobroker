@@ -1,0 +1,50 @@
+{
+    "iobout": {
+        "label": {
+            "name": "Name",
+            "stateid": "State ID",
+            "objectName": "Object Name",
+            "ack": "Acknowledged",
+            "server": "Server"
+        },
+        "placeholder": {
+            "name": "Optional node name",
+            "stateid": "e.g. 0_userdata.0.myValue (if empty, msg.topic is used)",
+            "objectName": "Display name for auto-created objects"
+        },
+        "options": {
+            "ack": {
+                "true": "Acknowledged (true)",
+                "false": "Command (false)", 
+                "auto": "Auto (from msg.ack or true)"
+            }
+        },
+        "sections": {
+            "stateConfig": "State Configuration",
+            "objectCreation": "Auto Object Creation"
+        },
+        "info": {
+            "stateId": "Target state ID for value output. Can be overridden by msg.topic",
+            "objectName": "Name for automatically created objects when state doesn't exist",
+            "autoCreation": "Missing states will be created automatically with appropriate object definition",
+            "ack": "Acknowledgment flag for the state value:",
+            "ackOptions": [
+                "Acknowledged (true): Sensor value or confirmed state",
+                "Command (false): Control command to device",
+                "Auto: Uses msg.ack if present, otherwise true"
+            ]
+        },
+        "help": {
+            "title": "State Value Output",
+            "description": "Send values to ioBroker states with automatic object creation."
+        },
+        "status": {
+            "ready": "Ready",
+            "connecting": "Connecting...",
+            "disconnected": "Disconnected",
+            "retrying": "Retrying...",
+            "failed": "Auth failed",
+            "sent": "Value sent"
+        }
+    }
+}

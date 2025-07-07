@@ -1,0 +1,41 @@
+{
+    "iob-config": {
+        "label": {
+            "name": "Name",
+            "iobhost": "Host",
+            "iobport": "Port", 
+            "user": "Benutzername",
+            "password": "Passwort",
+            "usessl": "SSL verwenden"
+        },
+        "placeholder": {
+            "name": "ioBroker Server",
+            "iobhost": "z.B. 192.168.1.100 oder iobroker.local",
+            "iobport": "8091",
+            "user": "Optional: ioBroker Benutzername",
+            "password": "Optional: ioBroker Passwort"
+        },
+        "help": {
+            "title": "ioBroker Server Konfiguration",
+            "description": "<p>Konfiguriere die Verbindung zu deinem ioBroker Server.</p>",
+            "connection": {
+                "title": "Verbindungseinstellungen",
+                "host": "IP-Adresse oder Hostname deines ioBroker Servers",
+                "port": "Port der Admin Adapter Instanz (empfohlen: dedizierte Instanz auf Port 8091)",
+                "ssl": "Für HTTPS/WSS Verbindungen aktivieren"
+            },
+            "authentication": {
+                "title": "Authentifizierung",
+                "none": "Benutzername und Passwort leer lassen für keine Authentifizierung",
+                "oauth": "Gültige ioBroker Anmeldedaten für OAuth2 Authentifizierung eingeben",
+                "warning": "Session-Dauer sollte ≥3600 Sekunden (1 Stunde) in den ioBroker Einstellungen betragen"
+            },
+            "setup": {
+                "title": "Empfohlene Einrichtung",
+                "dedicated": "Erstelle eine dedizierte Admin Adapter Instanz für Node-RED Verbindungen",
+                "port": "Auf anderem Port konfigurieren (z.B. 8091)",
+                "isolation": "Trennt Node-RED Traffic von der Haupt-Admin Oberfläche"
+            }
+        }
+    }
+}

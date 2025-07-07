@@ -1,0 +1,50 @@
+{
+    "iobout": {
+        "label": {
+            "name": "Name",
+            "stateid": "State ID",
+            "objectName": "Objekt-Name",
+            "ack": "Bestätigt",
+            "server": "Server"
+        },
+        "placeholder": {
+            "name": "Optionaler Node-Name",
+            "stateid": "z.B. 0_userdata.0.meinWert (falls leer, wird msg.topic verwendet)",
+            "objectName": "Anzeigename für automatisch erstellte Objekte"
+        },
+        "options": {
+            "ack": {
+                "true": "Bestätigt (true)",
+                "false": "Befehl (false)", 
+                "auto": "Automatisch (von msg.ack oder true)"
+            }
+        },
+        "sections": {
+            "stateConfig": "State Konfiguration",
+            "objectCreation": "Automatische Objekt-Erstellung"
+        },
+        "info": {
+            "stateId": "Ziel-State ID für Wert-Ausgabe. Kann durch msg.topic überschrieben werden",
+            "objectName": "Name für automatisch erstellte Objekte wenn State nicht existiert",
+            "autoCreation": "Fehlende States werden automatisch mit passender Objekt-Definition erstellt",
+            "ack": "Bestätigungs-Flag für den State-Wert:",
+            "ackOptions": [
+                "Bestätigt (true): Sensorwert oder bestätigter Zustand",
+                "Befehl (false): Steuerbefehl an Gerät",
+                "Automatisch: Verwendet msg.ack falls vorhanden, sonst true"
+            ]
+        },
+        "help": {
+            "title": "State-Wert Ausgabe",
+            "description": "Sende Werte an ioBroker States mit automatischer Objekt-Erstellung."
+        },
+        "status": {
+            "ready": "Bereit",
+            "connecting": "Verbinde...",
+            "disconnected": "Getrennt",
+            "retrying": "Wiederhole...",
+            "failed": "Auth fehlgeschlagen",
+            "sent": "Wert gesendet"
+        }
+    }
+}

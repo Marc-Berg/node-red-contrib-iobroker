@@ -1,0 +1,70 @@
+{
+    "iobin": {
+        "label": {
+            "name": "Name",
+            "stateid": "State ID oder Muster",
+            "specificStates": "Spezifische States",
+            "objectName": "Objekt-Name",
+            "initialValue": "Anfangswert abrufen",
+            "outputMode": "Ausgabe-Modus",
+            "multipleStates": "Mehrere States",
+            "server": "Server"
+        },
+        "placeholder": {
+            "name": "Optionaler Node-Name",
+            "stateid": "z.B. system.adapter.admin.0.alive oder hm-rpc.*.alive",
+            "specificStates": "Eine State ID pro Zeile, z.B.:\nsystem.adapter.admin.0.alive\nsystem.adapter.history.0.alive",
+            "objectName": "Benutzerdefinierter Objekt-Name für State-Erstellung"
+        },
+        "options": {
+            "inputMode": {
+                "pattern": "Muster/Wildcard",
+                "specific": "Spezifische States Liste"
+            },
+            "outputMode": {
+                "individual": "Einzeln - Separate Nachricht pro State-Änderung",
+                "grouped": "Gruppiert - Kombinierte Nachricht mit allen aktuellen Werten"
+            }
+        },
+        "sections": {
+            "stateInput": "State Eingabe-Konfiguration",
+            "multipleStates": "Mehrere States Konfiguration",
+            "outputSettings": "Ausgabe-Einstellungen",
+            "advanced": "Erweiterte Optionen"
+        },
+        "info": {
+            "pattern": "Verwende * als Wildcard um mehrere States zu erfassen. Beispiele:",
+            "patternExamples": [
+                "system.adapter.*.alive - Alle Adapter-Alive States",
+                "hm-rpc.1.* - Alle States von HM-RPC Adapter Instanz 1",
+                "0_userdata.0.* - Alle Benutzerdaten States"
+            ],
+            "specificStates": "Gib exakte State IDs ein, eine pro Zeile. Keine Wildcards erlaubt.",
+            "objectName": "Falls angegeben, werden fehlende States mit diesem Objekt-Namen erstellt",
+            "initialValue": "Aktuellen State-Wert sofort nach Abonnement senden",
+            "outputMode": {
+                "individual": "Jede State-Änderung sendet eine separate Nachricht mit msg.topic = State ID",
+                "grouped": "Alle State-Änderungen lösen eine Nachricht mit aktuellen Werten aller abonnierten States aus"
+            },
+            "groupedOutput": "Gruppierte Ausgabe enthält:",
+            "groupedOutputList": [
+                "msg.topic = 'grouped_states'",
+                "msg.payload = {stateId: aktuellerWert, ...}",
+                "msg.changedState = ID des States der die Nachricht ausgelöst hat",
+                "msg.changedValue = neuer Wert des geänderten States"
+            ]
+        },
+        "help": {
+            "title": "State-Änderungen Überwachen",
+            "description": "Überwache ioBroker State-Änderungen mit Unterstützung für Wildcards und mehrere States."
+        },
+        "status": {
+            "ready": "Bereit",
+            "connecting": "Verbinde...",
+            "disconnected": "Getrennt",
+            "retrying": "Wiederhole...",
+            "failed": "Auth fehlgeschlagen",
+            "subscribed": "Abonniert"
+        }
+    }
+}

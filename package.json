@@ -36,6 +36,7 @@
     "nodes/*.js",
     "nodes/*.html",
     "nodes/icons/*.svg",
+    "nodes/locales/**/*.json",
     "lib/**/*.js",
     "shared/*.js",
     "examples/*.json",
