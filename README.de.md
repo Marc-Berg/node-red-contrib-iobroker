@@ -49,6 +49,7 @@ Das Diagramm zeigt die empfohlene Architektur mit einer dedizierten Admin Adapte
 | **WS ioB inObj** | Objektänderungen überwachen | Adapter-Installationen verfolgen | [📖 Details](docs/nodes/iob-inobj.md) |
 | **WS ioB history** | Historische Daten zugreifen | Energieverbrauchsanalyse | [📖 Details](docs/nodes/iob-history.md) |
 | **WS ioB log** | Live-Log Überwachung | Systemzustand überwachen | [📖 Details](docs/nodes/iob-log.md) |
+| **WS ioB sendTo** | Befehle an ioBroker Adapter senden | Telegram-Benachrichtigungen, Datenbankabfragen | [📖 Details](docs/nodes/iob-sendto.md) |
 
 ## 🔧 Konfiguration
 

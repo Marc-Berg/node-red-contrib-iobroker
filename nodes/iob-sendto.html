@@ -1,0 +1,396 @@
+<script type="text/javascript">
+RED.nodes.registerType('iobsendto', {
+    category: 'ioBroker WS',
+    color: '#a6bbcf',
+    defaults: {
+        name: { value: "" },
+        adapter: { value: "" },
+        command: { value: "" },
+        message: { value: "" },
+        waitForResponse: { value: false },
+        responseTimeout: { value: 10000 },
+        server: { value: "", type: "iob-config" }
+    },
+    inputs: 1,
+    outputs: 1,
+    icon: "iobroker_sendto.svg",
+    paletteLabel: "WS ioB sendTo",
+    label: function() {
+        if (this.name) return this.name;
+        
+        let label = this.adapter || "iob-sendto";
+        if (this.command) {
+            label += ` (${this.command})`;
+        }
+        return label;
+    },
+    
+    oneditprepare: function() {
+        const node = this;
+        const serverInput = $('#node-input-server');
+        const adapterSelect = $('#node-input-adapter');
+        
+        if (!this.server || this.server === '') {
+            const configNodes = [];
+            RED.nodes.eachConfig(function(config) {
+                if (config.type === 'iob-config') {
+                    configNodes.push(config);
+                }
+            });
+            
+            if (configNodes.length === 1) {
+                this.server = configNodes[0].id;
+                serverInput.val(this.server);
+                
+                setTimeout(() => {
+                    RED.notify(`Automatically selected server: ${configNodes[0].name || configNodes[0].iobhost}`, {
+                        type: "info",
+                        timeout: 1500
+                    });
+                }, 500);
+            }
+        }
+        
+        initializeAdapterDropdown();
+        
+        const currentAdapter = this.adapter;
+        if (currentAdapter && currentAdapter.trim() !== '') {
+            adapterSelect.val(currentAdapter);
+        } else {
+            adapterSelect.val('');
+        }
+        
+        $('#node-input-waitForResponse').on('change', function() {
+            const isChecked = $(this).prop('checked');
+            $('#response-timeout-container').toggle(isChecked);
+            $('#response-info').toggle(isChecked);
+            
+            if (isChecked) {
+                $('#no-response-info').hide();
+            } else {
+                $('#no-response-info').show();
+            }
+        });
+        
+        const waitForResponseChecked = $('#node-input-waitForResponse').prop('checked');
+        $('#response-timeout-container').toggle(waitForResponseChecked);
+        $('#response-info').toggle(waitForResponseChecked);
+        $('#no-response-info').toggle(!waitForResponseChecked);
+        
+        function initializeAdapterDropdown() {
+            adapterSelect.find('optgroup').remove();
+            adapterSelect.find('option:contains("Loading")').remove();
+            
+            const emptyOption = adapterSelect.find('option[value=""]');
+            $('<option value="" disabled>Loading instances...</option>').insertAfter(emptyOption);
+            
+            setTimeout(() => {
+                loadAvailableInstances();
+            }, 1000);
+        }
+        
+        function loadAvailableInstances() {
+            const serverNode = RED.nodes.node(serverInput.val());
+            if (!serverNode) {
+                showFallbackInstances();
+                return;
+            }
+            
+            const serverId = `${serverNode.iobhost}:${serverNode.iobport}`;
+            
+            $.ajax({
+                url: `/iobroker/ws/states/${encodeURIComponent(serverId)}`,
+                method: 'GET',
+                timeout: 15000,
+                dataType: 'json',
+                cache: false
+            }).done(function(response) {
+                if (response && typeof response === 'object') {
+                    const instances = extractInstancesFromStates(response);
+                    
+                    if (instances.length > 0) {
+                        populateInstanceDropdown(instances);
+                    } else {
+                        showFallbackInstances();
+                    }
+                } else {
+                    showFallbackInstances();
+                }
+            }).fail(function(xhr, status, error) {
+                showFallbackInstances();
+            });
+        }
+        
+        function extractInstancesFromStates(states) {
+            const instanceConfigs = new Map();
+            
+            Object.keys(states).forEach(stateId => {
+                const aliveMatch = stateId.match(/^system\.adapter\.([^.]+)\.(\d+)\.alive$/);
+                if (aliveMatch) {
+                    const adapterType = aliveMatch[1];
+                    const instance = parseInt(aliveMatch[2]);
+                    const instanceName = `${adapterType}.${instance}`;
+                    
+                    const state = states[stateId];
+                    const isAlive = state && typeof state.val === 'boolean' ? state.val : Boolean(state?.val);
+                    
+                    if (!instanceConfigs.has(instanceName)) {
+                        instanceConfigs.set(instanceName, {
+                            name: instanceName,
+                            type: adapterType,
+                            instance: instance,
+                            alive: isAlive
+                        });
+                    } else {
+                        instanceConfigs.get(instanceName).alive = isAlive;
+                    }
+                }
+            });
+
+            const instances = [];
+            for (const config of instanceConfigs.values()) {
+                if (!['admin', 'discovery', 'backitup', 'objects', 'states', 'web'].includes(config.type)) {
+                    instances.push(config);
+                }
+            }
+
+            instances.sort((a, b) => {
+                if (a.type !== b.type) return a.type.localeCompare(b.type);
+                return a.instance - b.instance;
+            });
+
+            return instances;
+        }
+        
+        function populateInstanceDropdown(instances) {
+            console.log('🔍 populateInstanceDropdown called with', instances.length, 'instances');
+            
+            adapterSelect.find('option:contains("Loading")').remove();
+            adapterSelect.find('optgroup').remove();
+            
+            const emptyOption = adapterSelect.find('option[value=""]');
+            
+            if (instances.length > 0) {
+                const instanceGroup = $('<optgroup label="📦 Available Instances"></optgroup>');
+                
+                instances.forEach(instance => {
+                    const statusIcon = instance.alive ? '🟢' : '🔴';
+                    const displayName = `${statusIcon} ${instance.name}`;
+                    instanceGroup.append($('<option></option>').attr('value', instance.name).text(displayName));
+                });
+                
+                instanceGroup.insertAfter(emptyOption);
+                console.log('✅ Added instance group with', instances.length, 'instances');
+            }
+            
+            const currentAdapter = node.adapter;
+            if (currentAdapter && instances.find(i => i.name === currentAdapter)) {
+                adapterSelect.val(currentAdapter);
+            }
+        }
+        
+        function showFallbackInstances() {
+            adapterSelect.find('option:contains("Loading")').remove();
+            adapterSelect.find('optgroup').remove();
+            
+            const fallbackGroup = $('<optgroup label="⚠️ Common Instances (not verified)"></optgroup>');
+            const fallbackInstances = [
+                'telegram.0', 'email', 'pushover.0', 'javascript.0', 'sql.0', 
+                'influxdb.0', 'spotify-premium.0', 'sonos.0', 'kodi.0', 'slack.0'
+            ];
+            
+            fallbackInstances.forEach(instance => {
+                fallbackGroup.append(`<option value="${instance}" style="color: #666;">🔴 ${instance}</option>`);
+            });
+            
+            const emptyOption = adapterSelect.find('option[value=""]');
+            fallbackGroup.insertAfter(emptyOption);
+        }
+        
+        serverInput.on('change', function() {
+            adapterSelect.find('optgroup').remove();
+            adapterSelect.find('option:contains("Loading")').remove();
+            
+            setTimeout(() => {
+                initializeAdapterDropdown();
+            }, 100);
+        });
+    },
+    
+    oneditsave: function() {
+        const selectedAdapter = $('#node-input-adapter').val();
+        
+        if (selectedAdapter && selectedAdapter !== '') {
+            this.adapter = selectedAdapter;
+        } else {
+            this.adapter = "";
+        }
+        
+        this.changed = true;
+        this.dirty = true;
+    },
+    
+    oneditresize: function() {
+    }
+});
+</script>
+
+<script type="text/html" data-template-name="iobsendto">
+    <div class="form-row">
+        <label for="node-input-name"><i class="icon-tag"></i> Name</label>
+        <input type="text" id="node-input-name" placeholder="Name">
+    </div>
+    
+    <div class="form-row">
+        <label for="node-input-adapter"><i class="icon-tag"></i> Target Instance</label>
+        <select id="node-input-adapter" style="width: 100%;">
+            <option value="">-- Select instance or use msg.instance --</option>
+        </select>
+        <div style="margin-top: 5px; font-size: 12px; color: #666;">
+            If no instance is selected, <code>msg.instance</code> will be used
+        </div>
+    </div>
+    
+    <div class="form-row">
+        <label for="node-input-command"><i class="icon-tag"></i> Command</label>
+        <input type="text" id="node-input-command" placeholder="e.g. send, query, toScript (optional, can be empty)">
+    </div>
+    
+    <div class="form-row">
+        <label for="node-input-message"><i class="icon-tag"></i> Static Message</label>
+        <textarea id="node-input-message" rows="4" style="width:100%; font-family: monospace;" placeholder="Optional JSON message (leave empty to use msg.payload)"></textarea>
+        <div style="margin-top: 5px; font-size: 12px; color: #666;">
+            If empty, <code>msg.payload</code> will be used as the message content
+        </div>
+    </div>
+    
+    <div class="form-row">
+        <label for="node-input-waitForResponse" style="width: auto;">
+            <input type="checkbox" id="node-input-waitForResponse" style="width: auto; margin-right: 5px;">
+            <i class="icon-tag"></i> Wait for response
+        </label>
+    </div>
+    
+    <div class="form-row" id="response-timeout-container" style="display: none;">
+        <label for="node-input-responseTimeout"><i class="icon-tag"></i> Response Timeout</label>
+        <input type="number" id="node-input-responseTimeout" style="width: 120px;" min="1000" max="60000" step="1000"> ms
+    </div>
+    
+    <div id="response-info" style="display: none; margin-top: 5px; padding: 8px; background-color: #e8f4fd; border: 1px solid #bee5eb; border-radius: 4px; font-size: 12px; color: #0c5460;">
+        <i class="fa fa-info-circle"></i> <strong>Response Mode:</strong><br>
+        Node will wait for adapter response and send it as output message. Useful for queries and commands that return data.
+    </div>
+    
+    <div id="no-response-info" style="margin-top: 5px; padding: 8px; background-color: #fff3cd; border: 1px solid #ffeaa7; border-radius: 4px; font-size: 12px; color: #856404;">
+        <i class="fa fa-info-circle"></i> <strong>Fire-and-forget Mode:</strong><br>
+        Node will send the command and not wait for response. No output will be generated.
+    </div>
+    
+    <div class="form-row">
+        <label for="node-input-server"><i class="icon-tag"></i> Server</label>
+        <input type="text" id="node-input-server">
+    </div>
+</script>
+
+<script type="text/html" data-help-name="iobsendto">
+    <p>Send commands and messages to ioBroker adapter instances via WebSocket using the sendTo functionality for service integration and automation.</p>
+    
+    <h3>Configuration</h3>
+    <ul>
+        <li><b>Target Instance:</b> Select from dropdown. If empty, <code>msg.instance</code> is used.</li>
+        <li><b>Command:</b> Optional command parameter. Some instances require this, others don't.</li>
+        <li><b>Static Message:</b> Optional JSON message to send. If empty, <code>msg.payload</code> is used.</li>
+        <li><b>Wait for Response:</b> Enable to receive instance response as output message.</li>
+        <li><b>Response Timeout:</b> Maximum time to wait for response (1-60 seconds).</li>
+        <li><b>Server:</b> The ioBroker server configuration.</li>
+    </ul>
+    
+    <h3>Instance Selection</h3>
+    <p>The dropdown shows all available adapter instances with their current status:</p>
+    <ul>
+        <li><b>🟢 Running:</b> Instance is currently active and ready to receive commands</li>
+        <li><b>🔴 Stopped:</b> Instance is installed but not currently running</li>
+    </ul>
+    
+    <h3>Input Message</h3>
+    <p>Message properties that can override node configuration:</p>
+    <ul>
+        <li><code>msg.instance</code> - Target instance (overrides node setting)</li>
+        <li><code>msg.command</code> - Command parameter (overrides node setting)</li>
+        <li><code>msg.message</code> - Message content (overrides node setting and msg.payload)</li>
+        <li><code>msg.payload</code> - Used as message if no static message configured</li>
+        <li><code>msg.timeout</code> - Response timeout in milliseconds (overrides node setting)</li>
+    </ul>
+    
+    <h3>Common Use Cases</h3>
+    
+    <h4>Telegram Notifications</h4>
+    <pre>// Node config: instance="telegram.0", command="send"
+msg.payload = {
+    text: "Motion detected in living room!",
+    user: "admin"
+}</pre>
+    
+    <h4>Email Alerts</h4>
+    <pre>// Node config: instance="email", command=""
+msg.payload = {
+    to: "admin@home.com",
+    subject: "System Alert",
+    text: "Temperature critical: 85°C"
+}</pre>
+    
+    <h4>SQL Database Queries</h4>
+    <pre>// Node config: instance="sql.0", command="query", waitForResponse=true
+msg.payload = "SELECT * FROM datapoints WHERE ts > NOW() - INTERVAL 1 DAY"</pre>
+    
+    <h4>JavaScript Execution</h4>
+    <pre>// Node config: instance="javascript.0", command="toScript"
+msg.payload = {
+    script: "myScript",
+    message: { action: "cleanup", data: [1,2,3] }
+}</pre>
+    
+    <h4>Media Control</h4>
+    <pre>// Node config: instance="spotify-premium.0", command="play"
+msg.payload = {
+    playlist: "Morning Music",
+    volume: 60
+}</pre>
+    
+    <h3>Output (Response Mode)</h3>
+    <p>When "Wait for Response" is enabled:</p>
+    <ul>
+        <li><code>msg.payload</code> - Instance response data</li>
+        <li><code>msg.instance</code> - Target instance that was called</li>
+        <li><code>msg.command</code> - Command that was sent</li>
+        <li><code>msg.originalMessage</code> - Original message sent to instance</li>
+        <li><code>msg.responseTime</code> - Time taken for response (ms)</li>
+        <li><code>msg.timestamp</code> - When response was received</li>
+    </ul>
+    
+    <h3>Error Handling</h3>
+    <ul>
+        <li>Missing instance specification triggers error</li>
+        <li>Response timeouts generate error messages</li>
+        <li>Invalid JSON in static message triggers validation error</li>
+        <li>Connection issues are handled by underlying WebSocket manager</li>
+    </ul>
+    
+    <h3>Instance Compatibility</h3>
+    <p>Works with any ioBroker adapter instance that supports sendTo messages:</p>
+    <ul>
+        <li><b>Notifications:</b> telegram, pushover, email, slack</li>
+        <li><b>Databases:</b> sql, influxdb, history</li>
+        <li><b>Media:</b> spotify, sonos, kodi</li>
+        <li><b>Scripts:</b> javascript, node-red</li>
+        <li><b>Services:</b> weather, calendar</li>
+    </ul>
+    
+    <h3>Performance Notes</h3>
+    <ul>
+        <li>Fire-and-forget mode is faster for simple notifications</li>
+        <li>Response mode adds latency but provides feedback</li>
+        <li>Timeout values should match expected adapter response times</li>
+        <li>Avoid very short timeouts that may cause false failures</li>
+    </ul>
+</script>

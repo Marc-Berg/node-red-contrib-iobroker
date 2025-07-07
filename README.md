@@ -49,6 +49,7 @@ The diagram shows the recommended architecture with a dedicated Admin adapter in
 | **WS ioB inObj** | Monitor object changes | Track adapter installations | [📖 Details](docs/nodes/iob-inobj.md) |
 | **WS ioB history** | Access historical data | Energy consumption analysis | [📖 Details](docs/nodes/iob-history.md) |
 | **WS ioB log** | Live log monitoring | System health monitoring | [📖 Details](docs/nodes/iob-log.md) |
+| **WS ioB sendTo** | Send commands to ioBroker adapters | Telegram notifications, database queries | [📖 Details](docs/nodes/iob-sendto.md) |
 
 ## 🔧 Configuration
 
