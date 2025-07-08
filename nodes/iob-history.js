@@ -1,20 +1,19 @@
 const connectionManager = require('../lib/manager/websocket-manager');
+const { NodeHelpers } = require('../lib/utils/node-helpers');
 
 module.exports = function (RED) {
     function iobhistory(config) {
         RED.nodes.createNode(this, config);
         const node = this;
 
-        // Get server configuration
-        const globalConfig = RED.nodes.getNode(config.server);
-        if (!globalConfig) {
-            return setError("No server configuration selected", "No server config");
-        }
+        // Use helper to create status functions
+        const { setStatus, setError } = NodeHelpers.createStatusHelpers(node);
+        
+        // Use helper to validate server config
+        const serverConfig = NodeHelpers.validateServerConfig(RED, config, setError);
+        if (!serverConfig) return;
 
-        const { iobhost, iobport, user, password, usessl } = globalConfig;
-        if (!iobhost || !iobport) {
-            return setError("ioBroker host or port missing", "Host/port missing");
-        }
+        const { globalConfig, connectionDetails, serverId } = serverConfig;
 
         // Configuration with defaults
         const settings = {
@@ -34,12 +33,12 @@ module.exports = function (RED) {
             percentile: parseFloat(config.percentile) || 50,
             quantile: parseFloat(config.quantile) || 0.5,
             integralUnit: parseInt(config.integralUnit) || 3600,
-            queryMode: config.queryMode || "parallel", // NEW: Query processing mode
-            serverId: connectionManager.getServerId(globalConfig),
+            queryMode: config.queryMode || "parallel",
+            serverId,
             nodeId: node.id
         };
 
-        node.currentConfig = { iobhost, iobport, user, password, usessl };
+        node.currentConfig = connectionDetails;
         node.isInitialized = false;
 
         // Query management state
@@ -49,20 +48,6 @@ module.exports = function (RED) {
 
         // Log configuration
         node.log(`History node configured: ${settings.stateId || 'from msg.topic'} via ${settings.historyAdapter} (mode: ${settings.queryMode})`);
-
-        // Helper functions
-        function setError(message, statusText) {
-            node.error(message);
-            setStatus("red", "ring", statusText);
-        }
-
-        function setStatus(fill, shape, text) {
-            try {
-                node.status({ fill, shape, text });
-            } catch (error) {
-                node.warn(`Status update error: ${error.message}`);
-            }
-        }
 
         function parseTimeInput(timeInput) {
             if (!timeInput) return null;
@@ -453,141 +438,35 @@ module.exports = function (RED) {
             }
         }
 
-        // Create callback for event notifications
-        function createEventCallback() {
-            const callback = function () { };
+        // Custom status texts for history mode
+        const statusTexts = {
+            ready: getQueueStatusText()
+        };
 
-            callback.updateStatus = function (status) {
-                switch (status) {
-                    case 'ready':
-                        setStatus("green", "dot", getQueueStatusText());
-                        node.isInitialized = true;
-                        break;
-                    case 'connecting':
-                        setStatus("yellow", "ring", "Connecting...");
-                        break;
-                    case 'disconnected':
-                        setStatus("red", "ring", "Disconnected");
-                        node.isInitialized = false;
-                        break;
-                    case 'retrying':
-                        setStatus("yellow", "ring", "Retrying...");
-                        break;
-                    case 'failed_permanently':
-                        setStatus("red", "ring", "Auth failed");
-                        break;
-                    default:
-                        setStatus("grey", "ring", status);
-                }
-            };
-
-            callback.onReconnect = function () {
-                node.log("Reconnection detected by history node");
-                setStatus("green", "dot", getQueueStatusText());
-                node.isInitialized = true;
-            };
-
-            callback.onDisconnect = function () {
-                node.log("Disconnection detected by history node");
-                setStatus("red", "ring", "Disconnected");
-            };
-
-            return callback;
-        }
-
-        // Check if configuration has changed
-        function hasConfigChanged() {
-            const currentGlobalConfig = RED.nodes.getNode(config.server);
-            if (!currentGlobalConfig) return false;
-
-            return (
-                node.currentConfig.iobhost !== currentGlobalConfig.iobhost ||
-                node.currentConfig.iobport !== currentGlobalConfig.iobport ||
-                node.currentConfig.user !== currentGlobalConfig.user ||
-                node.currentConfig.password !== currentGlobalConfig.password ||
-                node.currentConfig.usessl !== currentGlobalConfig.usessl
-            );
-        }
-
-        // Initialize connection
-        async function initializeConnection() {
-            try {
-                setStatus("yellow", "ring", "Connecting...");
-
-                if (hasConfigChanged()) {
-                    const newGlobalConfig = RED.nodes.getNode(config.server);
-                    const oldServerId = settings.serverId;
-
-                    node.currentConfig = {
-                        iobhost: newGlobalConfig.iobhost,
-                        iobport: newGlobalConfig.iobport,
-                        user: newGlobalConfig.user,
-                        password: newGlobalConfig.password,
-                        usessl: newGlobalConfig.usessl
-                    };
-
-                    const newServerId = connectionManager.getServerId(newGlobalConfig);
-                    settings.serverId = newServerId;
-
-                    if (oldServerId !== newServerId) {
-                        node.log(`Server changed from ${oldServerId} to ${newServerId}, forcing connection reset`);
-                        await connectionManager.forceServerSwitch(oldServerId, newServerId, newGlobalConfig);
-                    }
-                }
-
-                // Register for events using centralized manager
-                const eventCallback = createEventCallback();
-                await connectionManager.registerForEvents(
-                    settings.nodeId,
-                    settings.serverId,
-                    eventCallback,
-                    globalConfig
-                );
-
-                // Check connection status
-                const status = connectionManager.getConnectionStatus(settings.serverId);
-                if (status.ready) {
-                    setStatus("green", "dot", getQueueStatusText());
-                    node.isInitialized = true;
-                    node.log(`Connection established for history node (query mode: ${settings.queryMode})`);
-                } else {
-                    setStatus("yellow", "ring", "Waiting for connection...");
-                    node.log(`History node registered - waiting for connection to be ready`);
-                }
-
-            } catch (error) {
-                const errorMsg = error.message || 'Unknown error';
-                setStatus("red", "ring", "Registration failed");
-                node.error(`Node registration failed: ${errorMsg}`);
-            }
-        }
+        // Initialize connection using helper
+        NodeHelpers.initializeConnection(
+            node, config, RED, settings, globalConfig, setStatus, statusTexts
+        );
 
         // Input handler
         node.on('input', function (msg, send, done) {
             try {
-                if (msg.topic === "status") {
-                    const status = connectionManager.getConnectionStatus(settings.serverId);
-                    const statusMsg = {
-                        payload: {
-                            ...status,
-                            queryMode: settings.queryMode,
-                            isQueryRunning: node.isQueryRunning,
-                            queueLength: node.queryQueue.length,
-                            currentQueryId: node.currentQueryId
-                        },
-                        topic: "status",
-                        timestamp: Date.now()
+                // Handle status requests using helper
+                if (NodeHelpers.handleStatusRequest(msg, send, done, settings)) {
+                    // Add query-specific status information
+                    msg.payload = {
+                        ...msg.payload,
+                        queryMode: settings.queryMode,
+                        isQueryRunning: node.isQueryRunning,
+                        queueLength: node.queryQueue.length,
+                        currentQueryId: node.currentQueryId
                     };
-                    send(statusMsg);
-                    done && done();
+                    send(msg);
                     return;
                 }
 
                 const stateId = settings.stateId || (typeof msg.topic === "string" ? msg.topic.trim() : "");
-                if (!stateId) {
-                    setError("State ID missing", "State ID missing");
-                    const error = new Error("State ID missing (neither configured nor in msg.topic)");
-                    done && done(error);
+                if (!NodeHelpers.validateRequiredInput(stateId, "State ID", setStatus, done)) {
                     return;
                 }
 
@@ -647,26 +526,11 @@ module.exports = function (RED) {
                 node.log(`Dropped ${droppedQueries} queued queries during shutdown`);
             }
 
-            // Unregister from events
-            connectionManager.unregisterFromEvents(settings.nodeId);
-
-            try {
-                node.status({});
-            } catch (statusError) {
-                // Ignore status errors during cleanup
-            }
-
+            await NodeHelpers.handleNodeClose(node, settings, "History");
             done();
         });
 
-        // Error handling
-        node.on("error", function (error) {
-            node.error(`History node error: ${error.message}`);
-            setError(`Node error: ${error.message}`, "Node error");
-        });
-
-        // Initialize the node
-        initializeConnection();
+        node.on("error", NodeHelpers.createErrorHandler(node, setError));
     }
 
     RED.nodes.registerType("iobhistory", iobhistory);
