@@ -80,7 +80,7 @@ RED.nodes.registerType('iobget', {
         }).catch(error => {
             const fallbackMessage = $(`
                 <div style="margin-top: 5px; padding: 8px; background-color: #fff3cd; border-radius: 4px; font-size: 12px; color: #856404;">
-                    <i class="fa fa-exclamation-triangle"></i> ${RED._("iobget.treeview.fallbackMessage")}
+                    <i class="fa fa-exclamation-triangle"></i> TreeView component not available. Manual input only.
                 </div>
             `);
             $('#node-input-state').after(fallbackMessage);
@@ -97,44 +97,44 @@ RED.nodes.registerType('iobget', {
 
 <script type="text/html" data-template-name="iobget">
     <div class="form-row">
-        <label for="node-input-name"><i class="icon-tag"></i> <span data-i18n="iobget.label.name"></span></label>
-        <input type="text" id="node-input-name" data-i18n="[placeholder]iobget.placeholder.name">
+        <label for="node-input-name"><i class="icon-tag"></i> <span data-i18n="iobget.label.name">Name</span></label>
+        <input type="text" id="node-input-name" data-i18n="[placeholder]iobget.placeholder.name" placeholder="Name">
     </div>
     <div class="form-row">
-        <label for="node-input-state"><i class="icon-tag"></i> <span data-i18n="iobget.label.state"></span></label>
-        <input type="text" id="node-input-state" data-i18n="[placeholder]iobget.placeholder.state">
+        <label for="node-input-state"><i class="icon-tag"></i> <span data-i18n="iobget.label.state">State</span></label>
+        <input type="text" id="node-input-state" data-i18n="[placeholder]iobget.placeholder.state" placeholder="e.g. 0_userdata.0.test (if empty, msg.topic is used)">
     </div>
     <div class="form-row">
-        <label for="node-input-outputProperty"><i class="icon-tag"></i> <span data-i18n="iobget.label.outputProperty"></span></label>
-        <input type="text" id="node-input-outputProperty" data-i18n="[placeholder]iobget.placeholder.outputProperty">
+        <label for="node-input-outputProperty"><i class="icon-tag"></i> <span data-i18n="iobget.label.outputProperty">Output Property</span></label>
+        <input type="text" id="node-input-outputProperty" data-i18n="[placeholder]iobget.placeholder.outputProperty" placeholder="e.g. payload">
     </div>
     <div class="form-row">
-        <label for="node-input-server"><i class="icon-tag"></i> <span data-i18n="iobget.label.server"></span></label>
+        <label for="node-input-server"><i class="icon-tag"></i> <span data-i18n="iobget.label.server">Server</span></label>
         <input type="text" id="node-input-server">
     </div>
 </script>
 
 <script type="text/html" data-help-name="iobget">
-    <p data-i18n="iobget.help.description"></p>
+    <p data-i18n="iobget.help.description">ioBroker state getter via WebSocket.</p>
     
-    <h3 data-i18n="iobget.help.configuration"></h3>
+    <h3 data-i18n="iobget.help.configuration">Configuration</h3>
     <ul>
-        <li><b data-i18n="iobget.label.state"></b>: <span data-i18n="iobget.help.stateDescription"></span></li>
-        <li><b data-i18n="iobget.label.outputProperty"></b>: <span data-i18n="iobget.help.outputPropertyDescription"></span></li>
-        <li><b data-i18n="iobget.label.server"></b>: <span data-i18n="iobget.help.serverDescription"></span></li>
+        <li><b data-i18n="iobget.label.state">State</b>: <span data-i18n="iobget.help.stateDescription">The ioBroker state ID. If empty, msg.topic is used as the state ID.</span></li>
+        <li><b data-i18n="iobget.label.outputProperty">Output Property</b>: <span data-i18n="iobget.help.outputPropertyDescription">The message property to store the value (default: payload).</span></li>
+        <li><b data-i18n="iobget.label.server">Server</b>: <span data-i18n="iobget.help.serverDescription">The ioBroker server configuration.</span></li>
     </ul>
     
-    <h3 data-i18n="iobget.help.stateSelection"></h3>
+    <h3 data-i18n="iobget.help.stateSelection">State Selection</h3>
     <ul>
-        <li><b data-i18n="iobget.help.manualInput"></b></li>
-        <li><b data-i18n="iobget.help.treeBrowser"></b></li>
-        <li><b data-i18n="iobget.help.intelligentSearch"></b></li>
+        <li><b data-i18n="iobget.help.manualInput">Manual input</b>: Type the state ID directly</li>
+        <li><b data-i18n="iobget.help.treeBrowser">Tree browser</b>: Virtual scrolling tree view for large datasets</li>
+        <li><b data-i18n="iobget.help.intelligentSearch">Intelligent search</b>: Pre-indexed search for instant results</li>
     </ul>
     
-    <h3 data-i18n="iobget.help.output"></h3>
+    <h3 data-i18n="iobget.help.output">Output</h3>
     <ul>
-        <li data-i18n="iobget.help.valueStored"></li>
-        <li data-i18n="iobget.help.completeState"></li>
-        <li data-i18n="iobget.help.timestampIncluded"></li>
+        <li data-i18n="iobget.help.valueStored">The value is stored in msg.[outputProperty] (default: msg.payload)</li>
+        <li data-i18n="iobget.help.completeState">The complete state object is available in msg.state</li>
+        <li data-i18n="iobget.help.timestampIncluded">Timestamp information is included in the state object</li>
     </ul>
 </script>

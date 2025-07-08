@@ -12,7 +12,6 @@ function loadSharedTreeView() {
         
         script.onload = () => {
             if (window.ioBrokerSharedTreeView && window.ioBrokerSharedTreeView.initialized) {
-                console.log('TreeView component loaded successfully');
                 resolve();
             } else {
                 reject(new Error('TreeView component failed to initialize'));
@@ -20,7 +19,6 @@ function loadSharedTreeView() {
         };
         
         script.onerror = () => {
-            console.error('TreeView component script not found');
             reject(new Error('TreeView component script not found'));
         };
         
@@ -70,7 +68,7 @@ RED.nodes.registerType('iobout', {
                 serverInput.val(this.server);
                 
                 setTimeout(() => {
-                    RED.notify(RED._("iobout.notification.autoSelected", {server: configNodes[0].name || configNodes[0].iobhost}), {
+                    RED.notify("Auto-selected server: " + (configNodes[0].name || configNodes[0].iobhost), {
                         type: "info",
                         timeout: 1500
                     });
@@ -98,17 +96,15 @@ RED.nodes.registerType('iobout', {
                 nodeType: 'iobout',
                 inputId: 'node-input-state',
                 serverInputId: 'node-input-server',
-                searchPlaceholder: RED._("iobout.treeview.searchPlaceholder"),
+                searchPlaceholder: 'Search states (hierarchical filtering)...',
                 itemType: 'states',
                 dataEndpoint: '/iobroker/ws/states',
                 enableWildcardDetection: false
             });
         }).catch(error => {
-            console.error('Failed to load TreeView component:', error);
-            
             const fallbackMessage = $(`
                 <div style="margin-top: 5px; padding: 8px; background-color: #fff3cd; border: 1px solid #ffeaa7; border-radius: 4px; font-size: 12px; color: #856404;">
-                    <i class="fa fa-exclamation-triangle"></i> ${RED._("iobout.treeview.fallbackMessage")}
+                    <i class="fa fa-exclamation-triangle"></i> TreeView component not available. Manual input only.
                 </div>
             `);
             $('#node-input-state').after(fallbackMessage);
@@ -125,40 +121,40 @@ RED.nodes.registerType('iobout', {
 
 <script type="text/html" data-template-name="iobout">
     <div class="form-row">
-        <label for="node-input-name"><i class="icon-tag"></i> <span data-i18n="iobout.label.name"></span></label>
-        <input type="text" id="node-input-name" data-i18n="[placeholder]iobout.placeholder.name">
+        <label for="node-input-name"><i class="icon-tag"></i> <span data-i18n="iobout.label.name">Name</span></label>
+        <input type="text" id="node-input-name" data-i18n="[placeholder]iobout.placeholder.name" placeholder="Name">
     </div>
     
     <div class="form-row">
-        <label for="node-input-state"><i class="icon-tag"></i> <span data-i18n="iobout.label.state"></span></label>
-        <input type="text" id="node-input-state" data-i18n="[placeholder]iobout.placeholder.state">
+        <label for="node-input-state"><i class="icon-tag"></i> <span data-i18n="iobout.label.state">State</span></label>
+        <input type="text" id="node-input-state" data-i18n="[placeholder]iobout.placeholder.state" placeholder="e.g. 0_userdata.0.test (if empty, msg.topic is used)">
     </div>
     
     <div class="form-row">
-        <label for="node-input-inputProperty"><i class="icon-tag"></i> <span data-i18n="iobout.label.inputProperty"></span></label>
-        <input type="text" id="node-input-inputProperty" data-i18n="[placeholder]iobout.placeholder.inputProperty">
+        <label for="node-input-inputProperty"><i class="icon-tag"></i> <span data-i18n="iobout.label.inputProperty">Input Property</span></label>
+        <input type="text" id="node-input-inputProperty" data-i18n="[placeholder]iobout.placeholder.inputProperty" placeholder="e.g. payload">
     </div>
     
     <div class="form-row">
-        <label for="node-input-setMode"><i class="icon-tag"></i> <span data-i18n="iobout.label.setMode"></span></label>
+        <label for="node-input-setMode"><i class="icon-tag"></i> <span data-i18n="iobout.label.setMode">Set as</span></label>
         <select id="node-input-setMode" style="width:100%">
-            <option value="value" data-i18n="iobout.options.setMode.value"></option>
-            <option value="command" data-i18n="iobout.options.setMode.command"></option>
+            <option value="value" data-i18n="iobout.options.setMode.value">Value (ack=true)</option>
+            <option value="command" data-i18n="iobout.options.setMode.command">Command (ack=false)</option>
         </select>
     </div>
     
     <div class="form-row">
         <label for="node-input-autoCreate" style="width: auto;">
             <input type="checkbox" id="node-input-autoCreate" style="width: auto; margin-right: 5px;">
-            <i class="icon-tag"></i> <span data-i18n="iobout.label.autoCreate"></span>
+            <i class="icon-tag"></i> <span data-i18n="iobout.label.autoCreate">Auto create objects if not exist</span>
         </label>
     </div>
     
     <div id="auto-create-info" class="form-row" style="display: none; margin-top: 5px; padding: 10px; background-color: #e8f4fd; border: 1px solid #bee5eb; border-radius: 4px;">
         <div style="color: #0c5460; font-size: 13px;">
             <i class="fa fa-info-circle" style="color: #17a2b8; margin-right: 5px;"></i>
-            <strong data-i18n="iobout.info.autoCreate.title"></strong><br>
-            <span data-i18n="iobout.info.autoCreate.description"></span>
+            <strong data-i18n="iobout.info.autoCreate.title">Object Auto-Creation:</strong><br>
+            <span data-i18n="iobout.info.autoCreate.description">If enabled, missing objects will be created automatically with the specified properties. Properties can be configured below or passed via message properties (msg.stateName, msg.stateRole, etc.).</span>
         </div>
     </div>
     
@@ -166,77 +162,77 @@ RED.nodes.registerType('iobout', {
         <hr style="margin: 15px 0; border: none; border-top: 1px solid #ddd;">
         
         <div class="form-row">
-            <label for="node-input-stateName"><i class="icon-tag"></i> <span data-i18n="iobout.label.stateName"></span></label>
-            <input type="text" id="node-input-stateName" data-i18n="[placeholder]iobout.placeholder.stateName">
+            <label for="node-input-stateName"><i class="icon-tag"></i> <span data-i18n="iobout.label.stateName">State Name</span></label>
+            <input type="text" id="node-input-stateName" data-i18n="[placeholder]iobout.placeholder.stateName" placeholder="Leave empty to use msg.stateName">
         </div>
         
         <div class="form-row">
-            <label for="node-input-stateRole"><i class="icon-tag"></i> <span data-i18n="iobout.label.stateRole"></span></label>
-            <input type="text" id="node-input-stateRole" data-i18n="[placeholder]iobout.placeholder.stateRole">
+            <label for="node-input-stateRole"><i class="icon-tag"></i> <span data-i18n="iobout.label.stateRole">Role</span></label>
+            <input type="text" id="node-input-stateRole" data-i18n="[placeholder]iobout.placeholder.stateRole" placeholder="e.g. state, value, sensor - Leave empty to use msg.stateRole">
         </div>
         
         <div class="form-row">
-            <label for="node-input-payloadType"><i class="icon-tag"></i> <span data-i18n="iobout.label.payloadType"></span></label>
+            <label for="node-input-payloadType"><i class="icon-tag"></i> <span data-i18n="iobout.label.payloadType">Payload Type</span></label>
             <select id="node-input-payloadType" style="width:100%">
-                <option value="" data-i18n="iobout.options.payloadType.auto"></option>
-                <option value="boolean" data-i18n="iobout.options.payloadType.boolean"></option>
-                <option value="number" data-i18n="iobout.options.payloadType.number"></option>
-                <option value="string" data-i18n="iobout.options.payloadType.string"></option>
-                <option value="object" data-i18n="iobout.options.payloadType.object"></option>
-                <option value="array" data-i18n="iobout.options.payloadType.array"></option>
-                <option value="file" data-i18n="iobout.options.payloadType.file"></option>
-                <option value="mixed" data-i18n="iobout.options.payloadType.mixed"></option>
+                <option value="" data-i18n="iobout.options.payloadType.auto">Auto-detect (or use msg.payloadType)</option>
+                <option value="boolean" data-i18n="iobout.options.payloadType.boolean">Boolean</option>
+                <option value="number" data-i18n="iobout.options.payloadType.number">Number</option>
+                <option value="string" data-i18n="iobout.options.payloadType.string">String</option>
+                <option value="object" data-i18n="iobout.options.payloadType.object">Object</option>
+                <option value="array" data-i18n="iobout.options.payloadType.array">Array</option>
+                <option value="file" data-i18n="iobout.options.payloadType.file">File</option>
+                <option value="mixed" data-i18n="iobout.options.payloadType.mixed">Mixed</option>
             </select>
         </div>
         
         <div class="form-row">
-            <label for="node-input-stateReadonly"><i class="icon-tag"></i> <span data-i18n="iobout.label.stateReadonly"></span></label>
+            <label for="node-input-stateReadonly"><i class="icon-tag"></i> <span data-i18n="iobout.label.stateReadonly">Readonly</span></label>
             <select id="node-input-stateReadonly" style="width:100%">
-                <option value="" data-i18n="iobout.options.stateReadonly.default"></option>
-                <option value="false" data-i18n="iobout.options.stateReadonly.writable"></option>
-                <option value="true" data-i18n="iobout.options.stateReadonly.readonly"></option>
+                <option value="" data-i18n="iobout.options.stateReadonly.default">Default: Writable (or use msg.stateReadonly)</option>
+                <option value="false" data-i18n="iobout.options.stateReadonly.writable">Writable</option>
+                <option value="true" data-i18n="iobout.options.stateReadonly.readonly">Read-only</option>
             </select>
         </div>
         
         <div class="form-row">
-            <label for="node-input-stateUnit"><i class="icon-tag"></i> <span data-i18n="iobout.label.stateUnit"></span></label>
-            <input type="text" id="node-input-stateUnit" data-i18n="[placeholder]iobout.placeholder.stateUnit">
+            <label for="node-input-stateUnit"><i class="icon-tag"></i> <span data-i18n="iobout.label.stateUnit">Unit</span></label>
+            <input type="text" id="node-input-stateUnit" data-i18n="[placeholder]iobout.placeholder.stateUnit" placeholder="e.g. °C, %, kWh - Leave empty to use msg.stateUnit">
         </div>
         
         <div class="form-row">
-            <label for="node-input-stateMin"><i class="icon-tag"></i> <span data-i18n="iobout.label.stateMin"></span></label>
-            <input type="number" id="node-input-stateMin" data-i18n="[placeholder]iobout.placeholder.stateMin">
+            <label for="node-input-stateMin"><i class="icon-tag"></i> <span data-i18n="iobout.label.stateMin">Min</span></label>
+            <input type="number" id="node-input-stateMin" data-i18n="[placeholder]iobout.placeholder.stateMin" placeholder="Minimum value - Leave empty to use msg.stateMin">
         </div>
         
         <div class="form-row">
-            <label for="node-input-stateMax"><i class="icon-tag"></i> <span data-i18n="iobout.label.stateMax"></span></label>
-            <input type="number" id="node-input-stateMax" data-i18n="[placeholder]iobout.placeholder.stateMax">
+            <label for="node-input-stateMax"><i class="icon-tag"></i> <span data-i18n="iobout.label.stateMax">Max</span></label>
+            <input type="number" id="node-input-stateMax" data-i18n="[placeholder]iobout.placeholder.stateMax" placeholder="Maximum value - Leave empty to use msg.stateMax">
         </div>
     </div>
     
     <div class="form-row">
-        <label for="node-input-server"><i class="icon-tag"></i> <span data-i18n="iobout.label.server"></span></label>
+        <label for="node-input-server"><i class="icon-tag"></i> <span data-i18n="iobout.label.server">Server</span></label>
         <input type="text" id="node-input-server">
     </div>
 </script>
 
 <script type="text/html" data-help-name="iobout">
-    <p data-i18n="iobout.help.description"></p>
+    <p data-i18n="iobout.help.description">ioBroker state output via WebSocket with optional automatic object creation capability.</p>
     
-    <h3 data-i18n="iobout.help.basicConfiguration"></h3>
+    <h3 data-i18n="iobout.help.basicConfiguration">Basic Configuration</h3>
     <ul>
-        <li><b data-i18n="iobout.label.state"></b>: <span data-i18n="iobout.help.stateDescription"></span></li>
-        <li><b data-i18n="iobout.label.inputProperty"></b>: <span data-i18n="iobout.help.inputPropertyDescription"></span></li>
-        <li><b data-i18n="iobout.label.setMode"></b>: <span data-i18n="iobout.help.setModeDescription"></span></li>
-        <li><b data-i18n="iobout.label.server"></b>: <span data-i18n="iobout.help.serverDescription"></span></li>
+        <li><b data-i18n="iobout.label.state">State</b>: <span data-i18n="iobout.help.stateDescription">The ioBroker state ID. If empty, msg.topic is used.</span></li>
+        <li><b data-i18n="iobout.label.inputProperty">Input Property</b>: <span data-i18n="iobout.help.inputPropertyDescription">The message property containing the value to set (default: payload).</span></li>
+        <li><b data-i18n="iobout.label.setMode">Set Mode</b>: <span data-i18n="iobout.help.setModeDescription">Value (ack=true): Sets the state as a confirmed value. Command (ack=false): Sets the state as a command for devices.</span></li>
+        <li><b data-i18n="iobout.label.server">Server</b>: <span data-i18n="iobout.help.serverDescription">The ioBroker server configuration</span></li>
     </ul>
     
-    <h3 data-i18n="iobout.help.autoCreateTitle"></h3>
-    <p data-i18n="iobout.help.autoCreateDescription"></p>
+    <h3 data-i18n="iobout.help.autoCreateTitle">Auto-Create Objects</h3>
+    <p data-i18n="iobout.help.autoCreateDescription">When enabled, this node will automatically create missing ioBroker objects before setting their values.</p>
     
-    <h4 data-i18n="iobout.help.configurationMethods"></h4>
+    <h4 data-i18n="iobout.help.configurationMethods">Configuration Methods</h4>
     <ul>
-        <li><b data-i18n="iobout.help.staticConfiguration"></b>: <span data-i18n="iobout.help.staticConfigurationDescription"></span></li>
-        <li><b data-i18n="iobout.help.dynamicConfiguration"></b>: <span data-i18n="iobout.help.dynamicConfigurationDescription"></span></li>
+        <li><b data-i18n="iobout.help.staticConfiguration">Static Configuration</b>: <span data-i18n="iobout.help.staticConfigurationDescription">Set object properties in the node configuration</span></li>
+        <li><b data-i18n="iobout.help.dynamicConfiguration">Dynamic via Message</b>: <span data-i18n="iobout.help.dynamicConfigurationDescription">Override properties using message properties (msg.stateName, msg.stateRole, etc.)</span></li>
     </ul>
 </script>
