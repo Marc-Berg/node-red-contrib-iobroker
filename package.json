@@ -67,6 +67,10 @@
       "examples/iob-log.json",
       "examples/iob-out.json",
       "examples/iob-sendto.json"
-    ]
+    ],
+        "locales": {
+      "de": "nodes/locales/de",
+      "en-US": "nodes/locales/en-US"
+    }
   }
 }
