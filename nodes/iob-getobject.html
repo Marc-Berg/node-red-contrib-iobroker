@@ -404,9 +404,10 @@
         Each returned object will include an <code>aliasInfo</code> property containing:
         <ul style="margin: 5px 0 0 20px; padding: 0;">
             <li><code>isAlias</code> - Boolean: Is this object an alias?</li>
-            <li><code>aliasTarget</code> - Object: Target object if this is an alias</li>
+            <li><code>aliasTarget</code> - Object: Target information (simple or complex structure)</li>
             <li><code>aliasedBy</code> - Array: Objects that alias this object</li>
         </ul>
+        <strong>Supports both simple aliases and complex read/write aliases.</strong><br>
         <strong>Note:</strong> This feature requires additional queries and may increase response time.
     </div>
     
@@ -457,15 +458,46 @@
     
     <h3>Alias Information</h3>
     <p>When "Include alias information" is enabled, each object gets an <code>aliasInfo</code> property:</p>
+    
+    <p><strong>Simple Alias (single target):</strong></p>
     <pre>{
   "aliasInfo": {
     "isAlias": true,
     "aliasTarget": {
+      "type": "simple",
+      "target": {
       "_id": "hue.0.lights.1.state",
       "type": "state",
       "common": {...},
       "native": {...}
+      }
     },
+    "aliasedBy": []
+  }
+}</pre>
+
+    <p><strong>Complex Alias (separate read/write targets):</strong></p>
+    <pre>{
+  "aliasInfo": {
+    "isAlias": true,
+    "aliasTarget": {
+      "type": "complex",
+      "readId": "mqtt.0.z2m.FH_Actor_OG.state_l1",
+      "writeId": "mqtt.0.z2m.FH_Actor_OG.set.state_l1",
+      "targets": {
+        "read": { "_id": "mqtt.0.z2m.FH_Actor_OG.state_l1", ... },
+        "write": { "_id": "mqtt.0.z2m.FH_Actor_OG.set.state_l1", ... }
+      }
+    },
+    "aliasedBy": []
+  }
+}</pre>
+
+    <p><strong>Target Object (referenced by aliases):</strong></p>
+    <pre>{
+  "aliasInfo": {
+    "isAlias": false,
+    "aliasTarget": null,
     "aliasedBy": [
       {
         "_id": "alias.0.Wohnzimmer.Licht.switch",

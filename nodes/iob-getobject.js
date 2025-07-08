@@ -179,7 +179,7 @@ module.exports = function(RED) {
                 node.log(`Loading alias data from ioBroker...`);
                 const allAliases = await connectionManager.getObjects(settings.serverId, "alias.*");
                 
-                const aliasMap = new Map(); // alias ID → target ID
+                const aliasMap = new Map(); // alias ID → target info
                 const reverseAliasMap = new Map(); // target ID → [alias objects...]
                 const aliasObjects = new Map(); // alias ID → full alias object
 
@@ -187,17 +187,46 @@ module.exports = function(RED) {
                     allAliases.forEach(aliasObj => {
                         if (aliasObj.common && aliasObj.common.alias && aliasObj.common.alias.id) {
                             const aliasId = aliasObj._id;
-                            const targetId = aliasObj.common.alias.id;
+                            const aliasConfig = aliasObj.common.alias.id;
+                            
+                            // Handle both simple string IDs and complex read/write objects
+                            let targetInfo;
+                            if (typeof aliasConfig === 'string') {
+                                // Simple alias: "target.state.id"
+                                targetInfo = {
+                                    type: 'simple',
+                                    read: aliasConfig,
+                                    write: aliasConfig,
+                                    targets: [aliasConfig]
+                                };
+                            } else if (typeof aliasConfig === 'object' && aliasConfig !== null) {
+                                // Complex alias with read/write: { read: "...", write: "..." }
+                                const readId = aliasConfig.read || null;
+                                const writeId = aliasConfig.write || null;
+                                
+                                targetInfo = {
+                                    type: 'complex',
+                                    read: readId,
+                                    write: writeId,
+                                    targets: [readId, writeId].filter(id => id && typeof id === 'string')
+                                };
+                            } else {
+                                // Invalid alias configuration
+                                node.warn(`Invalid alias configuration for ${aliasId}: ${JSON.stringify(aliasConfig)}`);
+                                return;
+                            }
                             
                             // Store alias mapping
-                            aliasMap.set(aliasId, targetId);
+                            aliasMap.set(aliasId, targetInfo);
                             aliasObjects.set(aliasId, aliasObj);
                             
-                            // Store reverse mapping
-                            if (!reverseAliasMap.has(targetId)) {
-                                reverseAliasMap.set(targetId, []);
-                            }
-                            reverseAliasMap.get(targetId).push(aliasObj);
+                            // Store reverse mapping for all target IDs
+                            targetInfo.targets.forEach(targetId => {
+                                if (!reverseAliasMap.has(targetId)) {
+                                    reverseAliasMap.set(targetId, []);
+                                }
+                                reverseAliasMap.get(targetId).push(aliasObj);
+                            });
                         }
                     });
                 }
@@ -209,8 +238,7 @@ module.exports = function(RED) {
                     totalAliases: aliasMap.size
                 };
 
-                node.log(`Loaded ${aliasData.totalAliases} aliases`);
-                
+                node.log(`Loaded ${aliasData.totalAliases} aliases (simple + complex read/write)`);
                 return aliasData;
 
             } catch (error) {
@@ -238,17 +266,55 @@ module.exports = function(RED) {
                 // Check if this object is an alias (alias → target resolution)
                 if (settings.aliasResolution === 'both' || settings.aliasResolution === 'target') {
                     if (aliasData.aliasMap.has(objectId)) {
-                        const targetId = aliasData.aliasMap.get(objectId);
+                        const targetInfo = aliasData.aliasMap.get(objectId);
                         aliasInfo.isAlias = true;
 
                         try {
-                            // Get target object
-                            const targetObject = await connectionManager.getObject(settings.serverId, targetId);
-                            if (targetObject) {
-                                aliasInfo.aliasTarget = targetObject;
+                            // For complex aliases, create a comprehensive target description
+                            if (targetInfo.type === 'simple') {
+                                // Simple alias - get the single target object
+                                const targetObject = await connectionManager.getObject(settings.serverId, targetInfo.read);
+                                if (targetObject) {
+                                    aliasInfo.aliasTarget = {
+                                        type: 'simple',
+                                        target: targetObject
+                                    };
+                                }
+                            } else if (targetInfo.type === 'complex') {
+                                // Complex alias - get both read and write targets if they exist
+                                const targets = {};
+                                
+                                if (targetInfo.read) {
+                                    try {
+                                        const readTarget = await connectionManager.getObject(settings.serverId, targetInfo.read);
+                                        if (readTarget) {
+                                            targets.read = readTarget;
+                                        }
+                                    } catch (readError) {
+                                        node.warn(`Could not get read target ${targetInfo.read}: ${readError.message}`);
+                                    }
+                                }
+                                
+                                if (targetInfo.write && targetInfo.write !== targetInfo.read) {
+                                    try {
+                                        const writeTarget = await connectionManager.getObject(settings.serverId, targetInfo.write);
+                                        if (writeTarget) {
+                                            targets.write = writeTarget;
+                                        }
+                                    } catch (writeError) {
+                                        node.warn(`Could not get write target ${targetInfo.write}: ${writeError.message}`);
+                                    }
+                                }
+                                
+                                aliasInfo.aliasTarget = {
+                                    type: 'complex',
+                                    readId: targetInfo.read,
+                                    writeId: targetInfo.write,
+                                    targets: targets
+                                };
                             }
                         } catch (targetError) {
-                            node.warn(`Could not get target object ${targetId} for alias ${objectId}: ${targetError.message}`);
+                            node.warn(`Error getting target objects for alias ${objectId}: ${targetError.message}`);
                         }
                     }
                 }
