@@ -247,7 +247,7 @@ module.exports = function(RED) {
             }
         }
 
-        async function getAliasInfo(objectId, aliasData) {
+        async function getAliasInfo(objectId, aliasData, enumData = null) {
             if (!aliasData) {
                 return {
                     isAlias: false,
@@ -275,9 +275,18 @@ module.exports = function(RED) {
                                 // Simple alias - get the single target object
                                 const targetObject = await connectionManager.getObject(settings.serverId, targetInfo.read);
                                 if (targetObject) {
+                                    // Enrich target object with enum assignments if enabled
+                                    let enrichedTarget = targetObject;
+                                    if (settings.includeEnums && enumData) {
+                                        enrichedTarget = {
+                                            ...targetObject,
+                                            enumAssignments: getEnumAssignments(targetObject._id, enumData)
+                                        };
+                                    }
+                                    
                                     aliasInfo.aliasTarget = {
                                         type: 'simple',
-                                        target: targetObject
+                                        target: enrichedTarget
                                     };
                                 }
                             } else if (targetInfo.type === 'complex') {
@@ -288,7 +297,15 @@ module.exports = function(RED) {
                                     try {
                                         const readTarget = await connectionManager.getObject(settings.serverId, targetInfo.read);
                                         if (readTarget) {
-                                            targets.read = readTarget;
+                                            // Enrich read target with enum assignments if enabled
+                                            let enrichedReadTarget = readTarget;
+                                            if (settings.includeEnums && enumData) {
+                                                enrichedReadTarget = {
+                                                    ...readTarget,
+                                                    enumAssignments: getEnumAssignments(readTarget._id, enumData)
+                                                };
+                                            }
+                                            targets.read = enrichedReadTarget;
                                         }
                                     } catch (readError) {
                                         node.warn(`Could not get read target ${targetInfo.read}: ${readError.message}`);
@@ -299,7 +316,15 @@ module.exports = function(RED) {
                                     try {
                                         const writeTarget = await connectionManager.getObject(settings.serverId, targetInfo.write);
                                         if (writeTarget) {
-                                            targets.write = writeTarget;
+                                            // Enrich write target with enum assignments if enabled
+                                            let enrichedWriteTarget = writeTarget;
+                                            if (settings.includeEnums && enumData) {
+                                                enrichedWriteTarget = {
+                                                    ...writeTarget,
+                                                    enumAssignments: getEnumAssignments(writeTarget._id, enumData)
+                                                };
+                                            }
+                                            targets.write = enrichedWriteTarget;
                                         }
                                     } catch (writeError) {
                                         node.warn(`Could not get write target ${targetInfo.write}: ${writeError.message}`);
@@ -323,12 +348,21 @@ module.exports = function(RED) {
                 if (settings.aliasResolution === 'both' || settings.aliasResolution === 'reverse') {
                     if (aliasData.reverseAliasMap.has(objectId)) {
                         const aliasObjects = aliasData.reverseAliasMap.get(objectId);
-                        aliasInfo.aliasedBy = aliasObjects.map(aliasObj => ({
-                            _id: aliasObj._id,
-                            type: aliasObj.type,
-                            common: aliasObj.common,
-                            native: aliasObj.native
-                        }));
+                        aliasInfo.aliasedBy = aliasObjects.map(aliasObj => {
+                            let enrichedAliasObj = {
+                                _id: aliasObj._id,
+                                type: aliasObj.type,
+                                common: aliasObj.common,
+                                native: aliasObj.native
+                            };
+                            
+                            // Enrich alias objects with enum assignments if enabled
+                            if (settings.includeEnums && enumData) {
+                                enrichedAliasObj.enumAssignments = getEnumAssignments(aliasObj._id, enumData);
+                            }
+                            
+                            return enrichedAliasObj;
+                        });
                     }
                 }
 
@@ -339,7 +373,7 @@ module.exports = function(RED) {
             return aliasInfo;
         }
 
-        async function enrichObjectsWithAliases(objects, aliasData) {
+        async function enrichObjectsWithAliases(objects, aliasData, enumData = null) {
             if (!settings.includeAliases || !aliasData) {
                 return objects;
             }
@@ -348,7 +382,7 @@ module.exports = function(RED) {
                 const enrichedObjects = [];
                 for (const obj of objects) {
                     if (obj && obj._id) {
-                        const aliasInfo = await getAliasInfo(obj._id, aliasData);
+                        const aliasInfo = await getAliasInfo(obj._id, aliasData, enumData);
                         enrichedObjects.push({
                             ...obj,
                             aliasInfo
@@ -364,7 +398,7 @@ module.exports = function(RED) {
                 }
                 return enrichedObjects;
             } else if (objects && typeof objects === 'object' && objects._id) {
-                const aliasInfo = await getAliasInfo(objects._id, aliasData);
+                const aliasInfo = await getAliasInfo(objects._id, aliasData, enumData);
                 return {
                     ...objects,
                     aliasInfo
@@ -698,8 +732,8 @@ module.exports = function(RED) {
                         // Enrich with enum assignments
                         objects = await enrichObjectsWithEnums(objects, enumData);
                         
-                        // Enrich with alias information
-                        objects = await enrichObjectsWithAliases(objects, aliasData);
+                        // Enrich with alias information (including enum data for target objects)
+                        objects = await enrichObjectsWithAliases(objects, aliasData, enumData);
                         
                         const result = formatOutput(objects, objectIdOrPattern, currentOutputMode, currentObjectType, enumData, aliasData);
                         Object.assign(msg, result);
@@ -761,8 +795,8 @@ module.exports = function(RED) {
                         // Enrich with enum assignments
                         objectData = await enrichObjectsWithEnums(objectData, enumData);
                         
-                        // Enrich with alias information
-                        objectData = await enrichObjectsWithAliases(objectData, aliasData);
+                        // Enrich with alias information (including enum data for target objects)
+                        objectData = await enrichObjectsWithAliases(objectData, aliasData, enumData);
                         
                         const result = formatOutput(objectData, objectIdOrPattern, 'single', currentObjectType, enumData, aliasData);
                         Object.assign(msg, result);
