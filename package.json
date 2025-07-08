@@ -68,9 +68,9 @@
       "examples/iob-out.json",
       "examples/iob-sendto.json"
     ],
-        "locales": {
-      "de": "nodes/locales/de",
-      "en-US": "nodes/locales/en-US"
+    "locales": {
+      "de": "locales/de",
+      "en-US": "locales/en-US"
     }
   }
 }
