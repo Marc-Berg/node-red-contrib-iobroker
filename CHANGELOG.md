@@ -30,6 +30,9 @@
   - Improved visual structure and user experience
   - Better grouping of related settings
 
+### Changed
+- **Extracted Common Patterns**: Created comprehensive helper utilities to eliminate code duplication
+
 ## [0.11.0] - 2025-07-06
 
 ### Added
