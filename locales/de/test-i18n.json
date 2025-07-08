@@ -1,0 +1,10 @@
+{
+    "test-i18n": {
+        "label": {
+            "name": "DEUTSCH-TEST-NAME"
+        },
+        "placeholder": {
+            "name": "DEUTSCH-TEST-PLACEHOLDER"
+        }
+    }
+}

@@ -27,6 +27,7 @@
   },
   "dependencies": {
     "express": "^4.19.0",
+    "node-red-contrib-iobroker": "file:node-red-contrib-iobroker-0.12.0-1.tgz",
     "ws": "^8.18.0"
   },
   "peerDependencies": {
@@ -36,7 +37,7 @@
     "nodes/*.js",
     "nodes/*.html",
     "nodes/icons/*.svg",
-    "nodes/locales/**/*.json",
+    "locales/**/*.json",
     "lib/**/*.js",
     "shared/*.js",
     "examples/*.json",
@@ -56,6 +57,7 @@
       "iobhistory": "nodes/iob-history.js",
       "ioblog": "nodes/iob-log.js",
       "iobsendto": "nodes/iob-sendto.js",
+      "test-i18n": "nodes/test-i18n.js",
       "iob-config": "nodes/iob-config.js"
     },
     "examples": [

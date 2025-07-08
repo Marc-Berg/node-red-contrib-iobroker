@@ -1,0 +1,65 @@
+<script type="text/javascript">
+RED.nodes.registerType('test-i18n', {
+    category: 'test',
+    color: '#a6bbcf',
+    defaults: {
+        name: { value: "" }
+    },
+    inputs: 1,
+    outputs: 1,
+    label: function() {
+        return this.name || "test-i18n";
+    },
+    
+    oneditprepare: function() {
+        console.log("=== EXTENDED i18n DEBUG ===");
+        console.log("Browser language:", navigator.language);
+        console.log("RED.i18n.lang():", RED.i18n.lang());
+        
+        // Test verschiedene Lokalisierungsschlüssel
+        console.log("Test 1 - test-i18n.label.name:", RED._("test-i18n.label.name"));
+        console.log("Test 2 - node-red:common.label.name:", RED._("node-red:common.label.name"));
+        
+        // Prüfe verfügbare Kataloge
+        if (RED.i18n && RED.i18n.catalog) {
+            console.log("Available i18n catalogs:", Object.keys(RED.i18n.catalog()));
+            
+            // Prüfe ob unser Katalog existiert
+            const catalog = RED.i18n.catalog();
+            console.log("test-i18n catalog exists:", 'test-i18n' in catalog);
+            if ('test-i18n' in catalog) {
+                console.log("test-i18n catalog content:", catalog['test-i18n']);
+            }
+        }
+        
+        // Prüfe RED.nodes Informationen
+        console.log("RED.nodes type info:", RED.nodes.getType('test-i18n'));
+        
+        // Alternative: Direkte Abfrage
+        setTimeout(() => {
+            console.log("=== DELAYED CHECK ===");
+            console.log("After delay - test-i18n.label.name:", RED._("test-i18n.label.name"));
+            
+            // Prüfe nochmal Kataloge
+            if (RED.i18n && RED.i18n.catalog) {
+                const catalog = RED.i18n.catalog();
+                console.log("Delayed - Available catalogs:", Object.keys(catalog));
+                console.log("Delayed - test-i18n exists:", 'test-i18n' in catalog);
+            }
+        }, 2000);
+        
+        console.log("=== END EXTENDED DEBUG ===");
+    }
+});
+</script>
+
+<script type="text/html" data-template-name="test-i18n">
+    <div class="form-row">
+        <label for="node-input-name">
+            <span data-i18n="test-i18n.label.name">FALLBACK NAME</span>
+        </label>
+        <input type="text" id="node-input-name" 
+               data-i18n="[placeholder]test-i18n.placeholder.name" 
+               placeholder="FALLBACK PLACEHOLDER">
+    </div>
+</script>

@@ -1,0 +1,10 @@
+{
+    "test-i18n": {
+        "label": {
+            "name": "ENGLISH-TEST-NAME"
+        },
+        "placeholder": {
+            "name": "ENGLISH-TEST-PLACEHOLDER"
+        }
+    }
+}
