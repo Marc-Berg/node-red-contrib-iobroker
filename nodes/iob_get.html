@@ -59,7 +59,7 @@ RED.nodes.registerType('iobget', {
                 serverInput.val(this.server);
                 
                 setTimeout(() => {
-                    RED.notify(`Automatically selected server: ${configNodes[0].name || configNodes[0].iobhost}`, {
+                    RED.notify(RED._("iobget.notification.autoSelected", {server: configNodes[0].name || configNodes[0].iobhost}), {
                         type: "info",
                         timeout: 1500
                     });
@@ -72,7 +72,7 @@ RED.nodes.registerType('iobget', {
                 nodeType: 'iobget',
                 inputId: 'node-input-state',
                 serverInputId: 'node-input-server',
-                searchPlaceholder: 'Search states (hierarchical filtering)...',
+                searchPlaceholder: RED._("iobget.treeview.searchPlaceholder"),
                 itemType: 'states',
                 dataEndpoint: '/iobroker/ws/states',
                 enableWildcardDetection: false
@@ -80,7 +80,7 @@ RED.nodes.registerType('iobget', {
         }).catch(error => {
             const fallbackMessage = $(`
                 <div style="margin-top: 5px; padding: 8px; background-color: #fff3cd; border-radius: 4px; font-size: 12px; color: #856404;">
-                    <i class="fa fa-exclamation-triangle"></i> TreeView component not available. Manual input only.
+                    <i class="fa fa-exclamation-triangle"></i> ${RED._("iobget.treeview.fallbackMessage")}
                 </div>
             `);
             $('#node-input-state').after(fallbackMessage);

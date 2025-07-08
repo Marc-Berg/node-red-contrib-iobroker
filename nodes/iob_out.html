@@ -1,0 +1,242 @@
+<script type="text/javascript">
+function loadSharedTreeView() {
+    return new Promise((resolve, reject) => {
+        if (window.ioBrokerSharedTreeView && window.ioBrokerSharedTreeView.initialized) {
+            resolve();
+            return;
+        }
+        
+        const script = document.createElement('script');
+        script.src = 'iobroker/shared/iobroker-treeview.js?v=1.0.0';
+        script.async = true;
+        
+        script.onload = () => {
+            if (window.ioBrokerSharedTreeView && window.ioBrokerSharedTreeView.initialized) {
+                console.log('TreeView component loaded successfully');
+                resolve();
+            } else {
+                reject(new Error('TreeView component failed to initialize'));
+            }
+        };
+        
+        script.onerror = () => {
+            console.error('TreeView component script not found');
+            reject(new Error('TreeView component script not found'));
+        };
+        
+        document.head.appendChild(script);
+    });
+}
+
+RED.nodes.registerType('iobout', {
+    category: 'ioBroker WS',
+    color: '#a6bbcf',
+    defaults: {
+        name: { value: "" },
+        state: { value: "" },
+        inputProperty: { value: "payload" },
+        setMode: { value: "value" },
+        autoCreate: { value: false },
+        stateName: { value: "" },
+        stateRole: { value: "" },
+        payloadType: { value: "" },
+        stateReadonly: { value: "" },
+        stateUnit: { value: "" },
+        stateMin: { value: "" },
+        stateMax: { value: "" },
+        server: { value: "", type: "iob-config" }
+    },
+    inputs: 1,
+    outputs: 0,
+    icon: "iobroker_out.svg",
+    paletteLabel: "WS ioB out",
+    label: function() {
+        return this.name || "iob-out";
+    },
+    
+    oneditprepare: function() {
+        const serverInput = $('#node-input-server');
+        
+        if (!this.server || this.server === '') {
+            const configNodes = [];
+            RED.nodes.eachConfig(function(config) {
+                if (config.type === 'iob-config') {
+                    configNodes.push(config);
+                }
+            });
+            
+            if (configNodes.length === 1) {
+                this.server = configNodes[0].id;
+                serverInput.val(this.server);
+                
+                setTimeout(() => {
+                    RED.notify(RED._("iobout.notification.autoSelected", {server: configNodes[0].name || configNodes[0].iobhost}), {
+                        type: "info",
+                        timeout: 1500
+                    });
+                }, 500);
+            }
+        }
+        
+        $('#node-input-autoCreate').on('change', function() {
+            const isChecked = $(this).prop('checked');
+            $('.object-creation-fields').toggle(isChecked);
+            
+            if (isChecked) {
+                $('#auto-create-info').show();
+            } else {
+                $('#auto-create-info').hide();
+            }
+        });
+        
+        const autoCreateChecked = $('#node-input-autoCreate').prop('checked');
+        $('.object-creation-fields').toggle(autoCreateChecked);
+        $('#auto-create-info').toggle(autoCreateChecked);
+        
+        loadSharedTreeView().then(() => {
+            this.treeController = window.ioBrokerSharedTreeView.setup({
+                nodeType: 'iobout',
+                inputId: 'node-input-state',
+                serverInputId: 'node-input-server',
+                searchPlaceholder: RED._("iobout.treeview.searchPlaceholder"),
+                itemType: 'states',
+                dataEndpoint: '/iobroker/ws/states',
+                enableWildcardDetection: false
+            });
+        }).catch(error => {
+            console.error('Failed to load TreeView component:', error);
+            
+            const fallbackMessage = $(`
+                <div style="margin-top: 5px; padding: 8px; background-color: #fff3cd; border: 1px solid #ffeaa7; border-radius: 4px; font-size: 12px; color: #856404;">
+                    <i class="fa fa-exclamation-triangle"></i> ${RED._("iobout.treeview.fallbackMessage")}
+                </div>
+            `);
+            $('#node-input-state').after(fallbackMessage);
+        });
+    },
+
+    oneditsave: function() {
+        if (this.treeController) {
+            this.treeController.cleanup();
+        }
+    }
+});
+</script>
+
+<script type="text/html" data-template-name="iobout">
+    <div class="form-row">
+        <label for="node-input-name"><i class="icon-tag"></i> <span data-i18n="iobout.label.name"></span></label>
+        <input type="text" id="node-input-name" data-i18n="[placeholder]iobout.placeholder.name">
+    </div>
+    
+    <div class="form-row">
+        <label for="node-input-state"><i class="icon-tag"></i> <span data-i18n="iobout.label.state"></span></label>
+        <input type="text" id="node-input-state" data-i18n="[placeholder]iobout.placeholder.state">
+    </div>
+    
+    <div class="form-row">
+        <label for="node-input-inputProperty"><i class="icon-tag"></i> <span data-i18n="iobout.label.inputProperty"></span></label>
+        <input type="text" id="node-input-inputProperty" data-i18n="[placeholder]iobout.placeholder.inputProperty">
+    </div>
+    
+    <div class="form-row">
+        <label for="node-input-setMode"><i class="icon-tag"></i> <span data-i18n="iobout.label.setMode"></span></label>
+        <select id="node-input-setMode" style="width:100%">
+            <option value="value" data-i18n="iobout.options.setMode.value"></option>
+            <option value="command" data-i18n="iobout.options.setMode.command"></option>
+        </select>
+    </div>
+    
+    <div class="form-row">
+        <label for="node-input-autoCreate" style="width: auto;">
+            <input type="checkbox" id="node-input-autoCreate" style="width: auto; margin-right: 5px;">
+            <i class="icon-tag"></i> <span data-i18n="iobout.label.autoCreate"></span>
+        </label>
+    </div>
+    
+    <div id="auto-create-info" class="form-row" style="display: none; margin-top: 5px; padding: 10px; background-color: #e8f4fd; border: 1px solid #bee5eb; border-radius: 4px;">
+        <div style="color: #0c5460; font-size: 13px;">
+            <i class="fa fa-info-circle" style="color: #17a2b8; margin-right: 5px;"></i>
+            <strong data-i18n="iobout.info.autoCreate.title"></strong><br>
+            <span data-i18n="iobout.info.autoCreate.description"></span>
+        </div>
+    </div>
+    
+    <div class="object-creation-fields" style="display: none;">
+        <hr style="margin: 15px 0; border: none; border-top: 1px solid #ddd;">
+        
+        <div class="form-row">
+            <label for="node-input-stateName"><i class="icon-tag"></i> <span data-i18n="iobout.label.stateName"></span></label>
+            <input type="text" id="node-input-stateName" data-i18n="[placeholder]iobout.placeholder.stateName">
+        </div>
+        
+        <div class="form-row">
+            <label for="node-input-stateRole"><i class="icon-tag"></i> <span data-i18n="iobout.label.stateRole"></span></label>
+            <input type="text" id="node-input-stateRole" data-i18n="[placeholder]iobout.placeholder.stateRole">
+        </div>
+        
+        <div class="form-row">
+            <label for="node-input-payloadType"><i class="icon-tag"></i> <span data-i18n="iobout.label.payloadType"></span></label>
+            <select id="node-input-payloadType" style="width:100%">
+                <option value="" data-i18n="iobout.options.payloadType.auto"></option>
+                <option value="boolean" data-i18n="iobout.options.payloadType.boolean"></option>
+                <option value="number" data-i18n="iobout.options.payloadType.number"></option>
+                <option value="string" data-i18n="iobout.options.payloadType.string"></option>
+                <option value="object" data-i18n="iobout.options.payloadType.object"></option>
+                <option value="array" data-i18n="iobout.options.payloadType.array"></option>
+                <option value="file" data-i18n="iobout.options.payloadType.file"></option>
+                <option value="mixed" data-i18n="iobout.options.payloadType.mixed"></option>
+            </select>
+        </div>
+        
+        <div class="form-row">
+            <label for="node-input-stateReadonly"><i class="icon-tag"></i> <span data-i18n="iobout.label.stateReadonly"></span></label>
+            <select id="node-input-stateReadonly" style="width:100%">
+                <option value="" data-i18n="iobout.options.stateReadonly.default"></option>
+                <option value="false" data-i18n="iobout.options.stateReadonly.writable"></option>
+                <option value="true" data-i18n="iobout.options.stateReadonly.readonly"></option>
+            </select>
+        </div>
+        
+        <div class="form-row">
+            <label for="node-input-stateUnit"><i class="icon-tag"></i> <span data-i18n="iobout.label.stateUnit"></span></label>
+            <input type="text" id="node-input-stateUnit" data-i18n="[placeholder]iobout.placeholder.stateUnit">
+        </div>
+        
+        <div class="form-row">
+            <label for="node-input-stateMin"><i class="icon-tag"></i> <span data-i18n="iobout.label.stateMin"></span></label>
+            <input type="number" id="node-input-stateMin" data-i18n="[placeholder]iobout.placeholder.stateMin">
+        </div>
+        
+        <div class="form-row">
+            <label for="node-input-stateMax"><i class="icon-tag"></i> <span data-i18n="iobout.label.stateMax"></span></label>
+            <input type="number" id="node-input-stateMax" data-i18n="[placeholder]iobout.placeholder.stateMax">
+        </div>
+    </div>
+    
+    <div class="form-row">
+        <label for="node-input-server"><i class="icon-tag"></i> <span data-i18n="iobout.label.server"></span></label>
+        <input type="text" id="node-input-server">
+    </div>
+</script>
+
+<script type="text/html" data-help-name="iobout">
+    <p data-i18n="iobout.help.description"></p>
+    
+    <h3 data-i18n="iobout.help.basicConfiguration"></h3>
+    <ul>
+        <li><b data-i18n="iobout.label.state"></b>: <span data-i18n="iobout.help.stateDescription"></span></li>
+        <li><b data-i18n="iobout.label.inputProperty"></b>: <span data-i18n="iobout.help.inputPropertyDescription"></span></li>
+        <li><b data-i18n="iobout.label.setMode"></b>: <span data-i18n="iobout.help.setModeDescription"></span></li>
+        <li><b data-i18n="iobout.label.server"></b>: <span data-i18n="iobout.help.serverDescription"></span></li>
+    </ul>
+    
+    <h3 data-i18n="iobout.help.autoCreateTitle"></h3>
+    <p data-i18n="iobout.help.autoCreateDescription"></p>
+    
+    <h4 data-i18n="iobout.help.configurationMethods"></h4>
+    <ul>
+        <li><b data-i18n="iobout.help.staticConfiguration"></b>: <span data-i18n="iobout.help.staticConfigurationDescription"></span></li>
+        <li><b data-i18n="iobout.help.dynamicConfiguration"></b>: <span data-i18n="iobout.help.dynamicConfigurationDescription"></span></li>
+    </ul>
+</script>

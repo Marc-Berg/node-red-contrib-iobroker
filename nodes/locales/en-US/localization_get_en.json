@@ -11,6 +11,13 @@
             "state": "e.g. 0_userdata.0.test (if empty, msg.topic is used)",
             "outputProperty": "e.g. payload"
         },
+        "notification": {
+            "autoSelected": "Automatically selected server: __server__"
+        },
+        "treeview": {
+            "searchPlaceholder": "Search states (hierarchical filtering)...",
+            "fallbackMessage": "TreeView component not available. Manual input only."
+        },
         "help": {
             "title": "ioBroker State Getter",
             "description": "ioBroker state getter via WebSocket.",

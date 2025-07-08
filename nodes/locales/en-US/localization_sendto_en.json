@@ -11,48 +11,48 @@
         },
         "placeholder": {
             "name": "Name",
-            "adapter": "-- Select instance or use msg.instance --",
             "command": "e.g. send, query, toScript (optional, can be empty)",
-            "message": "Optional JSON message (leave empty to use msg.payload)",
-            "responseTimeout": "ms"
+            "message": "Optional JSON message (leave empty to use msg.payload)"
         },
         "options": {
-            "adapters": "Available adapters:",
-            "commonInstances": "Common Instances (not verified)"
+            "selectInstance": "-- Select instance or use msg.instance --"
+        },
+        "notification": {
+            "autoSelected": "Automatically selected server: __server__"
+        },
+        "loading": "Loading instances...",
+        "availableInstances": "📦 Available Instances",
+        "commonInstances": "⚠️ Common Instances (not verified)",
+        "units": {
+            "milliseconds": "ms"
         },
         "info": {
             "adapterNote": "If no instance is selected, msg.instance will be used",
             "messageNote": "If empty, msg.payload will be used as the message content",
-            "responseMode": "Response Mode:",
-            "responseModeDescription": "Node will wait for adapter response and send it as output message. Useful for queries and commands that return data.",
-            "fireAndForgetMode": "Fire-and-forget Mode:",
-            "fireAndForgetDescription": "Node will send the command and not wait for response. No output will be generated."
+            "responseMode": {
+                "title": "Response Mode:",
+                "description": "Node will wait for adapter response and send it as output message. Useful for queries and commands that return data."
+            },
+            "fireAndForgetMode": {
+                "title": "Fire-and-forget Mode:",
+                "description": "Node will send the command and not wait for response. No output will be generated."
+            }
         },
         "help": {
-            "title": "Send Commands to ioBroker Adapter Instances",
             "description": "Send commands and messages to ioBroker adapter instances via WebSocket using the sendTo functionality for service integration and automation.",
             "configuration": "Configuration",
-            "targetInstanceDescription": "Select from dropdown. If empty, msg.instance is used.",
+            "adapterDescription": "Select from dropdown. If empty, msg.instance is used.",
             "commandDescription": "Optional command parameter. Some instances require this, others don't.",
-            "staticMessageDescription": "Optional JSON message to send. If empty, msg.payload is used.",
+            "messageDescription": "Optional JSON message to send. If empty, msg.payload is used.",
             "waitForResponseDescription": "Enable to receive instance response as output message.",
             "responseTimeoutDescription": "Maximum time to wait for response (1-60 seconds).",
             "serverDescription": "The ioBroker server configuration.",
             "instanceSelection": "Instance Selection",
             "instanceSelectionDescription": "The dropdown shows all available adapter instances with their current status:",
-            "instanceStatusList": [
-                "🟢 Running: Instance is currently active and ready to receive commands",
-                "🔴 Stopped: Instance is installed but not currently running"
-            ],
-            "inputMessage": "Input Message",
-            "inputMessageDescription": "Message properties that can override node configuration:",
-            "inputMessageList": [
-                "msg.instance - Target instance (overrides node setting)",
-                "msg.command - Command parameter (overrides node setting)",
-                "msg.message - Message content (overrides node setting and msg.payload)",
-                "msg.payload - Used as message if no static message configured",
-                "msg.timeout - Response timeout in milliseconds (overrides node setting)"
-            ]
+            "runningInstance": "🟢 Running",
+            "runningInstanceDescription": "Instance is currently active and ready to receive commands",
+            "stoppedInstance": "🔴 Stopped",
+            "stoppedInstanceDescription": "Instance is installed but not currently running"
         }
     }
 }

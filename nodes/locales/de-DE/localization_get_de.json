@@ -11,6 +11,13 @@
             "state": "z.B. 0_userdata.0.test (falls leer, wird msg.topic verwendet)",
             "outputProperty": "z.B. payload"
         },
+        "notification": {
+            "autoSelected": "Server automatisch ausgewählt: __server__"
+        },
+        "treeview": {
+            "searchPlaceholder": "States suchen (hierarchische Filterung)...",
+            "fallbackMessage": "TreeView-Komponente nicht verfügbar. Nur manuelle Eingabe."
+        },
         "help": {
             "title": "ioBroker State Abrufen",
             "description": "ioBroker State-Getter über WebSocket.",

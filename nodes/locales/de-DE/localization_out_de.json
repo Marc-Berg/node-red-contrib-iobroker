@@ -2,49 +2,77 @@
     "iobout": {
         "label": {
             "name": "Name",
-            "stateid": "State ID",
-            "objectName": "Objekt-Name",
-            "ack": "Bestätigt",
+            "state": "State",
+            "inputProperty": "Eingabe-Eigenschaft",
+            "setMode": "Setzen als",
+            "autoCreate": "Objekte automatisch erstellen falls nicht vorhanden",
+            "stateName": "State-Name",
+            "stateRole": "Rolle",
+            "payloadType": "Payload-Typ",
+            "stateReadonly": "Schreibgeschützt",
+            "stateUnit": "Einheit",
+            "stateMin": "Min",
+            "stateMax": "Max",
             "server": "Server"
         },
         "placeholder": {
-            "name": "Optionaler Node-Name",
-            "stateid": "z.B. 0_userdata.0.meinWert (falls leer, wird msg.topic verwendet)",
-            "objectName": "Anzeigename für automatisch erstellte Objekte"
+            "name": "Name",
+            "state": "z.B. 0_userdata.0.test (falls leer, wird msg.topic verwendet)",
+            "inputProperty": "z.B. payload",
+            "stateName": "Leer lassen um msg.stateName zu verwenden",
+            "stateRole": "z.B. state, value, sensor - Leer lassen um msg.stateRole zu verwenden",
+            "stateUnit": "z.B. °C, %, kWh - Leer lassen um msg.stateUnit zu verwenden",
+            "stateMin": "Minimalwert - Leer lassen um msg.stateMin zu verwenden",
+            "stateMax": "Maximalwert - Leer lassen um msg.stateMax zu verwenden"
         },
         "options": {
-            "ack": {
-                "true": "Bestätigt (true)",
-                "false": "Befehl (false)", 
-                "auto": "Automatisch (von msg.ack oder true)"
+            "setMode": {
+                "value": "Wert (ack=true)",
+                "command": "Befehl (ack=false)"
+            },
+            "payloadType": {
+                "auto": "Automatisch erkennen (oder msg.payloadType verwenden)",
+                "boolean": "Boolean",
+                "number": "Number",
+                "string": "String",
+                "object": "Object",
+                "array": "Array",
+                "file": "File",
+                "mixed": "Mixed"
+            },
+            "stateReadonly": {
+                "default": "Standard: Beschreibbar (oder msg.stateReadonly verwenden)",
+                "writable": "Beschreibbar",
+                "readonly": "Schreibgeschützt"
             }
         },
-        "sections": {
-            "stateConfig": "State Konfiguration",
-            "objectCreation": "Automatische Objekt-Erstellung"
+        "notification": {
+            "autoSelected": "Server automatisch ausgewählt: __server__"
+        },
+        "treeview": {
+            "searchPlaceholder": "States suchen (hierarchische Filterung)...",
+            "fallbackMessage": "TreeView-Komponente nicht verfügbar. Nur manuelle Eingabe."
         },
         "info": {
-            "stateId": "Ziel-State ID für Wert-Ausgabe. Kann durch msg.topic überschrieben werden",
-            "objectName": "Name für automatisch erstellte Objekte wenn State nicht existiert",
-            "autoCreation": "Fehlende States werden automatisch mit passender Objekt-Definition erstellt",
-            "ack": "Bestätigungs-Flag für den State-Wert:",
-            "ackOptions": [
-                "Bestätigt (true): Sensorwert oder bestätigter Zustand",
-                "Befehl (false): Steuerbefehl an Gerät",
-                "Automatisch: Verwendet msg.ack falls vorhanden, sonst true"
-            ]
+            "autoCreate": {
+                "title": "Automatische Objekt-Erstellung:",
+                "description": "Falls aktiviert, werden fehlende Objekte automatisch mit den angegebenen Eigenschaften erstellt. Eigenschaften können unten konfiguriert oder über Nachrichten-Eigenschaften (msg.stateName, msg.stateRole, etc.) übergeben werden."
+            }
         },
         "help": {
-            "title": "State-Wert Ausgabe",
-            "description": "Sende Werte an ioBroker States mit automatischer Objekt-Erstellung."
-        },
-        "status": {
-            "ready": "Bereit",
-            "connecting": "Verbinde...",
-            "disconnected": "Getrennt",
-            "retrying": "Wiederhole...",
-            "failed": "Auth fehlgeschlagen",
-            "sent": "Wert gesendet"
+            "description": "ioBroker State-Ausgabe über WebSocket mit optionaler automatischer Objekt-Erstellung.",
+            "basicConfiguration": "Grundkonfiguration",
+            "stateDescription": "Die ioBroker State ID. Falls leer, wird msg.topic verwendet.",
+            "inputPropertyDescription": "Die Nachrichten-Eigenschaft mit dem zu setzenden Wert (Standard: payload).",
+            "setModeDescription": "Wert (ack=true): Setzt den State als bestätigten Wert. Befehl (ack=false): Setzt den State als Befehl für Geräte.",
+            "serverDescription": "Die ioBroker Server-Konfiguration",
+            "autoCreateTitle": "Automatische Objekt-Erstellung",
+            "autoCreateDescription": "Falls aktiviert, erstellt diese Node automatisch fehlende ioBroker-Objekte bevor deren Werte gesetzt werden.",
+            "configurationMethods": "Konfigurationsmethoden",
+            "staticConfiguration": "Statische Konfiguration",
+            "staticConfigurationDescription": "Objekt-Eigenschaften in der Node-Konfiguration festlegen",
+            "dynamicConfiguration": "Dynamisch über Nachricht",
+            "dynamicConfigurationDescription": "Eigenschaften über Nachrichten-Eigenschaften überschreiben (msg.stateName, msg.stateRole, etc.)"
         }
     }
 }
