@@ -299,201 +299,98 @@ RED.nodes.registerType('iobgetobject', {
 
 <script type="text/html" data-template-name="iobgetobject">
     <div class="form-row">
-        <label for="node-input-name"><i class="icon-tag"></i> Name</label>
-        <input type="text" id="node-input-name" placeholder="Name">
+        <label for="node-input-name"><i class="icon-tag"></i> <span data-i18n="iobgetobject.label.name">Name</span></label>
+        <input type="text" id="node-input-name" data-i18n="[placeholder]iobgetobject.placeholder.name" placeholder="Name">
     </div>
     <div class="form-row">
-        <label for="node-input-objectId"><i class="icon-tag"></i> Object ID / Pattern</label>
-        <input type="text" id="node-input-objectId" placeholder="e.g. system.adapter.admin.0 or system.adapter.* (if empty, msg.topic is used)">
+        <label for="node-input-objectId"><i class="icon-tag"></i> <span data-i18n="iobgetobject.label.objectId">Object ID / Pattern</span></label>
+        <input type="text" id="node-input-objectId" data-i18n="[placeholder]iobgetobject.placeholder.objectId" placeholder="e.g. system.adapter.admin.0 or system.adapter.* (if empty, msg.topic is used)">
     </div>
     <div class="form-row">
-        <label for="node-input-outputProperty"><i class="icon-tag"></i> Output Property</label>
-        <input type="text" id="node-input-outputProperty" placeholder="e.g. payload">
+        <label for="node-input-outputProperty"><i class="icon-tag"></i> <span data-i18n="iobgetobject.label.outputProperty">Output Property</span></label>
+        <input type="text" id="node-input-outputProperty" data-i18n="[placeholder]iobgetobject.placeholder.outputProperty" placeholder="e.g. payload">
     </div>
     <div class="form-row">
-        <label for="node-input-outputMode"><i class="icon-tag"></i> Output Mode</label>
+        <label for="node-input-outputMode"><i class="icon-tag"></i> <span data-i18n="iobgetobject.label.outputMode">Output Mode</span></label>
         <select id="node-input-outputMode" style="width:100%">
-            <option value="single">Single Object (for single object IDs)</option>
-            <option value="array">Array of Objects (for wildcard patterns)</option>
-            <option value="object">Object Map (objectId → object)</option>
+            <option value="single" data-i18n="iobgetobject.options.outputMode.single">Single Object (for single object IDs)</option>
+            <option value="array" data-i18n="iobgetobject.options.outputMode.array">Array of Objects (for wildcard patterns)</option>
+            <option value="object" data-i18n="iobgetobject.options.outputMode.object">Object Map (objectId → object)</option>
         </select>
     </div>
     <div class="form-row">
-        <label for="node-input-objectType"><i class="icon-tag"></i> Object Type Filter</label>
+        <label for="node-input-objectType"><i class="icon-tag"></i> <span data-i18n="iobgetobject.label.objectType">Object Type Filter</span></label>
         <select id="node-input-objectType" style="width:100%">
-            <option value="">All Types</option>
-            <option value="state">State</option>
-            <option value="channel">Channel</option>
-            <option value="device">Device</option>
-            <option value="folder">Folder</option>
-            <option value="adapter">Adapter</option>
-            <option value="instance">Instance</option>
-            <option value="host">Host</option>
-            <option value="group">Group</option>
-            <option value="user">User</option>
-            <option value="config">Config</option>
-            <option value="enum">Enum</option>
+            <option value="" data-i18n="iobgetobject.options.objectType.all">All Types</option>
+            <option value="state" data-i18n="iobgetobject.options.objectType.state">State</option>
+            <option value="channel" data-i18n="iobgetobject.options.objectType.channel">Channel</option>
+            <option value="device" data-i18n="iobgetobject.options.objectType.device">Device</option>
+            <option value="folder" data-i18n="iobgetobject.options.objectType.folder">Folder</option>
+            <option value="adapter" data-i18n="iobgetobject.options.objectType.adapter">Adapter</option>
+            <option value="instance" data-i18n="iobgetobject.options.objectType.instance">Instance</option>
+            <option value="host" data-i18n="iobgetobject.options.objectType.host">Host</option>
+            <option value="group" data-i18n="iobgetobject.options.objectType.group">Group</option>
+            <option value="user" data-i18n="iobgetobject.options.objectType.user">User</option>
+            <option value="config" data-i18n="iobgetobject.options.objectType.config">Config</option>
+            <option value="enum" data-i18n="iobgetobject.options.objectType.enum">Enum</option>
         </select>
     </div>
     
     <div class="form-row">
         <label for="node-input-includeEnums" style="width: auto;">
             <input type="checkbox" id="node-input-includeEnums" style="width: auto; margin-right: 5px;">
-            <i class="icon-tag"></i> Include assigned Enums
+            <i class="icon-tag"></i> <span data-i18n="iobgetobject.label.includeEnums">Include assigned Enums</span>
         </label>
     </div>
     
     <div id="enum-assignment-info" style="display: none; margin-top: 5px; padding: 8px; background-color: #e8f4fd; border: 1px solid #bee5eb; border-radius: 4px; font-size: 12px; color: #0c5460;">
-        <i class="fa fa-info-circle"></i> <strong>Enum Assignment:</strong><br>
-        Each returned object will include an <code>enumAssignments</code> property containing:
+        <i class="fa fa-info-circle"></i> <strong data-i18n="iobgetobject.info.enumAssignment">Enum Assignment:</strong><br>
+        <span data-i18n="iobgetobject.info.enumAssignmentDescription">Each returned object will include an enumAssignments property containing:</span>
         <ul style="margin: 5px 0 0 20px; padding: 0;">
-            <li><code>rooms</code> - Array of assigned room enums</li>
-            <li><code>functions</code> - Array of assigned function enums</li>
-            <li><code>other</code> - Array of other enum assignments</li>
-            <li><code>totalEnums</code> - Total number of enum assignments</li>
-            <li><code>roomName</code>, <code>functionName</code> - Convenience properties</li>
+            <li><code>rooms</code> - <span data-i18n="iobgetobject.info.enumAssignmentList.0">Array of assigned room enums</span></li>
+            <li><code>functions</code> - <span data-i18n="iobgetobject.info.enumAssignmentList.1">Array of assigned function enums</span></li>
+            <li><code>other</code> - <span data-i18n="iobgetobject.info.enumAssignmentList.2">Array of other enum assignments</span></li>
+            <li><code>totalEnums</code> - <span data-i18n="iobgetobject.info.enumAssignmentList.3">Total number of enum assignments</span></li>
+            <li><code>roomName</code>, <code>functionName</code> - <span data-i18n="iobgetobject.info.enumAssignmentList.4">Convenience properties</span></li>
         </ul>
-        <strong>Note:</strong> This feature requires additional queries and may increase response time.
+        <strong data-i18n="iobgetobject.info.enumNote">Note:</strong> <span data-i18n="iobgetobject.info.enumNoteDescription">This feature requires additional queries and may increase response time.</span>
     </div>
     
     <div id="enum-options" style="display: none;">
         <div class="form-row">
-            <label for="node-input-enumTypes"><i class="icon-tag"></i> Enum Types</label>
+            <label for="node-input-enumTypes"><i class="icon-tag"></i> <span data-i18n="iobgetobject.label.enumTypes">Enum Types</span></label>
             <select id="node-input-enumTypes" style="width:100%">
-                <option value="all">All Types (rooms, functions, custom)</option>
-                <option value="rooms">Rooms only</option>
-                <option value="functions">Functions only</option>
-                <option value="rooms,functions">Rooms and Functions</option>
+                <option value="all" data-i18n="iobgetobject.options.enumTypes.all">All Types (rooms, functions, custom)</option>
+                <option value="rooms" data-i18n="iobgetobject.options.enumTypes.rooms">Rooms only</option>
+                <option value="functions" data-i18n="iobgetobject.options.enumTypes.functions">Functions only</option>
+                <option value="rooms,functions" data-i18n="iobgetobject.options.enumTypes.roomsAndFunctions">Rooms and Functions</option>
             </select>
         </div>
     </div>
      
     <div class="form-row">
-        <label for="node-input-server"><i class="icon-tag"></i> Server</label>
+        <label for="node-input-server"><i class="icon-tag"></i> <span data-i18n="iobgetobject.label.server">Server</span></label>
         <input type="text" id="node-input-server">
     </div>
 </script>
 
 <script type="text/html" data-help-name="iobgetobject">
-    <p>ioBroker object retrieval via WebSocket with wildcard pattern support and optional enum assignments</p>
+    <p data-i18n="iobgetobject.help.description">ioBroker object retrieval via WebSocket with wildcard pattern support and optional enum assignments</p>
     
-    <h3>Input Modes</h3>
+    <h3 data-i18n="iobgetobject.help.inputModes">Input Modes</h3>
     <ul>
-        <li><b>Single Object:</b> Retrieve one specific object by ID</li>
-        <li><b>Wildcard Pattern:</b> Retrieve multiple objects matching a pattern (auto-detected when * is present)</li>
+        <li><b data-i18n="iobgetobject.help.singleObject">Single Object:</b> <span data-i18n="iobgetobject.help.singleObjectDescription">Retrieve one specific object by ID</span></li>
+        <li><b data-i18n="iobgetobject.help.wildcardPattern">Wildcard Pattern:</b> <span data-i18n="iobgetobject.help.wildcardPatternDescription">Retrieve multiple objects matching a pattern (auto-detected when * is present)</span></li>
     </ul>
     
-    <h3>Configuration</h3>
+    <h3 data-i18n="iobgetobject.help.configuration">Configuration</h3>
     <ul>
-        <li><b>Object ID / Pattern:</b> The ioBroker object identifier or wildcard pattern. If empty, <code>msg.topic</code> is used as the object ID.</li>
-        <li><b>Output Property:</b> The message property to store the object data (default: <code>payload</code>).</li>
-        <li><b>Output Mode:</b> How to format the output:
-            <ul>
-                <li><b>Single Object:</b> Returns the object directly (for single IDs or first match of patterns)</li>
-                <li><b>Array of Objects:</b> Returns an array of objects (ideal for wildcards)</li>
-                <li><b>Object Map:</b> Returns key-value pairs (objectId → object)</li>
-            </ul>
-        </li>
-        <li><b>Object Type Filter:</b> Filter objects by type (state, channel, device, etc.). Leave empty to include all types.</li>
-        <li><b>Include assigned Enums:</b> Automatically adds enum assignment information to each object.</li>
-        <li><b>Enum Types:</b> Filter which enum types to include (all, rooms only, functions only, etc.).</li>
-        <li><b>Server:</b> The ioBroker server configuration.</li>
-    </ul>
-    
-    <h3>Enum Assignments</h3>
-    <p>When "Include assigned Enums" is enabled, each object gets an <code>enumAssignments</code> property:</p>
-    <pre>{
-  "enumAssignments": {
-    "rooms": [
-      {
-        "id": "enum.rooms.living_room",
-        "name": "Living Room",
-        "type": "rooms",
-        "icon": "home",
-        "color": "#ff6600"
-      }
-    ],
-    "functions": [...],
-    "other": [...],
-    "totalEnums": 2,
-    "hasRoom": true,
-    "hasFunction": true,
-    "roomName": "Living Room",
-    "functionName": "Lighting"
-  }
-}</pre>
-    
-    <h3>Pattern and Mode Compatibility</h3>
-    <ul>
-        <li><b>Single Mode + Pattern:</b> Returns only the first matching object (warning shown)</li>
-        <li><b>Array/Object Mode + Single ID:</b> Wraps single result in array/object (info shown)</li>
-        <li><b>Recommended:</b> Use Array/Object modes with wildcard patterns for best results</li>
-    </ul>
-    
-    <h3>Object Type Filtering</h3>
-    <ul>
-        <li><b>Available Types:</b> state, channel, device, folder, adapter, instance, host, group, user, config, enum</li>
-        <li><b>Performance:</b> Type filtering is applied at the ioBroker level when possible</li>
-        <li><b>Compatibility:</b> Works with all ioBroker adapters (Admin, WebSocket, Web)</li>
-    </ul>
-    
-    <h3>Wildcard Patterns</h3>
-    <ul>
-        <li><code>*</code> matches any number of characters</li>
-        <li><code>?</code> is <strong>not supported</strong> by ioBroker</li>
-        <li>Examples:
-            <ul>
-                <li><code>system.adapter.*</code> - all adapter objects</li>
-                <li><code>system.adapter.admin.*</code> - all admin adapter objects</li>
-                <li><code>*.info.*</code> - all info objects</li>
-                <li><code>0_userdata.0.*</code> - all user data objects</li>
-                <li><code>enum.rooms.*</code> - all room enums</li>
-            </ul>
-        </li>
-        <li><strong>Note:</strong> Wildcard mode is automatically detected when * is present in the pattern</li>
-    </ul>
-    
-    <h3>Output</h3>
-    <ul>
-        <li>Object data is stored in <code>msg.[outputProperty]</code> (default: <code>msg.payload</code>)</li>
-        <li>Object metadata is available in <code>msg.objects</code> (for compatibility)</li>
-        <li>Object ID or pattern is included in <code>msg.objectId</code></li>
-        <li>Count information in <code>msg.count</code> (for wildcard results)</li>
-        <li>Enum inclusion flag in <code>msg.includesEnums</code></li>
-        <li>Enum statistics in <code>msg.enumStatistics</code> (when enums enabled)</li>
-        <li>Timestamp information is included in the response</li>
-    </ul>
-    
-    <h3>Enum Statistics (when enabled)</h3>
-    <p>Additional statistics about enum coverage:</p>
-    <pre>{
-  "enumStatistics": {
-    "objectsWithRooms": 15,
-    "objectsWithFunctions": 12,
-    "objectsWithAnyEnum": 18,
-    "totalEnumAssignments": 32
-  }
-}</pre>
-    
-    <h3>Use Cases</h3>
-    <ul>
-        <li>Retrieve single object definitions for inspection</li>
-        <li>Get all adapter objects for system monitoring</li>
-        <li>Analyze object structures for configuration purposes</li>
-        <li>Bulk object processing and analysis</li>
-        <li>System health and configuration auditing</li>
-        <li>Smart home dashboards with automatic room/function grouping</li>
-        <li>Find uncategorized objects without enum assignments</li>
-        <li>Generate UI based on ioBroker's enum structure</li>
-    </ul>
-    
-    <h3>Performance Notes</h3>
-    <ul>
-        <li>Single object retrieval is very fast</li>
-        <li>Wildcard patterns may take longer depending on scope</li>
-        <li>Enum assignments add minimal overhead</li>
-        <li>Avoid overly broad patterns like <code>*</code> for performance</li>
-        <li>Use specific patterns when possible (e.g., <code>system.adapter.*</code> instead of <code>*</code>)</li>
-        <li>Type filtering can improve performance by reducing result sets</li>
+        <li><b data-i18n="iobgetobject.label.objectId">Object ID / Pattern:</b> <span data-i18n="iobgetobject.help.objectIdDescription">The ioBroker object identifier or wildcard pattern. If empty, msg.topic is used as the object ID.</span></li>
+        <li><b data-i18n="iobgetobject.label.outputProperty">Output Property:</b> <span data-i18n="iobgetobject.help.outputPropertyDescription">The message property to store the object data (default: payload).</span></li>
+        <li><b data-i18n="iobgetobject.label.outputMode">Output Mode:</b> <span data-i18n="iobgetobject.help.outputModeDescription">How to format the output</span></li>
+        <li><b data-i18n="iobgetobject.label.objectType">Object Type Filter:</b> <span data-i18n="iobgetobject.help.objectTypeDescription">Filter objects by type (state, channel, device, etc.). Leave empty to include all types.</span></li>
+        <li><b data-i18n="iobgetobject.label.includeEnums">Include assigned Enums:</b> <span data-i18n="iobgetobject.help.includeEnumsDescription">Automatically adds enum assignment information to each object.</span></li>
+        <li><b data-i18n="iobgetobject.label.enumTypes">Enum Types:</b> <span data-i18n="iobgetobject.help.enumTypesDescription">Filter which enum types to include (all, rooms only, functions only, etc.).</span></li>
+        <li><b data-i18n="iobgetobject.label.server">Server:</b> <span data-i18n="iobgetobject.help.serverDescription">The ioBroker server configuration.</span></li>
     </ul>
 </script>

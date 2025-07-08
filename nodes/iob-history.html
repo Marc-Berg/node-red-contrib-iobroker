@@ -479,16 +479,16 @@ RED.nodes.registerType('iobhistory', {
 
     <!-- Basic Info -->
     <div class="form-row">
-        <label for="node-input-name"><i class="icon-tag"></i> Name</label>
-        <input type="text" id="node-input-name" placeholder="Optional node name">
+        <label for="node-input-name"><i class="icon-tag"></i> <span data-i18n="iobhistory.label.name">Name</span></label>
+        <input type="text" id="node-input-name" data-i18n="[placeholder]iobhistory.placeholder.name" placeholder="Optional node name">
     </div>
 
     <!-- Tab Navigation -->
     <ul class="node-config-tabs">
-        <li data-tab="datasource">📊 Data Source</li>
-        <li data-tab="timerange">🕐 Time Range</li>
-        <li data-tab="processing">⚙️ Processing</li>
-        <li data-tab="output">📤 Output</li>
+        <li data-tab="datasource"><span data-i18n="iobhistory.tabs.datasource">📊 Data Source</span></li>
+        <li data-tab="timerange"><span data-i18n="iobhistory.tabs.timerange">🕐 Time Range</span></li>
+        <li data-tab="processing"><span data-i18n="iobhistory.tabs.processing">⚙️ Processing</span></li>
+        <li data-tab="output"><span data-i18n="iobhistory.tabs.output">📤 Output</span></li>
     </ul>
 
     <!-- Tab Content -->
@@ -496,29 +496,29 @@ RED.nodes.registerType('iobhistory', {
         <!-- Data Source Tab -->
         <div class="tab-pane" data-tab="datasource">
             <div class="tab-section">
-                <h4>State Configuration</h4>
+                <h4 data-i18n="iobhistory.sections.stateConfig">State Configuration</h4>
                 <div class="form-row">
-                    <label for="node-input-stateId"><i class="icon-tag"></i> State ID</label>
-                    <input type="text" id="node-input-stateId" placeholder="e.g. system.adapter.admin.0.memRss (if empty, msg.topic is used)">
+                    <label for="node-input-stateId"><i class="icon-tag"></i> <span data-i18n="iobhistory.label.stateId">State ID</span></label>
+                    <input type="text" id="node-input-stateId" data-i18n="[placeholder]iobhistory.placeholder.stateId" placeholder="e.g. system.adapter.admin.0.memRss (if empty, msg.topic is used)">
                 </div>
             </div>
             
             <div class="tab-section">
-                <h4>History Adapter</h4>
+                <h4 data-i18n="iobhistory.sections.historyAdapterConfig">History Adapter</h4>
                 <div class="form-row">
-                    <label for="node-input-historyAdapter"><i class="icon-tag"></i> Adapter Instance</label>
-                    <input type="text" id="node-input-historyAdapter" placeholder="e.g. history.0, sql.1, influxdb.2">
+                    <label for="node-input-historyAdapter"><i class="icon-tag"></i> <span data-i18n="iobhistory.label.historyAdapter">Adapter Instance</span></label>
+                    <input type="text" id="node-input-historyAdapter" data-i18n="[placeholder]iobhistory.placeholder.historyAdapter" placeholder="e.g. history.0, sql.1, influxdb.2">
                     <div class="adapter-suggestions" style="display: none;">
-                        <span style="font-size: 12px; color: #666;">Available adapters: </span>
+                        <span style="font-size: 12px; color: #666;" data-i18n="iobhistory.info.adapters">Available adapters: </span>
                         <span class="adapter-list" style="font-size: 12px;"></span>
                     </div>
                 </div>
             </div>
             
             <div class="tab-section">
-                <h4>Server Connection</h4>
+                <h4 data-i18n="iobhistory.sections.serverConnection">Server Connection</h4>
                 <div class="form-row">
-                    <label for="node-input-server"><i class="icon-tag"></i> ioBroker Server</label>
+                    <label for="node-input-server"><i class="icon-tag"></i> <span data-i18n="iobhistory.label.server">ioBroker Server</span></label>
                     <input type="text" id="node-input-server">
                 </div>
             </div>
@@ -527,11 +527,11 @@ RED.nodes.registerType('iobhistory', {
         <!-- Time Range Tab -->
         <div class="tab-pane" data-tab="timerange">
             <div class="tab-section">
-                <h4>Time Range Mode</h4>
+                <h4 data-i18n="iobhistory.sections.timeRangeMode">Time Range Mode</h4>
                 <div class="time-range-options">
-                    <label><input type="radio" name="timeRangeMode" value="duration"> Duration from now</label>
-                    <label><input type="radio" name="timeRangeMode" value="absolute"> Absolute time period</label>
-                    <label><input type="radio" name="timeRangeMode" value="message"> From message properties</label>
+                    <label><input type="radio" name="timeRangeMode" value="duration"> <span data-i18n="iobhistory.options.timeRange.duration">Duration from now</span></label>
+                    <label><input type="radio" name="timeRangeMode" value="absolute"> <span data-i18n="iobhistory.options.timeRange.absolute">Absolute time period</span></label>
+                    <label><input type="radio" name="timeRangeMode" value="message"> <span data-i18n="iobhistory.options.timeRange.message">From message properties</span></label>
                 </div>
                 <input type="hidden" id="node-input-timeRange">
             </div>
@@ -539,15 +539,15 @@ RED.nodes.registerType('iobhistory', {
             <!-- Duration Configuration -->
             <div class="time-config-section duration">
                 <div class="tab-section">
-                    <h4>Duration Settings</h4>
+                    <h4 data-i18n="iobhistory.sections.durationSettings">Duration Settings</h4>
                     <div class="form-row">
-                        <label for="node-input-duration"><i class="icon-clock-o"></i> Duration</label>
+                        <label for="node-input-duration"><i class="icon-clock-o"></i> <span data-i18n="iobhistory.label.duration">Duration</span></label>
                         <input type="number" id="node-input-duration" style="width: 100px;" min="1">
                         <select id="node-input-durationUnit" style="width: 100px; margin-left: 5px;">
-                            <option value="minutes">Minutes</option>
-                            <option value="hours">Hours</option>
-                            <option value="days">Days</option>
-                            <option value="weeks">Weeks</option>
+                            <option value="minutes" data-i18n="iobhistory.options.durationUnit.minutes">Minutes</option>
+                            <option value="hours" data-i18n="iobhistory.options.durationUnit.hours">Hours</option>
+                            <option value="days" data-i18n="iobhistory.options.durationUnit.days">Days</option>
+                            <option value="weeks" data-i18n="iobhistory.options.durationUnit.weeks">Weeks</option>
                         </select>
                     </div>
                 </div>
@@ -556,13 +556,13 @@ RED.nodes.registerType('iobhistory', {
             <!-- Absolute Time Configuration -->
             <div class="time-config-section absolute">
                 <div class="tab-section">
-                    <h4>Absolute Time Period</h4>
+                    <h4 data-i18n="iobhistory.sections.absoluteTime">Absolute Time Period</h4>
                     <div class="form-row">
-                        <label for="node-input-startTime"><i class="icon-calendar"></i> Start Time</label>
+                        <label for="node-input-startTime"><i class="icon-calendar"></i> <span data-i18n="iobhistory.label.startTime">Start Time</span></label>
                         <input type="datetime-local" id="node-input-startTime" style="width: 200px;">
                     </div>
                     <div class="form-row">
-                        <label for="node-input-endTime"><i class="icon-calendar"></i> End Time</label>
+                        <label for="node-input-endTime"><i class="icon-calendar"></i> <span data-i18n="iobhistory.label.endTime">End Time</span></label>
                         <input type="datetime-local" id="node-input-endTime" style="width: 200px;">
                     </div>
                 </div>
@@ -571,13 +571,13 @@ RED.nodes.registerType('iobhistory', {
             <!-- Message Configuration Info -->
             <div class="time-config-section message">
                 <div class="tab-section">
-                    <h4>Message Properties</h4>
+                    <h4 data-i18n="iobhistory.sections.messageProperties">Message Properties</h4>
                     <div style="color: #0c5460; font-size: 13px;">
-                        <i class="fa fa-info-circle"></i> Time range will be read from message properties:
+                        <i class="fa fa-info-circle"></i> <span data-i18n="iobhistory.info.messageProperties">Time range will be read from message properties:</span>
                         <ul style="margin: 8px 0 0 20px;">
-                            <li><code>msg.start</code> - Start timestamp (ISO string or milliseconds)</li>
-                            <li><code>msg.end</code> - End timestamp (ISO string or milliseconds)</li>
-                            <li><code>msg.duration</code> - Duration in hours (alternative to end)</li>
+                            <li><code>msg.start</code> - <span data-i18n="iobhistory.info.messagePropertiesList.0">Start timestamp (ISO string or milliseconds)</span></li>
+                            <li><code>msg.end</code> - <span data-i18n="iobhistory.info.messagePropertiesList.1">End timestamp (ISO string or milliseconds)</span></li>
+                            <li><code>msg.duration</code> - <span data-i18n="iobhistory.info.messagePropertiesList.2">Duration in hours (alternative to end)</span></li>
                         </ul>
                     </div>
                 </div>
@@ -587,13 +587,13 @@ RED.nodes.registerType('iobhistory', {
         <!-- Processing Tab -->
         <div class="tab-pane" data-tab="processing">
             <div class="tab-section">
-                <h4>Query Processing</h4>
+                <h4 data-i18n="iobhistory.sections.queryProcessing">Query Processing</h4>
                 <div class="form-row">
-                    <label for="node-input-queryMode"><i class="icon-cogs"></i> Query Mode</label>
+                    <label for="node-input-queryMode"><i class="icon-cogs"></i> <span data-i18n="iobhistory.label.queryMode">Query Mode</span></label>
                     <select id="node-input-queryMode" style="width:100%">
-                        <option value="parallel">Parallel - Allow multiple simultaneous queries</option>
-                        <option value="sequential">Sequential - Queue queries and process one by one</option>
-                        <option value="drop">Drop - Discard new queries while one is running</option>
+                        <option value="parallel" data-i18n="iobhistory.options.queryMode.parallel">Parallel - Allow multiple simultaneous queries</option>
+                        <option value="sequential" data-i18n="iobhistory.options.queryMode.sequential">Sequential - Queue queries and process one by one</option>
+                        <option value="drop" data-i18n="iobhistory.options.queryMode.drop">Drop - Discard new queries while one is running</option>
                     </select>
                     <div id="query-mode-info" style="margin-top: 8px; padding: 8px; background-color: #e8f4fd; border: 1px solid #bee5eb; border-radius: 4px; font-size: 12px; color: #0c5460;">
                         <!-- Dynamic info will be populated here -->
@@ -602,65 +602,65 @@ RED.nodes.registerType('iobhistory', {
             </div>
             
             <div class="tab-section">
-                <h4>Data Aggregation</h4>
+                <h4 data-i18n="iobhistory.sections.dataAggregation">Data Aggregation</h4>
                 <div class="form-row">
-                    <label for="node-input-aggregate"><i class="icon-cog"></i> Aggregation Method</label>
+                    <label for="node-input-aggregate"><i class="icon-cog"></i> <span data-i18n="iobhistory.label.aggregate">Aggregation Method</span></label>
                     <select id="node-input-aggregate" style="width:100%">
-                        <option value="none">None (Raw Data)</option>
-                        <option value="onchange">On Change</option>
-                        <option value="average">Average</option>
-                        <option value="min">Minimum</option>
-                        <option value="max">Maximum</option>
-                        <option value="minmax">Min/Max Pairs</option>
-                        <option value="total">Total/Sum</option>
-                        <option value="count">Count</option>
-                        <option value="percentile">Percentile</option>
-                        <option value="quantile">Quantile</option>
-                        <option value="integral">Integral</option>
+                        <option value="none" data-i18n="iobhistory.options.aggregate.none">None (Raw Data)</option>
+                        <option value="onchange" data-i18n="iobhistory.options.aggregate.onchange">On Change</option>
+                        <option value="average" data-i18n="iobhistory.options.aggregate.average">Average</option>
+                        <option value="min" data-i18n="iobhistory.options.aggregate.min">Minimum</option>
+                        <option value="max" data-i18n="iobhistory.options.aggregate.max">Maximum</option>
+                        <option value="minmax" data-i18n="iobhistory.options.aggregate.minmax">Min/Max Pairs</option>
+                        <option value="total" data-i18n="iobhistory.options.aggregate.total">Total/Sum</option>
+                        <option value="count" data-i18n="iobhistory.options.aggregate.count">Count</option>
+                        <option value="percentile" data-i18n="iobhistory.options.aggregate.percentile">Percentile</option>
+                        <option value="quantile" data-i18n="iobhistory.options.aggregate.quantile">Quantile</option>
+                        <option value="integral" data-i18n="iobhistory.options.aggregate.integral">Integral</option>
                     </select>
                 </div>
                 
                 <!-- Step Configuration -->
                 <div class="form-row" id="step-config" style="display: none;">
-                    <label for="node-input-step"><i class="icon-clock-o"></i> Step Interval</label>
+                    <label for="node-input-step"><i class="icon-clock-o"></i> <span data-i18n="iobhistory.label.step">Step Interval</span></label>
                     <input type="number" id="node-input-step" style="width: 100px;" min="1">
                     <select id="node-input-stepUnit" style="width: 100px; margin-left: 5px;">
-                        <option value="seconds">Seconds</option>
-                        <option value="minutes">Minutes</option>
-                        <option value="hours">Hours</option>
+                        <option value="seconds" data-i18n="iobhistory.options.stepUnit.seconds">Seconds</option>
+                        <option value="minutes" data-i18n="iobhistory.options.stepUnit.minutes">Minutes</option>
+                        <option value="hours" data-i18n="iobhistory.options.stepUnit.hours">Hours</option>
                     </select>
                 </div>
                 
                 <!-- Aggregation-specific options -->
                 <div class="form-row aggregate-option" id="percentile-config" style="display: none;">
-                    <label for="node-input-percentile"><i class="icon-tag"></i> Percentile</label>
+                    <label for="node-input-percentile"><i class="icon-tag"></i> <span data-i18n="iobhistory.label.percentile">Percentile</span></label>
                     <input type="number" id="node-input-percentile" style="width: 100px;" min="0" max="100" value="50">
-                    <span style="margin-left: 5px; font-size: 12px; color: #666;">% (0-100)</span>
+                    <span style="margin-left: 5px; font-size: 12px; color: #666;" data-i18n="iobhistory.units.percent">% (0-100)</span>
                 </div>
                 
                 <div class="form-row aggregate-option" id="quantile-config" style="display: none;">
-                    <label for="node-input-quantile"><i class="icon-tag"></i> Quantile</label>
+                    <label for="node-input-quantile"><i class="icon-tag"></i> <span data-i18n="iobhistory.label.quantile">Quantile</span></label>
                     <input type="number" id="node-input-quantile" style="width: 100px;" min="0" max="1" step="0.01" value="0.5">
-                    <span style="margin-left: 5px; font-size: 12px; color: #666;">(0-1)</span>
+                    <span style="margin-left: 5px; font-size: 12px; color: #666;" data-i18n="iobhistory.units.decimal">(0-1)</span>
                 </div>
                 
                 <div class="form-row aggregate-option" id="integral-config" style="display: none;">
-                    <label for="node-input-integralUnit"><i class="icon-tag"></i> Integral Unit</label>
+                    <label for="node-input-integralUnit"><i class="icon-tag"></i> <span data-i18n="iobhistory.label.integralUnit">Integral Unit</span></label>
                     <select id="node-input-integralUnit" style="width: 150px;">
-                        <option value="1">Seconds</option>
-                        <option value="60">Minutes</option>
-                        <option value="3600">Hours</option>
-                        <option value="86400">Days</option>
+                        <option value="1" data-i18n="iobhistory.options.integralUnit.seconds">Seconds</option>
+                        <option value="60" data-i18n="iobhistory.options.integralUnit.minutes">Minutes</option>
+                        <option value="3600" data-i18n="iobhistory.options.integralUnit.hours">Hours</option>
+                        <option value="86400" data-i18n="iobhistory.options.integralUnit.days">Days</option>
                     </select>
                 </div>
             </div>
             
             <div class="tab-section">
-                <h4>Data Limits</h4>
+                <h4 data-i18n="iobhistory.sections.dataLimits">Data Limits</h4>
                 <div class="form-row">
-                    <label for="node-input-maxEntries"><i class="icon-list"></i> Max Entries</label>
+                    <label for="node-input-maxEntries"><i class="icon-list"></i> <span data-i18n="iobhistory.label.maxEntries">Max Entries</span></label>
                     <input type="number" id="node-input-maxEntries" style="width: 100px;" min="1" max="100000">
-                    <span style="margin-left: 5px; font-size: 12px; color: #666;">Default: 2000</span>
+                    <span style="margin-left: 5px; font-size: 12px; color: #666;" data-i18n="iobhistory.units.default">Default: 2000</span>
                 </div>
             </div>
         </div>
@@ -668,143 +668,46 @@ RED.nodes.registerType('iobhistory', {
         <!-- Output Tab -->
         <div class="tab-pane" data-tab="output">
             <div class="tab-section">
-                <h4>Output Configuration</h4>
+                <h4 data-i18n="iobhistory.sections.outputConfig">Output Configuration</h4>
                 <div class="form-row">
-                    <label for="node-input-outputProperty"><i class="icon-tag"></i> Output Property</label>
-                    <input type="text" id="node-input-outputProperty" placeholder="payload">
+                    <label for="node-input-outputProperty"><i class="icon-tag"></i> <span data-i18n="iobhistory.label.outputProperty">Output Property</span></label>
+                    <input type="text" id="node-input-outputProperty" data-i18n="[placeholder]iobhistory.placeholder.outputProperty" placeholder="payload">
                 </div>
                 
                 <div class="form-row">
-                    <label for="node-input-outputFormat"><i class="icon-list-alt"></i> Output Format</label>
+                    <label for="node-input-outputFormat"><i class="icon-list-alt"></i> <span data-i18n="iobhistory.label.outputFormat">Output Format</span></label>
                     <select id="node-input-outputFormat" style="width:100%">
-                        <option value="array">Array of Data Points</option>
-                        <option value="chart">Chart.js Format</option>
-                        <option value="dashboard2">Dashboard 2.0 Format</option>
-                        <option value="statistics">Statistics Summary</option>
+                        <option value="array" data-i18n="iobhistory.options.outputFormat.array">Array of Data Points</option>
+                        <option value="chart" data-i18n="iobhistory.options.outputFormat.chart">Chart.js Format</option>
+                        <option value="dashboard2" data-i18n="iobhistory.options.outputFormat.dashboard2">Dashboard 2.0 Format</option>
+                        <option value="statistics" data-i18n="iobhistory.options.outputFormat.statistics">Statistics Summary</option>
                     </select>
                 </div>
             </div>
             
             <!-- Output Format Information -->
             <div class="output-format-info array" style="display: none;">
-                <i class="fa fa-info-circle"></i> <strong>Array Format:</strong> Returns raw data points as array: <code>[{val, ts, ack, from}, ...]</code>
+                <i class="fa fa-info-circle"></i> <strong>Array Format:</strong> <span data-i18n="iobhistory.info.outputFormat.array">Returns raw data points as array: [{val, ts, ack, from}, ...]</span>
             </div>
             
             <div class="output-format-info chart" style="display: none;">
-                <i class="fa fa-info-circle"></i> <strong>Chart.js Format:</strong> Returns Chart.js dataset: <code>{labels: [], datasets: [{data: [], label: ""}]}</code>
+                <i class="fa fa-info-circle"></i> <strong>Chart.js Format:</strong> <span data-i18n="iobhistory.info.outputFormat.chart">Returns Chart.js dataset: {labels: [], datasets: [{data: [], label: ""}]}</span>
             </div>
             
             <div class="output-format-info dashboard2" style="display: none;">
-                <i class="fa fa-info-circle"></i> <strong>Dashboard 2.0 Format:</strong> Returns ui-chart compatible data: <code>[{x: timestamp, y: value}, ...]</code> with <code>msg.topic</code> as series name. Configure ui-chart: X="x", Y="y"
+                <i class="fa fa-info-circle"></i> <strong>Dashboard 2.0 Format:</strong> <span data-i18n="iobhistory.info.outputFormat.dashboard2">Returns ui-chart compatible data: [{x: timestamp, y: value}, ...] with msg.topic as series name. Configure ui-chart: X="x", Y="y"</span>
             </div>
             
             <div class="output-format-info statistics" style="display: none;">
-                <i class="fa fa-info-circle"></i> <strong>Statistics Format:</strong> Returns summary: <code>{count, min, max, avg, first, last, timeRange}</code>
+                <i class="fa fa-info-circle"></i> <strong>Statistics Format:</strong> <span data-i18n="iobhistory.info.outputFormat.statistics">Returns summary: {count, min, max, avg, first, last, timeRange}</span>
             </div>
         </div>
     </div>
 </script>
 
 <script type="text/html" data-help-name="iobhistory">
-    <p>ioBroker historical data retrieval via WebSocket</p>
+    <p data-i18n="iobhistory.help.description">ioBroker historical data retrieval via WebSocket</p>
     
-    <h3>Configuration</h3>
-    <p>The node configuration is organized into four main sections:</p>
-    
-    <h4>📊 Data Source</h4>
-    <ul>
-        <li><b>State ID:</b> The ioBroker state to query. If empty, <code>msg.topic</code> is used.</li>
-        <li><b>History Adapter:</b> Which history adapter instance to query (auto-discovered with status indicators)</li>
-        <li><b>Server:</b> ioBroker server connection configuration</li>
-    </ul>
-    
-    <h4>🕐 Time Range</h4>
-    <ul>
-        <li><b>Duration:</b> Last X hours/days from now</li>
-        <li><b>Absolute:</b> Fixed start and end times</li>
-        <li><b>From Message:</b> Use msg.start, msg.end, or msg.duration</li>
-    </ul>
-    
-    <h4>⚙️ Processing</h4>
-    <ul>
-        <li><b>Query Mode:</b> How to handle multiple simultaneous queries:
-            <ul>
-                <li><b>Parallel:</b> Allow multiple queries to run simultaneously (default)</li>
-                <li><b>Sequential:</b> Queue queries and process them one by one</li>
-                <li><b>Drop:</b> Discard new queries while one is already running</li>
-            </ul>
-        </li>
-        <li><b>Aggregation:</b> How to process the data (none, average, min/max, etc.)</li>
-        <li><b>Step Interval:</b> Time interval for aggregation</li>
-        <li><b>Max Entries:</b> Limit number of returned data points</li>
-    </ul>
-    
-    <h4>📤 Output</h4>
-    <ul>
-        <li><b>Output Property:</b> Where to place the result in the message</li>
-        <li><b>Output Format:</b> Format of the returned data (Array, Chart.js, Dashboard 2.0, Statistics)</li>
-    </ul>
-    
-    <h3>Input</h3>
-    <p>Trigger history query on any input. Optional message properties:</p>
-    <ul>
-        <li><code>msg.topic</code> - State ID (if not configured)</li>
-        <li><code>msg.start</code> - Start time (ISO string or timestamp in ms)</li>
-        <li><code>msg.end</code> - End time (ISO string or timestamp in ms)</li>
-        <li><code>msg.duration</code> - Duration in hours (alternative to end time)</li>
-        <li><code>msg.aggregate</code> - Override aggregation method</li>
-        <li><code>msg.step</code> - Override step interval (in seconds)</li>
-        <li><code>msg.maxEntries</code> - Override max entries limit</li>
-    </ul>
-    
-    <h3>Output</h3>
-    <p>Historical data in the specified format plus additional properties:</p>
-    <ul>
-        <li><code>msg.stateId</code> - The queried state ID</li>
-        <li><code>msg.adapter</code> - History adapter used</li>
-        <li><code>msg.queryOptions</code> - Complete query options used</li>
-        <li><code>msg.queryTime</code> - Time taken for the query (ms)</li>
-        <li><code>msg.count</code> - Number of data points returned</li>
-        <li><code>msg.queryId</code> - Unique ID for this query</li>
-        <li><code>msg.queryMode</code> - Query processing mode used</li>
-        <li><code>msg.dropped</code> - True if query was dropped (drop mode only)</li>
-        <li><code>msg.error</code> - Error message if query failed</li>
-    </ul>
-    
-    <h3>Query Modes</h3>
-    <p>The node supports three different query processing modes:</p>
-    
-    <h4>Parallel Mode (Default)</h4>
-    <ul>
-        <li>Multiple queries can run simultaneously</li>
-        <li>Fastest processing for single queries</li>
-        <li>May overload history adapter with many concurrent requests</li>
-        <li>Best for: Low-frequency queries or powerful ioBroker systems</li>
-    </ul>
-    
-    <h4>Sequential Mode</h4>
-    <ul>
-        <li>Queries are processed one after another in order</li>
-        <li>All queries are executed, none are lost</li>
-        <li>Slower overall processing but more reliable</li>
-        <li>Queue status shown in node status</li>
-        <li>Best for: High-frequency queries or limited system resources</li>
-    </ul>
-    
-    <h4>Drop Mode</h4>
-    <ul>
-        <li>New queries are discarded while one is running</li>
-        <li>Only the currently running query completes</li>
-        <li>Dropped queries receive an error response with <code>msg.dropped = true</code></li>
-        <li>Best for: UI updates where only the latest result matters</li>
-    </ul>
-    
-    <h3>Use Cases</h3>
-    <ul>
-        <li>Energy consumption analysis and reporting</li>
-        <li>Temperature trending and statistics</li>
-        <li>System performance monitoring</li>
-        <li>Data visualization with Chart.js or Dashboard 2.0</li>
-        <li>Historical data export and backup</li>
-    </ul>
+    <h3 data-i18n="iobhistory.help.configuration">Configuration</h3>
+    <p data-i18n="iobhistory.help.description">The node configuration is organized into four main sections:</p>
 </script>
