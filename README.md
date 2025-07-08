@@ -94,6 +94,16 @@ If you prefer not to use a dedicated Admin instance:
 - **WS ioB log node does not work** with WebSocket or Web adapters (requires Admin adapter)
 - **WS ioB getObj node is limited** to state, channel, and device object types only
 
+## ✨ Features
+
+- **Real-time WebSocket communication** with automatic reconnection
+- **Wildcard pattern support** - subscribe to multiple states at once
+- **Automatic object creation** for missing ioBroker objects
+- **Shared connection management** - multiple nodes share connections
+- **Historical data access** from History adapters (History, SQL, InfluxDB)
+- **OAuth2 authentication** for secured installations
+- **SSL/TLS support** for encrypted connections
+
 ## ⚠️ Important Notes
 
 💡 For simpler installation: In most cases, it's easier to use the ioBroker Node-RED adapter if you prefer a straightforward setup.
@@ -102,6 +112,7 @@ If you prefer not to use a dedicated Admin instance:
 
 ## 📚 Additional Resources
 
+- **📋 Release Notes**: [Changelog](CHANGELOG.md)
 - **🔍 Troubleshooting**: [Troubleshooting Guide](docs/troubleshooting.md)
 - **🎯 Use Cases**: [Common Use Cases](docs/use-cases.md)
 - **📖 Full Documentation**: [GitHub Repository](https://github.com/Marc-Berg/node-red-contrib-iobroker)

@@ -1,36 +1,22 @@
 const connectionManager = require('../lib/manager/websocket-manager');
+const { NodeHelpers } = require('../lib/utils/node-helpers');
 
 module.exports = function (RED) {
     function iobin(config) {
         RED.nodes.createNode(this, config);
         const node = this;
 
-        function setError(message, statusText) {
-            node.error(message);
-            setStatus("red", "ring", statusText);
-        }
+        // Use helper to create status functions
+        const { setStatus, setError } = NodeHelpers.createStatusHelpers(node);
+        
+        // Use helper to validate server config
+        const serverConfig = NodeHelpers.validateServerConfig(RED, config, setError);
+        if (!serverConfig) return;
 
-        function setStatus(fill, shape, text) {
-            try {
-                node.status({ fill, shape, text });
-            } catch (error) {
-                node.warn(`Status update error: ${error.message}`);
-            }
-        }
+        const { globalConfig, connectionDetails, serverId } = serverConfig;
 
-        // Get server configuration
-        const globalConfig = RED.nodes.getNode(config.server);
-        if (!globalConfig) {
-            return setError("No server configuration selected", "No server config");
-        }
-
-        const { iobhost, iobport, user, password, usessl } = globalConfig;
-        if (!iobhost || !iobport) {
-            return setError("ioBroker host or port missing", "Host/port missing");
-        }
-
+        // Node-specific configuration
         const inputMode = config.inputMode || 'single';
-
         let stateList = [];
         let subscriptionPattern = '';
 
@@ -44,13 +30,11 @@ module.exports = function (RED) {
             if (stateList.length === 0) {
                 return setError("No states configured for multiple states mode", "No states");
             }
-            subscriptionPattern = '';
         } else {
             subscriptionPattern = config.state ? config.state.trim() : '';
             if (!subscriptionPattern) {
                 return setError("State ID or pattern missing", "Config missing");
             }
-            stateList = [];
         }
 
         const isWildcardPattern = inputMode === 'single' && subscriptionPattern.includes('*');
@@ -61,13 +45,13 @@ module.exports = function (RED) {
             ackFilter: config.ackFilter || "both",
             sendInitialValue: config.sendInitialValue && !isWildcardPattern,
             outputMode: config.outputMode || "individual",
-            serverId: connectionManager.getServerId(globalConfig),
+            serverId,
             nodeId: node.id,
             useWildcard: isWildcardPattern,
             inputMode: inputMode
         };
 
-        node.currentConfig = { iobhost, iobport, user, password, usessl };
+        node.currentConfig = connectionDetails;
         node.isInitialized = false;
         node.isSubscribed = false;
         node.subscriptionPattern = subscriptionPattern;
@@ -78,6 +62,7 @@ module.exports = function (RED) {
         node.expectedInitialValues = 0;
         node.initialGroupedMessageSent = false;
 
+        // Log configuration
         if (isMultipleStates) {
             node.log(`Multiple states mode: ${stateList.length} states [${stateList.join(', ')}], output: ${settings.outputMode}`);
         } else if (isWildcardPattern) {
@@ -293,41 +278,32 @@ module.exports = function (RED) {
                 }
             };
 
-            callback.updateStatus = function (status) {
-                switch (status) {
-                    case 'ready':
-                        let statusText;
-                        if (isMultipleStates) {
-                            statusText = `${stateList.length} states (${settings.outputMode})`;
-                        } else if (isWildcardPattern) {
-                            statusText = `Pattern: ${node.subscriptionPattern}`;
-                        } else {
-                            statusText = "Ready";
-                        }
-                        setStatus("green", "dot", statusText);
-                        node.isInitialized = true;
-                        break;
-                    case 'connecting':
-                        setStatus("yellow", "ring", "Connecting...");
-                        node.isSubscribed = false;
-                        break;
-                    case 'disconnected':
-                        setStatus("red", "ring", "Disconnected");
-                        node.isInitialized = false;
-                        node.isSubscribed = false;
-                        break;
-                    case 'retrying':
-                        setStatus("yellow", "ring", "Retrying...");
-                        break;
-                    case 'failed_permanently':
-                        setStatus("red", "ring", "Auth failed");
-                        break;
-                    default:
-                        setStatus("grey", "ring", status);
-                }
+            // Custom status texts for input subscription
+            const statusTexts = {
+                ready: isMultipleStates 
+                    ? `${stateList.length} states (${settings.outputMode})`
+                    : isWildcardPattern 
+                        ? `Pattern: ${subscriptionPattern}` 
+                        : "Ready",
+                disconnected: "Disconnected"
             };
 
-            callback.onReconnect = function () {
+            // Use helper for subscription event handling
+            const baseCallback = NodeHelpers.createSubscriptionEventCallback(
+                node, 
+                setStatus,
+                () => { 
+                    node.log("Subscription successful");
+                    node.isSubscribed = true; 
+                },
+                statusTexts
+            );
+
+            // Merge the callbacks
+            Object.assign(callback, baseCallback);
+
+            // Override reconnect to handle resubscription with state reset
+            callback.onReconnect = function() {
                 node.log("Reconnection detected - resubscribing");
                 node.isSubscribed = false;
                 node.initialValueCount = 0;
@@ -335,40 +311,7 @@ module.exports = function (RED) {
                 setStatus("yellow", "ring", "Resubscribing...");
             };
 
-            callback.onDisconnect = function () {
-                node.log("Disconnection detected by node");
-                setStatus("red", "ring", "Disconnected");
-                node.isSubscribed = false;
-            };
-
-            callback.onSubscribed = function () {
-                node.log("Subscription successful");
-                node.isSubscribed = true;
-            };
-
-            callback.alreadySubscribed = true;
-
             return callback;
-        }
-
-        function hasConfigChanged() {
-            const currentGlobalConfig = RED.nodes.getNode(config.server);
-            if (!currentGlobalConfig) return false;
-
-            const configChanged = (
-                node.currentConfig.iobhost !== currentGlobalConfig.iobhost ||
-                node.currentConfig.iobport !== currentGlobalConfig.iobport ||
-                node.currentConfig.user !== currentGlobalConfig.user ||
-                node.currentConfig.password !== currentGlobalConfig.password ||
-                node.currentConfig.usessl !== currentGlobalConfig.usessl
-            );
-
-            if (configChanged) {
-                node.log(`Configuration change detected`);
-                node.isSubscribed = false;
-            }
-
-            return configChanged;
         }
 
         async function subscribeToStates() {
@@ -423,26 +366,8 @@ module.exports = function (RED) {
                 node.initialValueCount = 0;
                 node.initialGroupedMessageSent = false;
 
-                if (hasConfigChanged()) {
-                    const newGlobalConfig = RED.nodes.getNode(config.server);
-                    const oldServerId = settings.serverId;
-
-                    node.currentConfig = {
-                        iobhost: newGlobalConfig.iobhost,
-                        iobport: newGlobalConfig.iobport,
-                        user: newGlobalConfig.user,
-                        password: newGlobalConfig.password,
-                        usessl: newGlobalConfig.usessl
-                    };
-
-                    const newServerId = `${newGlobalConfig.iobhost}:${newGlobalConfig.iobport}`;
-                    settings.serverId = newServerId;
-
-                    if (oldServerId !== newServerId) {
-                        node.log(`Server changed from ${oldServerId} to ${newServerId}, forcing connection reset`);
-                        await connectionManager.forceServerSwitch(oldServerId, newServerId, newGlobalConfig);
-                    }
-                }
+                // Handle config changes using helper
+                await NodeHelpers.handleConfigChange(node, config, RED, settings);
 
                 await subscribeToStates();
 
@@ -507,11 +432,7 @@ module.exports = function (RED) {
             }
         });
 
-        node.on("error", function (error) {
-            node.error(`Node error: ${error.message}`);
-            setError(`Node error: ${error.message}`, "Node error");
-            node.isSubscribed = false;
-        });
+        node.on("error", NodeHelpers.createErrorHandler(node, setError));
 
         initialize();
     }

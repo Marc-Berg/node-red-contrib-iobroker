@@ -112,6 +112,7 @@ Falls du keine dedizierte Admin Instanz verwenden möchtest:
 
 ## 📚 Zusätzliche Ressourcen
 
+- **📋 Release Notes**: [Changelog](CHANGELOG.md)
 - **🔍 Fehlerbehebung**: [Troubleshooting Guide](docs/troubleshooting.md)
 - **🎯 Anwendungsfälle**: [Common Use Cases](docs/use-cases.md)
 - **📖 Vollständige Dokumentation**: [GitHub Repository](https://github.com/Marc-Berg/node-red-contrib-iobroker)

@@ -1,44 +1,30 @@
 const connectionManager = require('../lib/manager/websocket-manager');
+const { NodeHelpers } = require('../lib/utils/node-helpers');
 
 module.exports = function (RED) {
     function ioblog(config) {
         RED.nodes.createNode(this, config);
         const node = this;
 
-        function setError(message, statusText) {
-            node.error(message);
-            setStatus("red", "ring", statusText);
-        }
+        // Use helper to create status functions
+        const { setStatus, setError } = NodeHelpers.createStatusHelpers(node);
+        
+        // Use helper to validate server config
+        const serverConfig = NodeHelpers.validateServerConfig(RED, config, setError);
+        if (!serverConfig) return;
 
-        function setStatus(fill, shape, text) {
-            try {
-                node.status({ fill, shape, text });
-            } catch (error) {
-                node.warn(`Status update error: ${error.message}`);
-            }
-        }
-
-        // Get server configuration
-        const globalConfig = RED.nodes.getNode(config.server);
-        if (!globalConfig) {
-            return setError("No server configuration selected", "No server config");
-        }
-
-        const { iobhost, iobport, user, password, usessl } = globalConfig;
-        if (!iobhost || !iobport) {
-            return setError("ioBroker host or port missing", "Host/port missing");
-        }
+        const { globalConfig, connectionDetails, serverId } = serverConfig;
 
         const settings = {
             outputProperty: config.outputProperty?.trim() || "payload",
             logLevel: config.logLevel || "info",
             includeTimestamp: config.includeTimestamp !== false,
             includeSource: config.includeSource !== false,
-            serverId: connectionManager.getServerId(globalConfig),
+            serverId,
             nodeId: node.id
         };
 
-        node.currentConfig = { iobhost, iobport, user, password, usessl };
+        node.currentConfig = connectionDetails;
         node.isInitialized = false;
         node.isSubscribed = false;
 
@@ -55,8 +41,7 @@ module.exports = function (RED) {
 
         function shouldProcessLogMessage(logLevel) {
             const messageLevel = LOG_LEVELS[logLevel];
-            const shouldProcess = messageLevel >= minimumLevel;           
-            return shouldProcess;
+            return messageLevel >= minimumLevel;
         }
 
         function formatTimestamp(ts) {
@@ -160,71 +145,27 @@ module.exports = function (RED) {
         function createCallback() {
             const callback = onLogMessage;
 
-            // Status update callback - called by the centralized manager
-            callback.updateStatus = function (status) {
-                switch (status) {
-                    case 'ready':
-                        setStatus("green", "dot", `Monitoring (${settings.logLevel}+)`);
-                        node.isInitialized = true;
-                        break;
-                    case 'connecting':
-                        setStatus("yellow", "ring", "Connecting...");
-                        node.isSubscribed = false;
-                        break;
-                    case 'disconnected':
-                        setStatus("red", "ring", "Disconnected");
-                        node.isInitialized = false;
-                        node.isSubscribed = false;
-                        break;
-                    case 'retrying':
-                        setStatus("yellow", "ring", "Retrying...");
-                        break;
-                    case 'failed_permanently':
-                        setStatus("red", "ring", "Auth failed");
-                        break;
-                    default:
-                        setStatus("grey", "ring", status);
-                }
+            // Custom status texts for log monitoring
+            const statusTexts = {
+                ready: `Monitoring (${settings.logLevel}+)`,
+                disconnected: "Disconnected"
             };
 
-            callback.onReconnect = function () {
-                node.log("Reconnection detected - resubscribing to logs");
-                node.isSubscribed = false;
-                setStatus("yellow", "ring", "Resubscribing...");
-            };
-
-            callback.onDisconnect = function () {
-                node.log("Disconnection detected by node");
-                setStatus("red", "ring", "Disconnected");
-                node.isSubscribed = false;
-            };
-
-            callback.onSubscribed = function () {
-                node.log("Log subscription successful");
-                node.isSubscribed = true;
-            };
-
-            return callback;
-        }
-
-        function hasConfigChanged() {
-            const currentGlobalConfig = RED.nodes.getNode(config.server);
-            if (!currentGlobalConfig) return false;
-
-            const configChanged = (
-                node.currentConfig.iobhost !== currentGlobalConfig.iobhost ||
-                node.currentConfig.iobport !== currentGlobalConfig.iobport ||
-                node.currentConfig.user !== currentGlobalConfig.user ||
-                node.currentConfig.password !== currentGlobalConfig.password ||
-                node.currentConfig.usessl !== currentGlobalConfig.usessl
+            // Use helper for subscription event handling
+            const baseCallback = NodeHelpers.createSubscriptionEventCallback(
+                node, 
+                setStatus,
+                () => { 
+                    node.log("Log subscription successful");
+                    node.isSubscribed = true; 
+                },
+                statusTexts
             );
 
-            if (configChanged) {
-                node.log(`Configuration change detected`);
-                node.isSubscribed = false;
-            }
+            // Merge the callbacks
+            Object.assign(callback, baseCallback);
 
-            return configChanged;
+            return callback;
         }
 
         async function initialize() {
@@ -238,27 +179,8 @@ module.exports = function (RED) {
             try {
                 setStatus("yellow", "ring", "Connecting...");
 
-                // Handle configuration changes
-                if (hasConfigChanged()) {
-                    const newGlobalConfig = RED.nodes.getNode(config.server);
-                    const oldServerId = settings.serverId;
-
-                    node.currentConfig = {
-                        iobhost: newGlobalConfig.iobhost,
-                        iobport: newGlobalConfig.iobport,
-                        user: newGlobalConfig.user,
-                        password: newGlobalConfig.password,
-                        usessl: newGlobalConfig.usessl
-                    };
-
-                    const newServerId = `${newGlobalConfig.iobhost}:${newGlobalConfig.iobport}`;
-                    settings.serverId = newServerId;
-
-                    if (oldServerId !== newServerId) {
-                        node.log(`Server changed from ${oldServerId} to ${newServerId}, forcing connection reset`);
-                        await connectionManager.forceServerSwitch(oldServerId, newServerId, newGlobalConfig);
-                    }
-                }
+                // Handle config changes using helper
+                await NodeHelpers.handleConfigChange(node, config, RED, settings);
 
                 const callback = createCallback();
 
@@ -316,11 +238,7 @@ module.exports = function (RED) {
             }
         });
 
-        node.on("error", function (error) {
-            node.error(`Node error: ${error.message}`);
-            setError(`Node error: ${error.message}`, "Node error");
-            node.isSubscribed = false;
-        });
+        node.on("error", NodeHelpers.createErrorHandler(node, setError));
 
         // Initialize the node
         initialize();
