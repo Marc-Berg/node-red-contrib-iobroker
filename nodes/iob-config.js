@@ -1,11 +1,13 @@
 const path = require('path');
 const express = require('express');
 const fs = require('fs');
+const { Logger } = require('../lib/utils/logger');
 
 let staticResourcesSetup = false;
 let apiEndpointsSetup = false;
 
 function setupStaticResources(RED) {
+    Logger.setRED(RED);
     if (staticResourcesSetup) return true;
 
     try {
@@ -99,7 +101,7 @@ function setupAPIEndpoints(RED) {
 
                 if (states && typeof states === 'object') {
                     const adapterConfigs = new Map();
-                    
+
                     // Extract history adapter information from states
                     Object.keys(states).forEach(stateId => {
                         // Look for alive states of history adapters
@@ -108,10 +110,10 @@ function setupAPIEndpoints(RED) {
                             const adapterType = aliveMatch[1];
                             const instance = parseInt(aliveMatch[2]);
                             const adapterName = `${adapterType}.${instance}`;
-                            
+
                             const state = states[stateId];
                             const isAlive = state && typeof state.val === 'boolean' ? state.val : Boolean(state?.val);
-                            
+
                             if (!adapterConfigs.has(adapterName)) {
                                 adapterConfigs.set(adapterName, {
                                     name: adapterName,
@@ -125,17 +127,17 @@ function setupAPIEndpoints(RED) {
                                 adapterConfigs.get(adapterName).alive = isAlive;
                             }
                         }
-                        
+
                         // Look for enabled states of history adapters
                         const enabledMatch = stateId.match(/^system\.adapter\.(history|sql|influxdb)\.(\d+)\.enabled$/);
                         if (enabledMatch) {
                             const adapterType = enabledMatch[1];
                             const instance = parseInt(enabledMatch[2]);
                             const adapterName = `${adapterType}.${instance}`;
-                            
+
                             const state = states[stateId];
                             const isEnabled = state && typeof state.val === 'boolean' ? state.val : Boolean(state?.val);
-                            
+
                             if (!adapterConfigs.has(adapterName)) {
                                 adapterConfigs.set(adapterName, {
                                     name: adapterName,
