@@ -1,6 +1,6 @@
 # Changelog
 
-## [0.12.1] - 2025-xx-xx
+## [0.13.0] - 2025-xx-xx
 
 ### Changed
   - integrate ioBroker logging with Node-RED logging system
