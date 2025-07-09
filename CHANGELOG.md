@@ -1,5 +1,8 @@
 # Changelog
 
+## [0.12.1] - 2025-07-xx
+- optimize getObjects with getObjectView for performance improvement
+
 ## [0.12.0] - 2025-07-07
 
 ### Added
