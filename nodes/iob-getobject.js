@@ -6,20 +6,16 @@ module.exports = function(RED) {
         RED.nodes.createNode(this, config);
         const node = this;
 
-        // Use helper to create status functions
         const { setStatus, setError } = NodeHelpers.createStatusHelpers(node);
         
-        // Use helper to validate server config
         const serverConfig = NodeHelpers.validateServerConfig(RED, config, setError);
         if (!serverConfig) return;
 
         const { globalConfig, connectionDetails, serverId } = serverConfig;
 
-        // Auto-detect wildcard mode from object ID
         const configObjectId = config.objectId?.trim() || "";
         const isWildcardPattern = configObjectId.includes('*');
 
-        // Configuration with defaults
         const settings = {
             outputProperty: config.outputProperty?.trim() || "payload",
             outputMode: config.outputMode || (isWildcardPattern ? "array" : "single"),
@@ -36,7 +32,6 @@ module.exports = function(RED) {
         node.currentConfig = connectionDetails;
         node.isInitialized = false;
 
-        // Custom status texts for getobject mode
         const statusTexts = {
             ready: (() => {
                 const baseText = isWildcardPattern ? "Ready (Pattern mode)" : "Ready";
@@ -52,70 +47,248 @@ module.exports = function(RED) {
             })()
         };
 
-        // Initialize connection using helper
         NodeHelpers.initializeConnection(
             node, config, RED, settings, globalConfig, setStatus, statusTexts
         );
 
-        // Enum assignment functions
-        async function loadEnumData() {
+        async function loadAllDataOptimized(objectIdOrPattern, currentObjectType) {
             try {
-                const allEnums = await connectionManager.getObjects(settings.serverId, "enum.*");
+                const queries = [];
                 
-                const enumsByType = {
-                    rooms: [],
-                    functions: [],
-                    other: []
-                };
-
-                const enumMemberMap = new Map();
-
-                if (allEnums && Array.isArray(allEnums)) {
-                    allEnums.forEach(enumObj => {
-                        if (!enumObj.common || !enumObj.common.members || !Array.isArray(enumObj.common.members)) {
-                            return;
-                        }
-
-                        const enumType = enumObj._id.split('.')[1];
-                        const enumData = {
-                            id: enumObj._id,
-                            name: enumObj.common.name,
-                            type: enumType,
-                            icon: enumObj.common.icon,
-                            color: enumObj.common.color,
-                            members: enumObj.common.members
-                        };
-
-                        if (enumType === 'rooms') {
-                            enumsByType.rooms.push(enumData);
-                        } else if (enumType === 'functions') {
-                            enumsByType.functions.push(enumData);
-                        } else {
-                            enumsByType.other.push(enumData);
-                        }
-
-                        enumObj.common.members.forEach(memberId => {
-                            if (!enumMemberMap.has(memberId)) {
-                                enumMemberMap.set(memberId, []);
-                            }
-                            enumMemberMap.get(memberId).push(enumData);
-                        });
+                if (currentObjectType) {
+                    const viewParams = {};
+                    if (objectIdOrPattern !== '*' && !objectIdOrPattern.includes('*')) {
+                        viewParams.key = objectIdOrPattern;
+                    }
+                    
+                    queries.push({
+                        name: 'objects',
+                        promise: connectionManager.getObjectView(settings.serverId, 'system', currentObjectType, viewParams)
+                    });
+                } else {
+                    queries.push({
+                        name: 'objects',
+                        promise: connectionManager.getObjects(settings.serverId, objectIdOrPattern, currentObjectType)
                     });
                 }
+                
+                if (settings.includeEnums) {
+                    queries.push({
+                        name: 'enums',
+                        promise: connectionManager.getObjectView(settings.serverId, 'system', 'enum', {})
+                    });
+                }
+                
+                if (settings.includeAliases) {
+                    queries.push({
+                        name: 'aliases',
+                        promise: connectionManager.getObjectView(settings.serverId, 'system', 'state', {
+                            startkey: 'alias.',
+                            endkey: 'alias.\uffff'
+                        })
+                    });
+                }
+                
+                const results = await Promise.all(queries.map(q => q.promise));
+                
+                const dataMap = {};
+                queries.forEach((query, index) => {
+                    dataMap[query.name] = results[index];
+                });
+                
+                return dataMap;
+                
+            } catch (error) {
+                node.error(`loadAllDataOptimized failed: ${error.message}`);
+                throw error;
+            }
+        }
 
+        async function performanceTest(msg, send, done) {
+            const testCases = [
+                { name: 'States only', pattern: '*', type: 'state' },
+                { name: 'Enums only', pattern: '*', type: 'enum' },
+                { name: 'Adapters only', pattern: '*', type: 'adapter' },
+                { name: 'All types', pattern: '*', type: null },
+                { name: 'Aliases only', pattern: 'alias.*', type: null }
+            ];
+            
+            const results = [];
+            
+            for (const testCase of testCases) {
+                const startTime = Date.now();
+                
+                try {
+                    let result;
+                    if (testCase.type) {
+                        result = await connectionManager.getObjectView(settings.serverId, 'system', testCase.type, {});
+                    } else {
+                        result = await connectionManager.getObjects(settings.serverId, testCase.pattern, testCase.type);
+                    }
+                    
+                    const duration = Date.now() - startTime;
+                    const count = result?.rows ? result.rows.length : (Array.isArray(result) ? result.length : 0);
+                    
+                    results.push({
+                        test: testCase.name,
+                        pattern: testCase.pattern,
+                        type: testCase.type,
+                        duration: duration,
+                        count: count,
+                        success: true
+                    });
+                    
+                } catch (error) {
+                    results.push({
+                        test: testCase.name,
+                        pattern: testCase.pattern,
+                        type: testCase.type,
+                        duration: 0,
+                        count: 0,
+                        success: false,
+                        error: error.message
+                    });
+                }
+            }
+            
+            const summary = {
+                testResults: results,
+                totalTests: results.length,
+                successfulTests: results.filter(r => r.success).length,
+                fastestTest: results.filter(r => r.success).sort((a, b) => a.duration - b.duration)[0],
+                slowestTest: results.filter(r => r.success).sort((a, b) => b.duration - a.duration)[0]
+            };
+            
+            setStatus("green", "dot", `Test complete: ${summary.successfulTests}/${summary.totalTests} passed`);
+            
+            msg.payload = summary;
+            msg.performanceTestResults = summary;
+            
+            send(msg);
+            done && done();
+        }
+
+        function processEnumData(enumResult) {
+            const enumsByType = {
+                rooms: [],
+                functions: [],
+                other: []
+            };
+            const enumMemberMap = new Map();
+            
+            if (!enumResult || !enumResult.rows) {
+                return { enumsByType, enumMemberMap, totalEnums: 0 };
+            }
+            
+            const allEnums = [];
+            
+            for (const row of enumResult.rows) {
+                if (row.value && row.value.type === 'enum') {
+                    allEnums.push({
+                        _id: row.id,
+                        ...row.value
+                    });
+                }
+            }
+            
+            allEnums.forEach(enumObj => {
+                if (!enumObj.common || !enumObj.common.members || !Array.isArray(enumObj.common.members)) {
+                    return;
+                }
+
+                const enumType = enumObj._id.split('.')[1];
                 const enumData = {
-                    enumsByType,
-                    enumMemberMap,
-                    totalEnums: allEnums ? allEnums.length : 0
+                    id: enumObj._id,
+                    name: enumObj.common.name,
+                    type: enumType,
+                    icon: enumObj.common.icon,
+                    color: enumObj.common.color,
+                    members: enumObj.common.members
                 };
 
-                
-                return enumData;
+                if (enumType === 'rooms') {
+                    enumsByType.rooms.push(enumData);
+                } else if (enumType === 'functions') {
+                    enumsByType.functions.push(enumData);
+                } else {
+                    enumsByType.other.push(enumData);
+                }
 
-            } catch (error) {
-                node.error(`Failed to load enum data: ${error.message}`);
-                return null;
+                enumObj.common.members.forEach(memberId => {
+                    if (!enumMemberMap.has(memberId)) {
+                        enumMemberMap.set(memberId, []);
+                    }
+                    enumMemberMap.get(memberId).push(enumData);
+                });
+            });
+
+            return {
+                enumsByType,
+                enumMemberMap,
+                totalEnums: allEnums.length
+            };
+        }
+
+        function processAliasData(aliasResult) {
+            const aliasMap = new Map();
+            const reverseAliasMap = new Map();
+            const aliasObjects = new Map();
+            
+            if (!aliasResult || !aliasResult.rows) {
+                return { aliasMap, reverseAliasMap, aliasObjects, totalAliases: 0 };
             }
+            
+            for (const row of aliasResult.rows) {
+                if (row.id.startsWith('alias.') && row.value && row.value.common && row.value.common.alias && row.value.common.alias.id) {
+                    const aliasObj = {
+                        _id: row.id,
+                        ...row.value
+                    };
+                    
+                    const aliasId = aliasObj._id;
+                    const aliasConfig = aliasObj.common.alias.id;
+                    
+                    let targetInfo;
+                    if (typeof aliasConfig === 'string') {
+                        targetInfo = {
+                            type: 'simple',
+                            read: aliasConfig,
+                            write: aliasConfig,
+                            targets: [aliasConfig]
+                        };
+                    } else if (typeof aliasConfig === 'object' && aliasConfig !== null) {
+                        const readId = aliasConfig.read || null;
+                        const writeId = aliasConfig.write || null;
+                        
+                        targetInfo = {
+                            type: 'complex',
+                            read: readId,
+                            write: writeId,
+                            targets: [readId, writeId].filter(id => id && typeof id === 'string')
+                        };
+                    } else {
+                        node.warn(`Invalid alias configuration for ${aliasId}: ${JSON.stringify(aliasConfig)}`);
+                        continue;
+                    }
+                    
+                    aliasMap.set(aliasId, targetInfo);
+                    aliasObjects.set(aliasId, aliasObj);
+                    
+                    targetInfo.targets.forEach(targetId => {
+                        if (!reverseAliasMap.has(targetId)) {
+                            reverseAliasMap.set(targetId, []);
+                        }
+                        reverseAliasMap.get(targetId).push(aliasObj);
+                    });
+                }
+            }
+
+            return {
+                aliasMap,
+                reverseAliasMap,
+                aliasObjects,
+                totalAliases: aliasMap.size
+            };
         }
 
         function getEnumAssignments(objectId, enumData) {
@@ -163,79 +336,89 @@ module.exports = function(RED) {
             return assignments;
         }
 
-        // Alias functions
-        async function loadAliasData() {
-            try {
-                const allAliases = await connectionManager.getObjects(settings.serverId, "alias.*");
-                
-                const aliasMap = new Map(); // alias ID → target info
-                const reverseAliasMap = new Map(); // target ID → [alias objects...]
-                const aliasObjects = new Map(); // alias ID → full alias object
+        async function loadAliasTargetObjects(objects, aliasData) {
+            if (!aliasData || !Array.isArray(objects)) {
+                return new Map();
+            }
 
-                if (allAliases && Array.isArray(allAliases)) {
-                    allAliases.forEach(aliasObj => {
-                        if (aliasObj.common && aliasObj.common.alias && aliasObj.common.alias.id) {
-                            const aliasId = aliasObj._id;
-                            const aliasConfig = aliasObj.common.alias.id;
-                            
-                            // Handle both simple string IDs and complex read/write objects
-                            let targetInfo;
-                            if (typeof aliasConfig === 'string') {
-                                // Simple alias: "target.state.id"
-                                targetInfo = {
-                                    type: 'simple',
-                                    read: aliasConfig,
-                                    write: aliasConfig,
-                                    targets: [aliasConfig]
-                                };
-                            } else if (typeof aliasConfig === 'object' && aliasConfig !== null) {
-                                // Complex alias with read/write: { read: "...", write: "..." }
-                                const readId = aliasConfig.read || null;
-                                const writeId = aliasConfig.write || null;
-                                
-                                targetInfo = {
-                                    type: 'complex',
-                                    read: readId,
-                                    write: writeId,
-                                    targets: [readId, writeId].filter(id => id && typeof id === 'string')
-                                };
-                            } else {
-                                // Invalid alias configuration
-                                node.warn(`Invalid alias configuration for ${aliasId}: ${JSON.stringify(aliasConfig)}`);
-                                return;
+            const targetIdsNeeded = new Set();
+            const existingObjectsMap = new Map();
+            
+            objects.forEach(obj => {
+                if (obj && obj._id) {
+                    existingObjectsMap.set(obj._id, obj);
+                }
+            });
+
+            for (const obj of objects) {
+                if (!obj || !obj._id) continue;
+
+                if (settings.aliasResolution === 'both' || settings.aliasResolution === 'target') {
+                    if (aliasData.aliasMap.has(obj._id)) {
+                        const targetInfo = aliasData.aliasMap.get(obj._id);
+                        targetInfo.targets.forEach(targetId => {
+                            if (targetId && !existingObjectsMap.has(targetId)) {
+                                targetIdsNeeded.add(targetId);
                             }
-                            
-                            // Store alias mapping
-                            aliasMap.set(aliasId, targetInfo);
-                            aliasObjects.set(aliasId, aliasObj);
-                            
-                            // Store reverse mapping for all target IDs
-                            targetInfo.targets.forEach(targetId => {
-                                if (!reverseAliasMap.has(targetId)) {
-                                    reverseAliasMap.set(targetId, []);
-                                }
-                                reverseAliasMap.get(targetId).push(aliasObj);
-                            });
-                        }
-                    });
+                        });
+                    }
                 }
 
-                const aliasData = {
-                    aliasMap,
-                    reverseAliasMap,
-                    aliasObjects,
-                    totalAliases: aliasMap.size
-                };
-
-                return aliasData;
-
-            } catch (error) {
-                node.error(`Failed to load alias data: ${error.message}`);
-                return null;
+                if (settings.aliasResolution === 'both' || settings.aliasResolution === 'reverse') {
+                    if (aliasData.reverseAliasMap.has(obj._id)) {
+                        const aliasObjects = aliasData.reverseAliasMap.get(obj._id);
+                        aliasObjects.forEach(aliasObj => {
+                            if (aliasObj._id && !existingObjectsMap.has(aliasObj._id)) {
+                                
+                            }
+                        });
+                    }
+                }
             }
+
+            const targetObjectsMap = new Map();
+            
+            existingObjectsMap.forEach((obj, id) => {
+                targetObjectsMap.set(id, obj);
+            });
+
+            if (targetIdsNeeded.size > 0) {
+                const batchSize = 20;
+                const targetIdArray = Array.from(targetIdsNeeded);
+                
+                for (let i = 0; i < targetIdArray.length; i += batchSize) {
+                    const batch = targetIdArray.slice(i, i + batchSize);
+                    
+                    const batchPromises = batch.map(async (targetId) => {
+                        try {
+                            const targetObj = await connectionManager.getObject(settings.serverId, targetId);
+                            if (targetObj) {
+                                return { id: targetId, object: targetObj };
+                            }
+                        } catch (error) {
+                            node.warn(`Could not load target object ${targetId}: ${error.message}`);
+                        }
+                        return null;
+                    });
+
+                    const batchResults = await Promise.all(batchPromises);
+                    
+                    batchResults.forEach(result => {
+                        if (result) {
+                            targetObjectsMap.set(result.id, result.object);
+                        }
+                    });
+
+                    if (i + batchSize < targetIdArray.length) {
+                        await new Promise(resolve => setTimeout(resolve, 10));
+                    }
+                }
+            }
+
+            return targetObjectsMap;
         }
 
-        async function getAliasInfo(objectId, aliasData, enumData = null) {
+        function getAliasInfoOptimized(objectId, aliasData, targetObjectsMap, enumData = null) {
             if (!aliasData) {
                 return {
                     isAlias: false,
@@ -251,88 +434,68 @@ module.exports = function(RED) {
             };
 
             try {
-                // Check if this object is an alias (alias → target resolution)
                 if (settings.aliasResolution === 'both' || settings.aliasResolution === 'target') {
                     if (aliasData.aliasMap.has(objectId)) {
                         const targetInfo = aliasData.aliasMap.get(objectId);
                         aliasInfo.isAlias = true;
 
-                        try {
-                            // For complex aliases, create a comprehensive target description
-                            if (targetInfo.type === 'simple') {
-                                // Simple alias - get the single target object
-                                const targetObject = await connectionManager.getObject(settings.serverId, targetInfo.read);
-                                if (targetObject) {
-                                    // Enrich target object with enum assignments if enabled
-                                    let enrichedTarget = targetObject;
-                                    if (settings.includeEnums && enumData) {
-                                        enrichedTarget = {
-                                            ...targetObject,
-                                            enumAssignments: getEnumAssignments(targetObject._id, enumData)
-                                        };
-                                    }
-                                    
-                                    aliasInfo.aliasTarget = {
-                                        type: 'simple',
-                                        target: enrichedTarget
+                        if (targetInfo.type === 'simple') {
+                            const targetObject = targetObjectsMap.get(targetInfo.read);
+                            if (targetObject) {
+                                let enrichedTarget = targetObject;
+                                if (settings.includeEnums && enumData) {
+                                    enrichedTarget = {
+                                        ...targetObject,
+                                        enumAssignments: getEnumAssignments(targetObject._id, enumData)
                                     };
-                                }
-                            } else if (targetInfo.type === 'complex') {
-                                // Complex alias - get both read and write targets if they exist
-                                const targets = {};
-                                
-                                if (targetInfo.read) {
-                                    try {
-                                        const readTarget = await connectionManager.getObject(settings.serverId, targetInfo.read);
-                                        if (readTarget) {
-                                            // Enrich read target with enum assignments if enabled
-                                            let enrichedReadTarget = readTarget;
-                                            if (settings.includeEnums && enumData) {
-                                                enrichedReadTarget = {
-                                                    ...readTarget,
-                                                    enumAssignments: getEnumAssignments(readTarget._id, enumData)
-                                                };
-                                            }
-                                            targets.read = enrichedReadTarget;
-                                        }
-                                    } catch (readError) {
-                                        node.warn(`Could not get read target ${targetInfo.read}: ${readError.message}`);
-                                    }
-                                }
-                                
-                                if (targetInfo.write && targetInfo.write !== targetInfo.read) {
-                                    try {
-                                        const writeTarget = await connectionManager.getObject(settings.serverId, targetInfo.write);
-                                        if (writeTarget) {
-                                            // Enrich write target with enum assignments if enabled
-                                            let enrichedWriteTarget = writeTarget;
-                                            if (settings.includeEnums && enumData) {
-                                                enrichedWriteTarget = {
-                                                    ...writeTarget,
-                                                    enumAssignments: getEnumAssignments(writeTarget._id, enumData)
-                                                };
-                                            }
-                                            targets.write = enrichedWriteTarget;
-                                        }
-                                    } catch (writeError) {
-                                        node.warn(`Could not get write target ${targetInfo.write}: ${writeError.message}`);
-                                    }
                                 }
                                 
                                 aliasInfo.aliasTarget = {
-                                    type: 'complex',
-                                    readId: targetInfo.read,
-                                    writeId: targetInfo.write,
-                                    targets: targets
+                                    type: 'simple',
+                                    target: enrichedTarget
                                 };
                             }
-                        } catch (targetError) {
-                            node.warn(`Error getting target objects for alias ${objectId}: ${targetError.message}`);
+                        } else if (targetInfo.type === 'complex') {
+                            const targets = {};
+                            
+                            if (targetInfo.read) {
+                                const readTarget = targetObjectsMap.get(targetInfo.read);
+                                if (readTarget) {
+                                    let enrichedReadTarget = readTarget;
+                                    if (settings.includeEnums && enumData) {
+                                        enrichedReadTarget = {
+                                            ...readTarget,
+                                            enumAssignments: getEnumAssignments(readTarget._id, enumData)
+                                        };
+                                    }
+                                    targets.read = enrichedReadTarget;
+                                }
+                            }
+                            
+                            if (targetInfo.write && targetInfo.write !== targetInfo.read) {
+                                const writeTarget = targetObjectsMap.get(targetInfo.write);
+                                if (writeTarget) {
+                                    let enrichedWriteTarget = writeTarget;
+                                    if (settings.includeEnums && enumData) {
+                                        enrichedWriteTarget = {
+                                            ...writeTarget,
+                                            enumAssignments: getEnumAssignments(writeTarget._id, enumData)
+                                        };
+                                    }
+                                    targets.write = enrichedWriteTarget;
+                                }
+                            }
+                            
+                            aliasInfo.aliasTarget = {
+                                type: 'complex',
+                                readId: targetInfo.read,
+                                writeId: targetInfo.write,
+                                targets: targets
+                            };
                         }
                     }
                 }
 
-                // Check if this object is aliased by others (target → alias resolution)
                 if (settings.aliasResolution === 'both' || settings.aliasResolution === 'reverse') {
                     if (aliasData.reverseAliasMap.has(objectId)) {
                         const aliasObjects = aliasData.reverseAliasMap.get(objectId);
@@ -344,7 +507,6 @@ module.exports = function(RED) {
                                 native: aliasObj.native
                             };
                             
-                            // Enrich alias objects with enum assignments if enabled
                             if (settings.includeEnums && enumData) {
                                 enrichedAliasObj.enumAssignments = getEnumAssignments(aliasObj._id, enumData);
                             }
@@ -361,32 +523,32 @@ module.exports = function(RED) {
             return aliasInfo;
         }
 
-        async function enrichObjectsWithAliases(objects, aliasData, enumData = null) {
+        async function enrichObjectsWithAliasesOptimized(objects, aliasData, enumData = null) {
             if (!settings.includeAliases || !aliasData) {
                 return objects;
             }
 
             if (Array.isArray(objects)) {
-                const enrichedObjects = [];
-                for (const obj of objects) {
+                const targetObjectsMap = await loadAliasTargetObjects(objects, aliasData);
+                
+                const enrichedObjects = objects.map(obj => {
                     if (obj && obj._id) {
-                        const aliasInfo = await getAliasInfo(obj._id, aliasData, enumData);
-                        enrichedObjects.push({
+                        const aliasInfo = getAliasInfoOptimized(obj._id, aliasData, targetObjectsMap, enumData);
+                        return {
                             ...obj,
                             aliasInfo
-                        });
-                        
-                        // Reduced delay since we're not doing state queries anymore
-                        if (enrichedObjects.length % 10 === 0) {
-                            await new Promise(resolve => setTimeout(resolve, 5));
-                        }
-                    } else {
-                        enrichedObjects.push(obj);
+                        };
                     }
-                }
+                    return obj;
+                });
+
                 return enrichedObjects;
+                
             } else if (objects && typeof objects === 'object' && objects._id) {
-                const aliasInfo = await getAliasInfo(objects._id, aliasData, enumData);
+                const singleObjectArray = [objects];
+                const targetObjectsMap = await loadAliasTargetObjects(singleObjectArray, aliasData);
+                const aliasInfo = getAliasInfoOptimized(objects._id, aliasData, targetObjectsMap, enumData);
+                
                 return {
                     ...objects,
                     aliasInfo
@@ -396,7 +558,7 @@ module.exports = function(RED) {
             return objects;
         }
 
-        async function enrichObjectsWithEnums(objects, enumData) {
+        function enrichObjectsWithEnums(objects, enumData) {
             if (!settings.includeEnums || !enumData) {
                 return objects;
             }
@@ -416,13 +578,35 @@ module.exports = function(RED) {
             return objects;
         }
 
+        function processObjectViewResult(objectResult, objectType) {
+            if (!objectResult) {
+                return [];
+            }
+            
+            if (objectResult.rows) {
+                const objects = [];
+                for (const row of objectResult.rows) {
+                    if (row.value && row.value.type === objectType) {
+                        objects.push({
+                            _id: row.id,
+                            ...row.value
+                        });
+                    }
+                }
+                return objects;
+            } else if (Array.isArray(objectResult)) {
+                return objectResult;
+            }
+            
+            return [];
+        }
+
         function formatOutput(objects, objectIdOrPattern, outputMode, appliedObjectType, enumData = null, aliasData = null) {
             const baseResult = {
                 [settings.outputProperty]: null,
                 objects: null,
                 count: 0,
                 timestamp: Date.now(),
-                // Conditional properties - only add if relevant
                 ...(appliedObjectType && { appliedFilter: appliedObjectType }),
                 ...(objectIdOrPattern.includes('*') && { pattern: objectIdOrPattern }),
                 ...(settings.includeEnums && { includesEnums: true }),
@@ -475,7 +659,6 @@ module.exports = function(RED) {
                 count: objectArray.length
             };
 
-            // Add enum statistics if enabled and data available
             if (settings.includeEnums && enumData && objectArray.length > 0) {
                 const enumStats = {
                     objectsWithRooms: 0,
@@ -498,7 +681,6 @@ module.exports = function(RED) {
                 }
             }
 
-            // Add alias statistics if enabled and data available
             if (settings.includeAliases && aliasData && objectArray.length > 0) {
                 const aliasStats = {
                     objectsWithAliases: 0,
@@ -530,10 +712,13 @@ module.exports = function(RED) {
             return result;
         }
 
-        // Input handler
         node.on('input', async function(msg, send, done) {
             try {
-                // Handle status requests using helper
+                if (msg.topic === 'PERFORMANCE_TEST') {
+                    await performanceTest(msg, send, done);
+                    return;
+                }
+
                 if (NodeHelpers.handleStatusRequest(msg, send, done, settings)) {
                     return;
                 }
@@ -547,141 +732,66 @@ module.exports = function(RED) {
                 const currentOutputMode = msg.outputMode || settings.outputMode;
                 const currentObjectType = msg.objectType || settings.objectType;
                 
-                // Load enum data if needed
-                let enumData = null;
-                if (settings.includeEnums) {
-                    setStatus("blue", "dot", `Loading enums...`);
-                    enumData = await loadEnumData();
-                    if (!enumData) {
-                        node.warn(`Failed to load enum data - continuing without enum assignments`);
-                    }
-                }
-
-                // Load alias data if needed
-                let aliasData = null;
-                if (settings.includeAliases) {
-                    setStatus("blue", "dot", `Loading aliases...`);
-                    aliasData = await loadAliasData();
-                    if (!aliasData) {
-                        node.warn(`Failed to load alias data - continuing without alias information`);
-                    }
-                }
-
-                if (isCurrentWildcard) {
-                    const features = [];
-                    if (settings.includeEnums) features.push("+enums");
-                    if (settings.includeAliases) features.push("+aliases");
-                    const statusText = `Reading objects ${objectIdOrPattern} ${features.join(" ")}...`;
-                    setStatus("blue", "dot", statusText);
+                const features = [];
+                if (settings.includeEnums) features.push("+enums");
+                if (settings.includeAliases) features.push("+aliases");
+                const statusText = `Loading objects ${objectIdOrPattern} ${features.join(" ")}...`;
+                setStatus("blue", "dot", statusText);
+                
+                try {
+                    const dataMap = await loadAllDataOptimized(objectIdOrPattern, currentObjectType);
                     
-                    try {
-                        let objects = await connectionManager.getObjects(settings.serverId, objectIdOrPattern, currentObjectType);
+                    let objects = dataMap.objects;
+                    let enumData = null;
+                    let aliasData = null;
+                    
+                    if (currentObjectType && dataMap.objects && dataMap.objects.rows) {
+                        objects = processObjectViewResult(dataMap.objects, currentObjectType);
+                    }
+                    
+                    if (settings.includeEnums && dataMap.enums) {
+                        enumData = processEnumData(dataMap.enums);
+                    }
+                    
+                    if (settings.includeAliases && dataMap.aliases) {
+                        aliasData = processAliasData(dataMap.aliases);
+                    }
+                    
+                    if (!objects || (Array.isArray(objects) && objects.length === 0) || 
+                        (typeof objects === 'object' && Object.keys(objects).length === 0)) {
+                        setStatus("yellow", "ring", "No objects found");
+                        const typeInfo = currentObjectType ? ` (type: ${currentObjectType})` : '';
+                        node.warn(`No objects found for pattern: ${objectIdOrPattern}${typeInfo}`);
                         
-                        if (!objects || (Array.isArray(objects) && objects.length === 0) || 
-                            (typeof objects === 'object' && Object.keys(objects).length === 0)) {
-                            setStatus("yellow", "ring", "No objects found");
-                            const typeInfo = currentObjectType ? ` (type: ${currentObjectType})` : '';
-                            node.warn(`No objects found for pattern: ${objectIdOrPattern}${typeInfo}`);
-                            
-                            const result = formatOutput(currentOutputMode === 'array' ? [] : {}, objectIdOrPattern, currentOutputMode, currentObjectType, enumData, aliasData);
-                            Object.assign(msg, result);
-                            
-                            send(msg);
-                            done && done();
-                            return;
-                        }
-                        
-                        // Enrich with enum assignments
-                        objects = await enrichObjectsWithEnums(objects, enumData);
-                        
-                        // Enrich with alias information (including enum data for target objects)
-                        objects = await enrichObjectsWithAliases(objects, aliasData, enumData);
-                        
-                        const result = formatOutput(objects, objectIdOrPattern, currentOutputMode, currentObjectType, enumData, aliasData);
+                        const result = formatOutput(currentOutputMode === 'array' ? [] : {}, objectIdOrPattern, currentOutputMode, currentObjectType, enumData, aliasData);
                         Object.assign(msg, result);
-                        
-                        const readyText = statusTexts.ready;
-                        setStatus("green", "dot", readyText);
-                        
-                        const typeInfo = currentObjectType ? ` (filtered by type: ${currentObjectType})` : '';
-                        const enumInfo = settings.includeEnums ? ` with enum assignments` : '';
-                        const aliasInfo = settings.includeAliases ? ` with alias information` : '';
                         
                         send(msg);
                         done && done();
-                        
-                    } catch (error) {
-                        setStatus("red", "ring", "Pattern error");
-                        node.error(`Error retrieving objects for pattern ${objectIdOrPattern}: ${error.message}`);
-                        
-                        const result = formatOutput(null, objectIdOrPattern, currentOutputMode, currentObjectType, enumData, aliasData);
-                        result.error = error.message;
-                        result.errorType = error.message.includes('timeout') ? 'timeout' : 'unknown';
-                        Object.assign(msg, result);
-                        
-                        send(msg);
-                        done && done(error);
+                        return;
                     }
-                } else {
-                    // Single object retrieval
-                    const features = [];
-                    if (settings.includeEnums) features.push("+enums");
-                    if (settings.includeAliases) features.push("+aliases");
-                    const statusText = `Reading object ${objectIdOrPattern} ${features.join(" ")}...`;
-                    setStatus("blue", "dot", statusText);
-
-                    try {
-                        let objectData = await connectionManager.getObject(settings.serverId, objectIdOrPattern);
-                        
-                        if (objectData && currentObjectType && objectData.type !== currentObjectType) {
-                            objectData = null;
-                        }
-                        
-                        if (!objectData) {
-                            const typeInfo = currentObjectType ? ` (type filter: ${currentObjectType})` : '';
-                            setStatus("yellow", "ring", "Object not found");
-                            node.warn(`Object not found: ${objectIdOrPattern}${typeInfo}`);
-                            
-                            const result = formatOutput(null, objectIdOrPattern, 'single', currentObjectType, enumData, aliasData);
-                            result.error = currentObjectType ? "Object not found or type mismatch" : "Object not found";
-                            Object.assign(msg, result);
-                            
-                            send(msg);
-                            done && done();
-                            return;
-                        }
-                        
-                        // Enrich with enum assignments
-                        objectData = await enrichObjectsWithEnums(objectData, enumData);
-                        
-                        // Enrich with alias information (including enum data for target objects)
-                        objectData = await enrichObjectsWithAliases(objectData, aliasData, enumData);
-                        
-                        const result = formatOutput(objectData, objectIdOrPattern, 'single', currentObjectType, enumData, aliasData);
-                        Object.assign(msg, result);
-                        
-                        const readyText = statusTexts.ready;
-                        setStatus("green", "dot", readyText);
-                        
-                        const typeInfo = currentObjectType ? ` (type filter: ${currentObjectType})` : '';
-                        const enumInfo = settings.includeEnums ? ` with enum assignments` : '';
-                        const aliasInfo = settings.includeAliases ? ` with alias information` : '';
-                        
-                        send(msg);
-                        done && done();
-                        
-                    } catch (error) {
-                        setStatus("red", "ring", "Error");
-                        node.error(`Error processing input: ${error.message}`);
-                        
-                        const result = formatOutput(null, objectIdOrPattern, 'single', currentObjectType, enumData, aliasData);
-                        result.error = error.message;
-                        result.errorType = error.message.includes('timeout') ? 'timeout' : 'unknown';
-                        Object.assign(msg, result);
-                        
-                        send(msg);
-                        done && done(error);
-                    }
+                    
+                    objects = enrichObjectsWithEnums(objects, enumData);
+                    objects = await enrichObjectsWithAliasesOptimized(objects, aliasData, enumData);
+                    
+                    const result = formatOutput(objects, objectIdOrPattern, currentOutputMode, currentObjectType, enumData, aliasData);
+                    Object.assign(msg, result);
+                    
+                    setStatus("green", "dot", statusTexts.ready);
+                    send(msg);
+                    done && done();
+                    
+                } catch (error) {
+                    setStatus("red", "ring", "Error");
+                    node.error(`Error retrieving objects for pattern ${objectIdOrPattern}: ${error.message}`);
+                    
+                    const result = formatOutput(null, objectIdOrPattern, currentOutputMode, currentObjectType, null, null);
+                    result.error = error.message;
+                    result.errorType = error.message.includes('timeout') ? 'timeout' : 'unknown';
+                    Object.assign(msg, result);
+                    
+                    send(msg);
+                    done && done(error);
                 }
                 
             } catch (error) {
@@ -691,7 +801,6 @@ module.exports = function(RED) {
             }
         });
 
-        // Cleanup on node close
         node.on("close", async function(removed, done) {
             await NodeHelpers.handleNodeClose(node, settings, "Get object");
             done();

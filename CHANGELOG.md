@@ -1,8 +1,16 @@
 # Changelog
 
-## [0.12.1] - 2025-07-xx
-- optimize getObjects with getObjectView for performance improvement
+## [0.12.1] - 2025-xx-xx
 
+### Changed
+  - integrate ioBroker logging with Node-RED logging system
+  - remove excessive logging statements
+- **Optimized getObjects with getObjectView** - Improved performance for object retrieval operations
+- **Improved alias resolution performance in iobgetobject node**
+  - Replaced individual getObject() calls with batch loading for alias targets
+  - Added caching for already loaded objects to avoid redundant requests
+  - Reduced API calls for large wildcard patterns with aliases
+ 
 ## [0.12.0] - 2025-07-07
 
 ### Added
