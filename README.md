@@ -104,6 +104,7 @@ If you prefer not to use a Admin instance:
 
 - **📋 Release Notes**: [Changelog](CHANGELOG.md)
 - **🔍 Troubleshooting**: [Troubleshooting Guide](docs/troubleshooting.md)
+- **📊 Logging**: [Logging Guide](docs/logging.md) - Understanding log messages and troubleshooting
 - **🎯 Use Cases**: [Common Use Cases](docs/use-cases.md)
 - **📖 Full Documentation**: [GitHub Repository](https://github.com/Marc-Berg/node-red-contrib-iobroker)
 - **🐛 Bug Reports**: [GitHub Issues](https://github.com/Marc-Berg/node-red-contrib-iobroker/issues)

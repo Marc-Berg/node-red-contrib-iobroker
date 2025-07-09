@@ -3,13 +3,20 @@
 ## [0.13.0] - 2025-xx-xx
 
 ### Changed
-  - integrate ioBroker logging with Node-RED logging system
-  - remove excessive logging statements
 - **Optimized getObjects with getObjectView** - Improved performance for object retrieval operations
 - **Improved alias resolution performance in iobgetobject node**
   - Replaced individual getObject() calls with batch loading for alias targets
   - Added caching for already loaded objects to avoid redundant requests
   - Reduced API calls for large wildcard patterns with aliases
+
+### Changed
+- **Optimized logging levels across all core managers**
+  - Reduced INFO-level messages for cleaner production logs
+  - Implemented operation logging with automatic importance detection
+  - Moved technical details and internal state changes to DEBUG level
+  - INFO level now focuses on admin-relevant events: connections, authentication, subscriptions, and important operations
+  - DEBUG level provides comprehensive technical details for development and troubleshooting
+- **Integrate ioBroker logging with Node-RED logging system**
  
 ## [0.12.0] - 2025-07-07
 
