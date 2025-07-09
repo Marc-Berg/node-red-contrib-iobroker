@@ -36,20 +36,6 @@ module.exports = function(RED) {
         node.currentConfig = connectionDetails;
         node.isInitialized = false;
 
-        // Log initial configuration
-        if (isWildcardPattern) {
-            node.log(`Wildcard pattern detected: ${configObjectId} (output mode: ${settings.outputMode})`);
-        }
-        if (settings.objectType) {
-            node.log(`Object type filter: ${settings.objectType}`);
-        }
-        if (settings.includeEnums) {
-            node.log(`Enum assignments enabled (types: ${settings.enumTypes})`);
-        }
-        if (settings.includeAliases) {
-            node.log(`Alias resolution enabled (mode: ${settings.aliasResolution})`);
-        }
-
         // Custom status texts for getobject mode
         const statusTexts = {
             ready: (() => {
@@ -74,7 +60,6 @@ module.exports = function(RED) {
         // Enum assignment functions
         async function loadEnumData() {
             try {
-                node.log(`Loading enum data from ioBroker...`);
                 const allEnums = await connectionManager.getObjects(settings.serverId, "enum.*");
                 
                 const enumsByType = {
@@ -124,7 +109,6 @@ module.exports = function(RED) {
                     totalEnums: allEnums ? allEnums.length : 0
                 };
 
-                node.log(`Loaded ${enumData.totalEnums} enums (${enumsByType.rooms.length} rooms, ${enumsByType.functions.length} functions, ${enumsByType.other.length} other)`);
                 
                 return enumData;
 
@@ -182,7 +166,6 @@ module.exports = function(RED) {
         // Alias functions
         async function loadAliasData() {
             try {
-                node.log(`Loading alias data from ioBroker...`);
                 const allAliases = await connectionManager.getObjects(settings.serverId, "alias.*");
                 
                 const aliasMap = new Map(); // alias ID → target info
@@ -244,7 +227,6 @@ module.exports = function(RED) {
                     totalAliases: aliasMap.size
                 };
 
-                node.log(`Loaded ${aliasData.totalAliases} aliases (simple + complex read/write)`);
                 return aliasData;
 
             } catch (error) {
@@ -624,7 +606,6 @@ module.exports = function(RED) {
                         const typeInfo = currentObjectType ? ` (filtered by type: ${currentObjectType})` : '';
                         const enumInfo = settings.includeEnums ? ` with enum assignments` : '';
                         const aliasInfo = settings.includeAliases ? ` with alias information` : '';
-                        node.log(`Successfully retrieved ${result.count} objects for pattern: ${objectIdOrPattern} (mode: ${currentOutputMode})${typeInfo}${enumInfo}${aliasInfo}`);
                         
                         send(msg);
                         done && done();
@@ -685,7 +666,6 @@ module.exports = function(RED) {
                         const typeInfo = currentObjectType ? ` (type filter: ${currentObjectType})` : '';
                         const enumInfo = settings.includeEnums ? ` with enum assignments` : '';
                         const aliasInfo = settings.includeAliases ? ` with alias information` : '';
-                        node.log(`Successfully retrieved object: ${objectIdOrPattern}${typeInfo}${enumInfo}${aliasInfo}`);
                         
                         send(msg);
                         done && done();

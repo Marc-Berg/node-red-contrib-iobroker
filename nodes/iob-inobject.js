@@ -8,7 +8,7 @@ module.exports = function (RED) {
 
         // Use helper to create status functions
         const { setStatus, setError } = NodeHelpers.createStatusHelpers(node);
-        
+
         // Use helper to validate server config
         const serverConfig = NodeHelpers.validateServerConfig(RED, config, setError);
         if (!serverConfig) return;
@@ -33,9 +33,6 @@ module.exports = function (RED) {
         node.isInitialized = false;
         node.isSubscribed = false;
         node.objectPattern = objectPattern;
-
-        // Log pattern type for debugging
-        node.log(`Object subscription pattern: ${objectPattern} (${isWildcardPattern ? 'wildcard' : 'single'})`);
 
         function createMessage(objectId, objectData, operation = 'update') {
             const message = {
@@ -89,11 +86,10 @@ module.exports = function (RED) {
 
             // Use helper for subscription event handling
             const baseCallback = NodeHelpers.createSubscriptionEventCallback(
-                node, 
+                node,
                 setStatus,
-                () => { 
-                    node.log("Object subscription successful");
-                    node.isSubscribed = true; 
+                () => {
+                    node.isSubscribed = true;
                 },
                 statusTexts
             );
@@ -111,7 +107,6 @@ module.exports = function (RED) {
             // Check if we're already subscribed and connection is ready
             const status = connectionManager.getConnectionStatus(settings.serverId);
             if (node.isSubscribed && status.connected && status.ready) {
-                node.log("Already subscribed and connected, skipping initialization");
                 return;
             }
 
@@ -138,7 +133,6 @@ module.exports = function (RED) {
                     ? `wildcard pattern: ${objectPattern}`
                     : `single object: ${objectPattern}`;
 
-                node.log(`Successfully subscribed to ${patternInfo} via WebSocket`);
 
                 setStatus("green", "dot", isWildcardPattern ? `Pattern: ${objectPattern}` : "Ready");
                 node.isInitialized = true;
@@ -146,10 +140,6 @@ module.exports = function (RED) {
             } catch (error) {
                 const errorMsg = error.message || 'Unknown error';
 
-                // The centralized manager handles retry logic, so we just log the error
-                node.log(`Connection attempt failed: ${errorMsg} - Manager will handle recovery`);
-
-                // Set appropriate status based on error type
                 if (errorMsg.includes('auth_failed') || errorMsg.includes('Authentication failed')) {
                     // Permanent authentication failure
                     setStatus("red", "ring", "Auth failed");
@@ -166,7 +156,6 @@ module.exports = function (RED) {
         }
 
         node.on("close", async function (removed, done) {
-            node.log("Object subscription node closing...");
             node.isInitialized = false;
             node.isSubscribed = false;
 
@@ -183,7 +172,6 @@ module.exports = function (RED) {
                     ? `wildcard pattern ${objectPattern}`
                     : `single object ${objectPattern}`;
 
-                node.log(`Successfully unsubscribed from ${patternInfo}`);
 
             } catch (error) {
                 node.warn(`Cleanup error: ${error.message}`);

@@ -156,7 +156,6 @@ module.exports = function (RED) {
                 node, 
                 setStatus,
                 () => { 
-                    node.log("Log subscription successful");
                     node.isSubscribed = true; 
                 },
                 statusTexts
@@ -172,7 +171,6 @@ module.exports = function (RED) {
             // Check if we're already subscribed and connection is ready
             const status = connectionManager.getConnectionStatus(settings.serverId);
             if (node.isSubscribed && status.connected && status.ready) {
-                node.log("Already subscribed and connected, skipping initialization");
                 return;
             }
 
@@ -195,16 +193,12 @@ module.exports = function (RED) {
 
                 node.isSubscribed = true;
 
-                node.log(`Successfully subscribed to live logs (level: ${settings.logLevel}+, numeric: ${minimumLevel}+) via WebSocket`);
-
                 setStatus("green", "dot", `Monitoring (${settings.logLevel}+)`);
                 node.isInitialized = true;
 
             } catch (error) {
                 const errorMsg = error.message || 'Unknown error';
-                node.log(`Log subscription failed: ${errorMsg} - Manager will handle recovery`);
 
-                // Set appropriate status based on error type
                 if (errorMsg.includes('auth_failed') || errorMsg.includes('Authentication failed')) {
                     setStatus("red", "ring", "Auth failed");
                 } else if (errorMsg.includes('not possible in state')) {
@@ -218,7 +212,6 @@ module.exports = function (RED) {
         }
 
         node.on("close", async function (removed, done) {
-            node.log("Node closing...");
             node.isInitialized = false;
             node.isSubscribed = false;
 
@@ -229,7 +222,6 @@ module.exports = function (RED) {
                 );
 
                 node.status({});
-                node.log(`Successfully unsubscribed from live logs`);
 
             } catch (error) {
                 node.warn(`Cleanup error: ${error.message}`);

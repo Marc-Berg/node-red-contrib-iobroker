@@ -47,7 +47,6 @@ module.exports = function (RED) {
         node.currentQueryId = 0;
 
         // Log configuration
-        node.log(`History node configured: ${settings.stateId || 'from msg.topic'} via ${settings.historyAdapter} (mode: ${settings.queryMode})`);
 
         function parseTimeInput(timeInput) {
             if (!timeInput) return null;
@@ -320,10 +319,7 @@ module.exports = function (RED) {
                     break;
 
                 case 'sequential':
-                    // Add to queue
                     node.queryQueue.push(queueItem);
-                    node.log(`Query ${queryId} queued (position: ${node.queryQueue.length})`);
-                    
                     updateQueueStatus();
                     
                     // Process queue if not already running
@@ -361,9 +357,7 @@ module.exports = function (RED) {
                 return;
             }
 
-            const nextQuery = node.queryQueue.shift();
-            node.log(`Processing queued query ${nextQuery.id} (${node.queryQueue.length} remaining)`);
-            
+            const nextQuery = node.queryQueue.shift();          
             updateQueueStatus();
             executeQuery(nextQuery);
         }
@@ -377,9 +371,6 @@ module.exports = function (RED) {
             const queryStartTime = Date.now();
 
             try {
-                node.log(`History query ${id}: ${stateId} from ${new Date(timeRange.start).toISOString()} to ${new Date(timeRange.end).toISOString()} (${queryOptions.aggregate})`);
-
-                // Execute history query via WebSocket manager
                 const result = await connectionManager.getHistory(
                     settings.serverId,
                     settings.historyAdapter,
@@ -389,21 +380,17 @@ module.exports = function (RED) {
 
                 const queryTime = Date.now() - queryStartTime;
 
-                // Format output
                 const outputFormat = msg.outputFormat || settings.outputFormat;
                 const formattedResult = formatOutput(result, stateId, queryOptions, queryTime, outputFormat);
 
-                // Add result to message
                 Object.assign(msg, formattedResult);
                 msg.queryId = id;
                 msg.queryMode = settings.queryMode;
 
-                // For Dashboard 2.0 format, set topic for series name
                 if (outputFormat === 'dashboard2') {
                     msg.topic = stateId;
                 }
 
-                node.log(`History query ${id} completed: ${formattedResult.count} data points in ${queryTime}ms`);
 
                 send(msg);
                 done && done();
@@ -411,7 +398,6 @@ module.exports = function (RED) {
             } catch (queryError) {
                 node.error(`History query ${id} failed for ${stateId}: ${queryError.message}`);
 
-                // Send error message with details
                 msg.error = queryError.message;
                 msg[settings.outputProperty] = null;
                 msg.stateId = stateId;
@@ -426,7 +412,6 @@ module.exports = function (RED) {
             } finally {
                 node.isQueryRunning = false;
 
-                // Process next query in sequential mode
                 if (settings.queryMode === 'sequential') {
                     // Small delay to prevent overwhelming the system
                     setTimeout(() => {
@@ -438,22 +423,17 @@ module.exports = function (RED) {
             }
         }
 
-        // Custom status texts for history mode
         const statusTexts = {
             ready: getQueueStatusText()
         };
 
-        // Initialize connection using helper
         NodeHelpers.initializeConnection(
             node, config, RED, settings, globalConfig, setStatus, statusTexts
         );
 
-        // Input handler
         node.on('input', function (msg, send, done) {
             try {
-                // Handle status requests using helper
                 if (NodeHelpers.handleStatusRequest(msg, send, done, settings)) {
-                    // Add query-specific status information
                     msg.payload = {
                         ...msg.payload,
                         queryMode: settings.queryMode,
@@ -509,11 +489,7 @@ module.exports = function (RED) {
             }
         });
 
-        // Cleanup on node close
         node.on("close", async function (removed, done) {
-            node.log("History node closing...");
-
-            // Clear the query queue
             const droppedQueries = node.queryQueue.length;
             node.queryQueue.forEach(queueItem => {
                 if (queueItem.done) {
@@ -521,10 +497,6 @@ module.exports = function (RED) {
                 }
             });
             node.queryQueue = [];
-
-            if (droppedQueries > 0) {
-                node.log(`Dropped ${droppedQueries} queued queries during shutdown`);
-            }
 
             await NodeHelpers.handleNodeClose(node, settings, "History");
             done();

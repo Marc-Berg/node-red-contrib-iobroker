@@ -62,15 +62,6 @@ module.exports = function (RED) {
         node.expectedInitialValues = 0;
         node.initialGroupedMessageSent = false;
 
-        // Log configuration
-        if (isMultipleStates) {
-            node.log(`Multiple states mode: ${stateList.length} states [${stateList.join(', ')}], output: ${settings.outputMode}`);
-        } else if (isWildcardPattern) {
-            node.log(`Wildcard state mode: ${subscriptionPattern}`);
-        } else {
-            node.log(`Single state mode: ${subscriptionPattern}`);
-        }
-
         function shouldSendMessage(ack, filter) {
             switch (filter) {
                 case "ack": return ack === true;
@@ -109,8 +100,6 @@ module.exports = function (RED) {
             if (missingStates.length === 0) {
                 return true;
             }
-
-            node.log(`Loading ${missingStates.length} missing subscribed states for grouped mode`);
 
             try {
                 for (const stateId of missingStates) {
@@ -232,14 +221,10 @@ module.exports = function (RED) {
 
             callback.wantsInitialValue = settings.sendInitialValue;
 
-            node.log(`Callback created with wantsInitialValue: ${callback.wantsInitialValue}`);
-
             callback.onInitialValue = function (stateId, state) {
                 try {
-                    node.log(`Initial value callback triggered for ${stateId}: ${state.val}`);
 
                     if (!shouldSendMessage(state.ack, settings.ackFilter)) {
-                        node.log(`Initial value filtered out due to ack filter: ${stateId}`);
                         return;
                     }
 
@@ -252,14 +237,12 @@ module.exports = function (RED) {
                                 const message = createGroupedMessage(null, null, true);
                                 node.send(message);
                                 node.initialGroupedMessageSent = true;
-                                node.log(`Initial grouped message sent with ${node.initialValueCount} states`);
                             } else if (node.initialValueCount === 1) {
                                 setTimeout(() => {
                                     if (!node.initialGroupedMessageSent && node.currentStateValues.size > 0) {
                                         const message = createGroupedMessage(null, null, true);
                                         node.send(message);
                                         node.initialGroupedMessageSent = true;
-                                        node.log(`Initial grouped message sent (timeout fallback)`);
                                     }
                                 }, 3000);
                             }
@@ -270,7 +253,6 @@ module.exports = function (RED) {
                     } else {
                         const message = createMessage(stateId, state, true);
                         node.send(message);
-                        node.log(`Initial value sent for ${stateId}: ${state.val}`);
                     }
 
                 } catch (error) {
@@ -293,7 +275,6 @@ module.exports = function (RED) {
                 node, 
                 setStatus,
                 () => { 
-                    node.log("Subscription successful");
                     node.isSubscribed = true; 
                 },
                 statusTexts
@@ -304,7 +285,6 @@ module.exports = function (RED) {
 
             // Override reconnect to handle resubscription with state reset
             callback.onReconnect = function() {
-                node.log("Reconnection detected - resubscribing");
                 node.isSubscribed = false;
                 node.initialValueCount = 0;
                 node.initialGroupedMessageSent = false;
@@ -334,7 +314,6 @@ module.exports = function (RED) {
                         node.subscribedStates.add(stateId);
                     });
                     
-                    node.log(`Successfully subscribed to ${node.subscribedStates.size} states in ${settings.outputMode} mode`);
                 } catch (error) {
                     node.error(`Failed to subscribe to multiple states: ${error.message}`);
                     throw error;
@@ -347,14 +326,12 @@ module.exports = function (RED) {
                     callback,
                     globalConfig
                 );
-                node.log(`Successfully subscribed to ${isWildcardPattern ? 'wildcard pattern' : 'single state'}: ${subscriptionPattern}${settings.sendInitialValue ? ' (with initial value)' : ''}`);
             }
         }
 
         async function initialize() {
             const status = connectionManager.getConnectionStatus(settings.serverId);
             if (node.isSubscribed && status.connected && status.ready) {
-                node.log("Already subscribed and connected, skipping initialization");
                 return;
             }
 
@@ -387,7 +364,6 @@ module.exports = function (RED) {
 
             } catch (error) {
                 const errorMsg = error.message || 'Unknown error';
-                node.log(`Connection attempt failed: ${errorMsg} - Manager will handle recovery`);
 
                 if (errorMsg.includes('auth_failed') || errorMsg.includes('Authentication failed')) {
                     setStatus("red", "ring", "Auth failed");
@@ -402,7 +378,6 @@ module.exports = function (RED) {
         }
 
         node.on("close", async function (removed, done) {
-            node.log("Node closing...");
             node.isInitialized = false;
             node.isSubscribed = false;
 
@@ -413,14 +388,12 @@ module.exports = function (RED) {
                         settings.serverId,
                         Array.from(node.subscribedStates)
                     );
-                    node.log(`Successfully unsubscribed from ${node.subscribedStates.size} states`);
                 } else {
                     await connectionManager.unsubscribe(
                         settings.nodeId,
                         settings.serverId,
                         subscriptionPattern
                     );
-                    node.log(`Successfully unsubscribed from ${isWildcardPattern ? 'wildcard pattern' : 'single state'}: ${subscriptionPattern}`);
                 }
 
                 node.status({});

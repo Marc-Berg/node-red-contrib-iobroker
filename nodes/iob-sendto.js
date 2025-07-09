@@ -32,21 +32,16 @@ module.exports = function(RED) {
         if (settings.message) {
             try {
                 staticMessageParsed = JSON.parse(settings.message);
-                node.log(`Static message parsed: ${JSON.stringify(staticMessageParsed)}`);
             } catch (error) {
                 return setError(`Invalid JSON in static message: ${error.message}`, "JSON error");
             }
         }
 
-        node.log(`SendTo node initialized: adapter="${settings.adapter}", command="${settings.command}", waitForResponse=${settings.waitForResponse}`);
-
-        // Custom status texts for sendto mode
         const statusTexts = {
             ready: settings.waitForResponse ? "Ready (with response)" : "Ready (fire-and-forget)",
             reconnected: settings.waitForResponse ? "Reconnected (with response)" : "Reconnected (fire-and-forget)"
         };
 
-        // Initialize connection using helper
         NodeHelpers.initializeConnection(
             node, config, RED, settings, globalConfig, setStatus, statusTexts
         );
@@ -78,15 +73,11 @@ module.exports = function(RED) {
                     return;
                 }
 
-                node.log(`SendTo request: adapter="${adapter.trim()}", command="${command || '(none)'}", waitForResponse=${settings.waitForResponse}, timeout=${timeout}`);
-                node.log(`Message content: ${JSON.stringify(messageContent).substring(0, 200)}${JSON.stringify(messageContent).length > 200 ? '...' : ''}`);
-
                 setStatus("blue", "dot", `Sending to ${adapter}...`);
                 const startTime = Date.now();
 
                 try {
                     if (settings.waitForResponse) {
-                        node.log(`Sending with response expected...`);
                         const response = await connectionManager.sendToAdapter(
                             settings.serverId,
                             adapter.trim(),
@@ -109,13 +100,9 @@ module.exports = function(RED) {
                         const readyText = statusTexts.ready;
                         setStatus("green", "dot", readyText);
                         
-                        node.log(`SendTo completed with response: ${adapter}${command ? `.${command}` : ''} in ${responseTime}ms`);
-                        node.log(`Response: ${JSON.stringify(response).substring(0, 200)}${JSON.stringify(response).length > 200 ? '...' : ''}`);
-                        
                         send(responseMsg);
                         done && done();
                     } else {
-                        node.log(`Sending fire-and-forget...`);
                         await connectionManager.sendToAdapter(
                             settings.serverId,
                             adapter.trim(),
@@ -125,10 +112,7 @@ module.exports = function(RED) {
                         );
 
                         const readyText = statusTexts.ready;
-                        setStatus("green", "dot", readyText);
-                        
-                        node.log(`SendTo completed (fire-and-forget): ${adapter}${command ? `.${command}` : ''}`);
-                        
+                        setStatus("green", "dot", readyText);                        
                         done && done();
                     }
                     

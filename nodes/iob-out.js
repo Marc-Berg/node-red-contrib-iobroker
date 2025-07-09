@@ -110,7 +110,6 @@ module.exports = function(RED) {
 
             try {
                 await connectionManager.setObject(settings.serverId, stateId, objectDef);
-                node.log(`Created object: ${stateId} with type: ${properties.type}, role: ${properties.role}`);
                 return true;
             } catch (error) {
                 node.error(`Failed to create object ${stateId}: ${error.message}`);
@@ -128,11 +127,8 @@ module.exports = function(RED) {
                 const existingObject = await connectionManager.getObject(settings.serverId, stateId);
                 
                 if (existingObject) {
-                    node.log(`Object ${stateId} already exists, skipping creation`);
                     return true;
                 }
-
-                node.log(`Object ${stateId} not found, creating with auto-create settings`);
                 const objectProperties = getObjectProperties(msg, stateId, value);
                 await createObject(stateId, objectProperties);
                 
@@ -196,7 +192,6 @@ module.exports = function(RED) {
                 
                 const autoCreateStatus = settings.autoCreate ? " (auto-create)" : "";
                 setStatus("green", "dot", `Ready${autoCreateStatus}`);
-                node.log(`Successfully set ${stateId} = ${value} (mode: ${settings.setMode}${autoCreateStatus})`);
                 
                 done && done();
                 
