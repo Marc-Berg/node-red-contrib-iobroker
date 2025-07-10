@@ -92,7 +92,6 @@ If you prefer not to use a Admin instance:
 
 **⚠️ Important Limitations with Alternative Adapters:**
 - **WS ioB log node does not work** with WebSocket or Web adapter (requires Admin adapter)
-- **WS ioB getObj node is limited** to state, channel, and device object types only
 
 ## ⚠️ Important Notes
 
