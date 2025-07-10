@@ -1,6 +1,6 @@
 # Changelog
 
-## [0.13.0] - 2025-xx-xx
+## [0.13.0] - 2025-07-10
 
 ### Changed
 - **Optimized getObjects with getObjectView** - Improved performance for object retrieval operations
