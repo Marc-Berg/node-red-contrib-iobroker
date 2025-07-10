@@ -23,6 +23,12 @@
   - Standardized destroy() methods to call cleanup() first
   - Improved memory management and resource cleanup consistency
  
+### Fixed
+- **Shutdown timeout errors in log unsubscription**
+  - Fixed race condition between log node cleanup and WebSocket manager destruction
+  - Improved all unsubscribe methods with graceful degradation when clients are destroyed
+  - Timeout errors during shutdown now logged as debug messages instead of errors
+ 
 ## [0.12.0] - 2025-07-07
 
 ### Added
