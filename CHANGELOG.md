@@ -17,6 +17,11 @@
   - INFO level now focuses on admin-relevant events: connections, authentication, subscriptions, and important operations
   - DEBUG level provides comprehensive technical details for development and troubleshooting
 - **Integrate ioBroker logging with Node-RED logging system**
+
+### Changed
+- **Implement consistent cleanup/destroy pattern across all managers**
+  - Standardized destroy() methods to call cleanup() first
+  - Improved memory management and resource cleanup consistency
  
 ## [0.12.0] - 2025-07-07
 
