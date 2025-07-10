@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.13.1] - 2025-xx-xx
+
+### Fixed
+- **Event-based graceful OAuth token renewal** - Rewrite of authentication token refresh mechanism
+  - Replaced full session rebuild with parallel connection strategy
+  - Implemented subscribe-first overlap strategy to prevent missed events during token renewal
+
 ## [0.13.0] - 2025-07-10
 
 ### Changed
