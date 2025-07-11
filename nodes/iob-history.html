@@ -1,321 +1,373 @@
 <script type="text/javascript">
-    function loadSharedTreeView() {
-        return new Promise((resolve, reject) => {
+// Shared TreeView loader
+function loadSharedTreeView() {
+    return new Promise((resolve, reject) => {
+        if (window.ioBrokerSharedTreeView && window.ioBrokerSharedTreeView.initialized) {
+            resolve();
+            return;
+        }
+        
+        const script = document.createElement('script');
+        script.src = 'iobroker/shared/iobroker-treeview.js?v=1.0.0';
+        script.async = true;
+        
+        script.onload = () => {
             if (window.ioBrokerSharedTreeView && window.ioBrokerSharedTreeView.initialized) {
                 resolve();
+            } else {
+                reject(new Error('TreeView component failed to initialize'));
+            }
+        };
+        
+        script.onerror = () => reject(new Error('TreeView component script not found'));
+        document.head.appendChild(script);
+    });
+}
+
+RED.nodes.registerType('iobhistory', {
+    category: 'ioBroker WS',
+    color: '#a6bbcf',
+    defaults: {
+        name: { value: "" },
+        stateId: { value: "" },
+        historyAdapter: { value: "history.0" },
+        timeRange: { value: "duration" },
+        duration: { value: 24 },
+        durationUnit: { value: "hours" },
+        startTime: { value: "" },
+        endTime: { value: "" },
+        aggregate: { value: "onchange" },
+        step: { value: 300 },
+        stepUnit: { value: "seconds" },
+        maxEntries: { value: 2000 },
+        queryMode: { value: "parallel" },
+        outputProperty: { value: "payload" },
+        outputFormat: { value: "array" },
+        percentile: { value: 50 },
+        quantile: { value: 0.5 },
+        integralUnit: { value: 3600 },
+        removeBorderValues: { value: false },
+        sortOrder: { value: "ascending" },
+        timestampFormat: { value: "unix" },
+        customTimeFormat: { value: "DD.MM.YYYY HH:mm:ss" },
+        timezone: { value: "auto" },
+        dataFormat: { value: "full" },
+        server: { value: "", type: "iob-config" }
+    },
+    inputs: 1,
+    outputs: 1,
+    icon: "iobroker_history.svg",
+    paletteLabel: "WS ioB history",
+    label: function() {
+        if (this.name) return this.name;
+        
+        const timeInfo = this.timeRange === 'duration' 
+            ? `${this.duration}${this.durationUnit.charAt(0)}`
+            : this.timeRange === 'absolute' ? 'abs' : 'msg';
+            
+        return `${this.stateId || 'history'} (${timeInfo}, ${this.aggregate})`;
+    },
+    
+    oneditprepare: function() {
+        const node = this;
+        const serverInput = $('#node-input-server');
+        
+        // Tab switching functionality
+        function initializeTabs() {
+            $('.node-config-tabs li').on('click', function() {
+                const tabId = $(this).data('tab');
+                
+                // Update active tab
+                $('.node-config-tabs li').removeClass('active');
+                $(this).addClass('active');
+                
+                // Show corresponding tab content
+                $('.tab-content .tab-pane').removeClass('active');
+                $(`.tab-content .tab-pane[data-tab="${tabId}"]`).addClass('active');
+            });
+            
+            // Activate first tab by default
+            $('.node-config-tabs li:first').addClass('active');
+            $('.tab-content .tab-pane:first').addClass('active');
+        }
+        
+        function showDefaultAdapterSuggestions() {
+            $('.adapter-list').html('<span style="color: #6c757d; font-style: italic;">Loading available adapters...</span>');
+            $('.adapter-suggestions').show();
+        }
+        
+        function loadHistoryAdapters() {
+            const serverNode = RED.nodes.node(serverInput.val());
+            if (!serverNode) {
+                console.log('No server node selected for history adapter discovery');
                 return;
             }
-
-            const script = document.createElement('script');
-            script.src = 'iobroker/shared/iobroker-treeview.js?v=1.0.0';
-            script.async = true;
-
-            script.onload = () => {
-                if (window.ioBrokerSharedTreeView && window.ioBrokerSharedTreeView.initialized) {
-                    resolve();
-                } else {
-                    reject(new Error('TreeView component failed to initialize'));
-                }
-            };
-
-            script.onerror = () => reject(new Error('TreeView component script not found'));
-            document.head.appendChild(script);
-        });
-    }
-
-    RED.nodes.registerType('iobhistory', {
-        category: 'ioBroker WS',
-        color: '#a6bbcf',
-        defaults: {
-            name: { value: "" },
-            stateId: { value: "" },
-            historyAdapter: { value: "history.0" },
-            timeRange: { value: "duration" },
-            duration: { value: 24 },
-            durationUnit: { value: "hours" },
-            startTime: { value: "" },
-            endTime: { value: "" },
-            aggregate: { value: "onchange" },
-            step: { value: 300 },
-            stepUnit: { value: "seconds" },
-            maxEntries: { value: 2000 },
-            queryMode: { value: "parallel" },
-            outputProperty: { value: "payload" },
-            outputFormat: { value: "array" },
-            percentile: { value: 50 },
-            quantile: { value: 0.5 },
-            integralUnit: { value: 3600 },
-            removeBorderValues: { value: false },
-            sortOrder: { value: "ascending" },
-            timestampFormat: { value: "unix" },
-            dataFormat: { value: "full" },
-            server: { value: "", type: "iob-config" }
-        },
-        inputs: 1,
-        outputs: 1,
-        icon: "iobroker_history.svg",
-        paletteLabel: "WS ioB history",
-        label: function () {
-            if (this.name) return this.name;
-
-            const timeInfo = this.timeRange === 'duration'
-                ? `${this.duration}${this.durationUnit.charAt(0)}`
-                : this.timeRange === 'absolute' ? 'abs' : 'msg';
-
-            return `${this.stateId || 'history'} (${timeInfo}, ${this.aggregate})`;
-        },
-
-        oneditprepare: function () {
-            const node = this;
-            const serverInput = $('#node-input-server');
-            function initializeTabs() {
-                $('.node-config-tabs li').on('click', function () {
-                    const tabId = $(this).data('tab');
-                    $('.node-config-tabs li').removeClass('active');
-                    $(this).addClass('active');
-                    $('.tab-content .tab-pane').removeClass('active');
-                    $(`.tab-content .tab-pane[data-tab="${tabId}"]`).addClass('active');
-                });
-                $('.node-config-tabs li:first').addClass('active');
-                $('.tab-content .tab-pane:first').addClass('active');
-            }
-
-            function showDefaultAdapterSuggestions() {
-                $('.adapter-list').html('<span style="color: #6c757d; font-style: italic;">Loading available adapters...</span>');
-                $('.adapter-suggestions').show();
-            }
-
-            function loadHistoryAdapters() {
-                const serverNode = RED.nodes.node(serverInput.val());
-                if (!serverNode) {
-                    console.log('No server node selected for history adapter discovery');
-                    return;
-                }
-
-                const serverId = `${serverNode.iobhost}:${serverNode.iobport}`;
-                console.log('Loading history adapters from:', serverId);
-
-                $.ajax({
-                    url: `/iobroker/ws/adapters/${encodeURIComponent(serverId)}`,
-                    method: 'GET',
-                    timeout: 15000,
-                    dataType: 'json',
-                    cache: false
-                }).done((response) => {
-                    console.log('History adapters response:', response);
-
-                    if (response.adapters && response.adapters.length > 0) {
-                        const adapters = response.adapters;
-
-                        const adapterButtons = adapters.map(adapter => {
-                            const statusClass = adapter.alive ? 'alive' : (adapter.enabled ? 'enabled' : 'disabled');
-                            const statusIcon = adapter.alive ? '🟢' : (adapter.enabled ? '🟡' : '🔴');
-                            const title = `${adapter.title || adapter.name} - ${adapter.alive ? 'Running' : adapter.enabled ? 'Enabled but not running' : 'Disabled'}`;
-
-                            return `<a href="#" data-adapter="${adapter.name}" class="${statusClass}" title="${title}">${statusIcon} ${adapter.name}</a>`;
-                        }).join('');
-
-                        const fallbacks = ['history.0', 'sql.0', 'influxdb.0'].filter(name =>
-                            !adapters.find(a => a.name === name)
-                        ).map(name =>
-                            `<a href="#" data-adapter="${name}" class="fallback" title="Common adapter (not verified)">${name}</a>`
-                        ).join('');
-
-                        $('.adapter-list').html(adapterButtons + fallbacks);
-
-                        $('.adapter-list a').on('click', function (e) {
-                            e.preventDefault();
-                            const adapter = $(this).data('adapter');
-                            $('#node-input-historyAdapter').val(adapter);
-                            $(this).addClass('selected').siblings().removeClass('selected');
-                            return false;
-                        });
-
-                        const currentAdapter = $('#node-input-historyAdapter').val();
-                        $(`.adapter-list a[data-adapter="${currentAdapter}"]`).addClass('selected');
-
-                        $('.adapter-suggestions').show();
-                        console.log(`Found ${adapters.length} history adapters on ${serverId}`);
-                    } else {
-                        console.log('No history adapters found, keeping default suggestions');
-                    }
-                }).fail((xhr, status, error) => {
-                    console.error('Failed to load history adapters:', status, error);
-
-                    const fallbackAdapters = ['history.0', 'sql.0', 'influxdb.0', 'history.1', 'sql.1', 'influxdb.1'];
-                    $('.adapter-list').html(
-                        '<span style="color: #dc3545; margin-right: 10px;">⚠️ Could not load from server</span>' +
-                        fallbackAdapters.map(adapter =>
-                            `<a href="#" data-adapter="${adapter}" class="fallback" title="Common adapter (not verified)">${adapter}</a>`
-                        ).join('')
-                    );
-
-                    $('.adapter-list a').on('click', function (e) {
+            
+            const serverId = `${serverNode.iobhost}:${serverNode.iobport}`;
+            console.log('Loading history adapters from:', serverId);
+            
+            $.ajax({
+                url: `/iobroker/ws/adapters/${encodeURIComponent(serverId)}`,
+                method: 'GET',
+                timeout: 15000,
+                dataType: 'json',
+                cache: false
+            }).done((response) => {
+                console.log('History adapters response:', response);
+                
+                if (response.adapters && response.adapters.length > 0) {
+                    const adapters = response.adapters;
+                    
+                    const adapterButtons = adapters.map(adapter => {
+                        const statusClass = adapter.alive ? 'alive' : (adapter.enabled ? 'enabled' : 'disabled');
+                        const statusIcon = adapter.alive ? '🟢' : (adapter.enabled ? '🟡' : '🔴');
+                        const title = `${adapter.title || adapter.name} - ${adapter.alive ? 'Running' : adapter.enabled ? 'Enabled but not running' : 'Disabled'}`;
+                        
+                        return `<a href="#" data-adapter="${adapter.name}" class="${statusClass}" title="${title}">${statusIcon} ${adapter.name}</a>`;
+                    }).join('');
+                    
+                    const fallbacks = ['history.0', 'sql.0', 'influxdb.0'].filter(name => 
+                        !adapters.find(a => a.name === name)
+                    ).map(name => 
+                        `<a href="#" data-adapter="${name}" class="fallback" title="Common adapter (not verified)">${name}</a>`
+                    ).join('');
+                    
+                    $('.adapter-list').html(adapterButtons + fallbacks);
+                    
+                    $('.adapter-list a').on('click', function(e) {
                         e.preventDefault();
                         const adapter = $(this).data('adapter');
                         $('#node-input-historyAdapter').val(adapter);
                         $(this).addClass('selected').siblings().removeClass('selected');
                         return false;
                     });
-                });
-            }
-
-            function initializeHistoryAdapterSuggestions() {
-                showDefaultAdapterSuggestions();
-                setTimeout(() => {
-                    loadHistoryAdapters();
-                }, 1000);
-                serverInput.on('change', () => {
-                    console.log('Server changed, reloading history adapters...');
-                    $('.adapter-suggestions').hide();
-                    setTimeout(() => {
-                        showDefaultAdapterSuggestions();
-                        setTimeout(loadHistoryAdapters, 500);
-                    }, 100);
-                });
-            }
-            initializeTabs();
-            if (!node.server || node.server === '') {
-                const configNodes = [];
-                RED.nodes.eachConfig(function (config) {
-                    if (config.type === 'iob-config') {
-                        configNodes.push(config);
-                    }
-                });
-
-                if (configNodes.length === 1) {
-                    node.server = configNodes[0].id;
-                    serverInput.val(node.server);
-
-                    setTimeout(() => {
-                        RED.notify(`Automatically selected server: ${configNodes[0].name || configNodes[0].iobhost}`, {
-                            type: "info",
-                            timeout: 1500
-                        });
-                    }, 500);
-                }
-            }
-            $('input[name="timeRangeMode"]').on('change', function () {
-                const mode = $(this).val();
-                $('.time-config-section').hide();
-                $(`.time-config-section.${mode}`).show();
-                $('#node-input-timeRange').val(mode);
-            });
-
-            const currentMode = node.timeRange || 'duration';
-            $(`input[name="timeRangeMode"][value="${currentMode}"]`).prop('checked', true);
-            $('.time-config-section').hide();
-            $(`.time-config-section.${currentMode}`).show();
-
-            $('#node-input-aggregate').on('change', function () {
-                const aggregate = $(this).val();
-                const stepConfig = $('#step-config');
-                const needsStep = ['average', 'min', 'max', 'total', 'count', 'percentile', 'quantile', 'integral'].includes(aggregate);
-
-                if (needsStep) {
-                    stepConfig.show();
+                    
+                    const currentAdapter = $('#node-input-historyAdapter').val();
+                    $(`.adapter-list a[data-adapter="${currentAdapter}"]`).addClass('selected');
+                    
+                    $('.adapter-suggestions').show();
+                    console.log(`Found ${adapters.length} history adapters on ${serverId}`);
                 } else {
-                    stepConfig.hide();
+                    console.log('No history adapters found, keeping default suggestions');
                 }
-                $('.aggregate-option').hide();
-                if (aggregate === 'percentile') {
-                    $('#percentile-config').show();
-                } else if (aggregate === 'quantile') {
-                    $('#quantile-config').show();
-                } else if (aggregate === 'integral') {
-                    $('#integral-config').show();
-                }
-            });
-            $('#node-input-aggregate').trigger('change');
-
-            $('#node-input-outputFormat').on('change', function () {
-                const format = $(this).val();
-                $('.output-format-info').hide();
-                $(`.output-format-info.${format}`).show();
-            });
-
-            $('#node-input-queryMode').on('change', function () {
-                const mode = $(this).val();
-                const infoElement = $('#query-mode-info');
-                let infoText = '';
-
-                switch (mode) {
-                    case 'parallel':
-                        infoText = '<i class="fa fa-info-circle"></i> <strong>Parallel:</strong> Multiple queries can run simultaneously. Fast but may overload the history adapter with many requests.';
-                        break;
-                    case 'sequential':
-                        infoText = '<i class="fa fa-clock-o"></i> <strong>Sequential:</strong> Queries are processed one after another in order. Slower but ensures reliable processing of all requests.';
-                        break;
-                    case 'drop':
-                        infoText = '<i class="fa fa-filter"></i> <strong>Drop:</strong> New queries are discarded while one is running. Best for UI updates where only the latest result matters.';
-                        break;
-                }
-
-                infoElement.html(infoText);
-            });
-
-            $('#node-input-dataFormat').on('change', function () {
-                const format = $(this).val();
-                const infoElement = $('#data-format-info');
-                let infoText = '';
-
-                switch (format) {
-                    case 'full':
-                        infoText = '<i class="fa fa-info-circle"></i> <strong>Full Format:</strong> Complete data objects including ts, val, ack, from, q, lc and other metadata.';
-                        break;
-                    case 'simple':
-                        infoText = '<i class="fa fa-compress"></i> <strong>Simple Format:</strong> Only timestamp (ts) and value (val) properties. Smaller payload, faster processing.';
-                        break;
-                }
-
-                infoElement.html(infoText);
-            });
-
-            $('#node-input-timestampFormat').on('change', function () {
-                const format = $(this).val();
-                const infoElement = $('#timestamp-format-info');
-                let infoText = '';
-
-                switch (format) {
-                    case 'unix':
-                        infoText = '<i class="fa fa-clock-o"></i> <strong>Unix Timestamp:</strong> Milliseconds since epoch (e.g., 1609459200000). Standard for JavaScript Date objects.';
-                        break;
-                    case 'iso':
-                        infoText = '<i class="fa fa-calendar"></i> <strong>ISO 8601 String:</strong> Human-readable format (e.g., "2021-01-01T00:00:00.000Z"). Better for debugging and logging.';
-                        break;
-                }
-
-                infoElement.html(infoText);
-            });
-
-            $('#node-input-outputFormat').trigger('change');
-            $('#node-input-queryMode').trigger('change');
-            $('#node-input-dataFormat').trigger('change');
-            $('#node-input-timestampFormat').trigger('change');
-
-            initializeHistoryAdapterSuggestions();
-
-            loadSharedTreeView().then(() => {
-                node.treeController = window.ioBrokerSharedTreeView.setup({
-                    nodeType: 'iobhistory',
-                    inputId: 'node-input-stateId',
-                    serverInputId: 'node-input-server',
-                    searchPlaceholder: 'Search states for history...',
-                    itemType: 'states',
-                    dataEndpoint: '/iobroker/ws/states',
-                    enableWildcardDetection: false
+            }).fail((xhr, status, error) => {
+                console.error('Failed to load history adapters:', status, error);
+                
+                const fallbackAdapters = ['history.0', 'sql.0', 'influxdb.0', 'history.1', 'sql.1', 'influxdb.1'];
+                $('.adapter-list').html(
+                    '<span style="color: #dc3545; margin-right: 10px;">⚠️ Could not load from server</span>' +
+                    fallbackAdapters.map(adapter => 
+                        `<a href="#" data-adapter="${adapter}" class="fallback" title="Common adapter (not verified)">${adapter}</a>`
+                    ).join('')
+                );
+                
+                $('.adapter-list a').on('click', function(e) {
+                    e.preventDefault();
+                    const adapter = $(this).data('adapter');
+                    $('#node-input-historyAdapter').val(adapter);
+                    $(this).addClass('selected').siblings().removeClass('selected');
+                    return false;
                 });
-            }).catch(error => {
-                console.error('Failed to load TreeView component:', error);
             });
-        },
-
-        oneditsave: function () {
-            if (this.treeController) {
-                this.treeController.cleanup();
+        }
+        
+        function initializeHistoryAdapterSuggestions() {
+            // Show default suggestions immediately
+            showDefaultAdapterSuggestions();
+            
+            // Try to load from server if available
+            setTimeout(() => {
+                loadHistoryAdapters();
+            }, 1000);
+            
+            // Reload adapters when server changes
+            serverInput.on('change', () => {
+                console.log('Server changed, reloading history adapters...');
+                $('.adapter-suggestions').hide();
+                setTimeout(() => {
+                    showDefaultAdapterSuggestions();
+                    setTimeout(loadHistoryAdapters, 500);
+                }, 100);
+            });
+        }
+        
+        // Initialize tabs
+        initializeTabs();
+        
+        // Auto-select server configuration
+        if (!node.server || node.server === '') {
+            const configNodes = [];
+            RED.nodes.eachConfig(function(config) {
+                if (config.type === 'iob-config') {
+                    configNodes.push(config);
+                }
+            });
+            
+            if (configNodes.length === 1) {
+                node.server = configNodes[0].id;
+                serverInput.val(node.server);
+                
+                setTimeout(() => {
+                    RED.notify(`Automatically selected server: ${configNodes[0].name || configNodes[0].iobhost}`, {
+                        type: "info",
+                        timeout: 1500
+                    });
+                }, 500);
             }
         }
-    });
+        
+        // Time range mode handlers
+        $('input[name="timeRangeMode"]').on('change', function() {
+            const mode = $(this).val();
+            $('.time-config-section').hide();
+            $(`.time-config-section.${mode}`).show();
+            $('#node-input-timeRange').val(mode);
+        });
+        
+        // Initialize time range mode
+        const currentMode = node.timeRange || 'duration';
+        $(`input[name="timeRangeMode"][value="${currentMode}"]`).prop('checked', true);
+        $('.time-config-section').hide();
+        $(`.time-config-section.${currentMode}`).show();
+        
+        // Aggregation change handler
+        $('#node-input-aggregate').on('change', function() {
+            const aggregate = $(this).val();
+            const stepConfig = $('#step-config');
+            const needsStep = ['average', 'min', 'max', 'total', 'count', 'percentile', 'quantile', 'integral'].includes(aggregate);
+            
+            if (needsStep) {
+                stepConfig.show();
+            } else {
+                stepConfig.hide();
+            }
+            
+            // Show/hide special options
+            $('.aggregate-option').hide();
+            if (aggregate === 'percentile') {
+                $('#percentile-config').show();
+            } else if (aggregate === 'quantile') {
+                $('#quantile-config').show();
+            } else if (aggregate === 'integral') {
+                $('#integral-config').show();
+            }
+        });
+        
+        // Initialize aggregation
+        $('#node-input-aggregate').trigger('change');
+        
+        // Output format change handler
+        $('#node-input-outputFormat').on('change', function() {
+            const format = $(this).val();
+            $('.output-format-info').hide();
+            $(`.output-format-info.${format}`).show();
+        });
+        
+        // Query mode change handler
+        $('#node-input-queryMode').on('change', function() {
+            const mode = $(this).val();
+            const infoElement = $('#query-mode-info');
+            let infoText = '';
+            
+            switch(mode) {
+                case 'parallel':
+                    infoText = '<i class="fa fa-info-circle"></i> <strong>Parallel:</strong> Multiple queries can run simultaneously. Fast but may overload the history adapter with many requests.';
+                    break;
+                case 'sequential':
+                    infoText = '<i class="fa fa-clock-o"></i> <strong>Sequential:</strong> Queries are processed one after another in order. Slower but ensures reliable processing of all requests.';
+                    break;
+                case 'drop':
+                    infoText = '<i class="fa fa-filter"></i> <strong>Drop:</strong> New queries are discarded while one is running. Best for UI updates where only the latest result matters.';
+                    break;
+            }
+            
+            infoElement.html(infoText);
+        });
+        
+        // Data format change handler
+        $('#node-input-dataFormat').on('change', function() {
+            const format = $(this).val();
+            const infoElement = $('#data-format-info');
+            let infoText = '';
+            
+            switch(format) {
+                case 'full':
+                    infoText = '<i class="fa fa-info-circle"></i> <strong>Full Format:</strong> Complete data objects including ts, val, ack, from, q, lc and other metadata.';
+                    break;
+                case 'simple':
+                    infoText = '<i class="fa fa-compress"></i> <strong>Simple Format:</strong> Only timestamp (ts) and value (val) properties. Smaller payload, faster processing.';
+                    break;
+            }
+            
+            infoElement.html(infoText);
+        });
+        
+        // Timestamp format change handler
+        $('#node-input-timestampFormat').on('change', function() {
+            const format = $(this).val();
+            const infoElement = $('#timestamp-format-info');
+            const customConfig = $('#custom-format-config');
+            let infoText = '';
+            
+            switch(format) {
+                case 'unix':
+                    infoText = '<i class="fa fa-clock-o"></i> <strong>Unix Timestamp:</strong> Milliseconds since epoch (e.g., 1609459200000). Standard for JavaScript Date objects.';
+                    customConfig.hide();
+                    break;
+                case 'iso':
+                    infoText = '<i class="fa fa-calendar"></i> <strong>ISO 8601 String:</strong> UTC format (e.g., "2021-01-01T00:00:00.000Z"). International standard.';
+                    customConfig.hide();
+                    break;
+                case 'local':
+                    infoText = '<i class="fa fa-globe"></i> <strong>Local Time:</strong> Formatted in local timezone (e.g., "01.01.2021 01:00:00"). Browser/system timezone.';
+                    customConfig.hide();
+                    break;
+                case 'custom':
+                    infoText = '<i class="fa fa-cog"></i> <strong>Custom Format:</strong> User-defined format with timezone support. Use format tokens like DD, MM, YYYY, HH, mm, ss.';
+                    customConfig.show();
+                    break;
+            }
+            
+            infoElement.html(infoText);
+        });
+        
+        // Initialize output format
+        $('#node-input-outputFormat').trigger('change');
+        
+        // Initialize query mode
+        $('#node-input-queryMode').trigger('change');
+        
+        // Initialize data format
+        $('#node-input-dataFormat').trigger('change');
+        
+        // Initialize timestamp format
+        $('#node-input-timestampFormat').trigger('change');
+        
+        // History adapter suggestions
+        initializeHistoryAdapterSuggestions();
+        
+        // Load TreeView component
+        loadSharedTreeView().then(() => {
+            node.treeController = window.ioBrokerSharedTreeView.setup({
+                nodeType: 'iobhistory',
+                inputId: 'node-input-stateId',
+                serverInputId: 'node-input-server',
+                searchPlaceholder: 'Search states for history...',
+                itemType: 'states',
+                dataEndpoint: '/iobroker/ws/states',
+                enableWildcardDetection: false
+            });
+        }).catch(error => {
+            console.error('Failed to load TreeView component:', error);
+        });
+    },
+
+    oneditsave: function() {
+        if (this.treeController) {
+            this.treeController.cleanup();
+        }
+    }
+});
 </script>
 
 <script type="text/html" data-template-name="iobhistory">
@@ -483,13 +535,11 @@
         }
     </style>
 
-    <!-- Basic Info -->
     <div class="form-row">
         <label for="node-input-name"><i class="icon-tag"></i> Name</label>
         <input type="text" id="node-input-name" placeholder="Optional node name">
     </div>
 
-    <!-- Tab Navigation -->
     <ul class="node-config-tabs">
         <li data-tab="datasource">📊 Data Source</li>
         <li data-tab="timerange">🕐 Time Range</li>
@@ -497,9 +547,7 @@
         <li data-tab="output">📤 Output</li>
     </ul>
 
-    <!-- Tab Content -->
     <div class="tab-content">
-        <!-- Data Source Tab -->
         <div class="tab-pane" data-tab="datasource">
             <div class="tab-section">
                 <h4>State Configuration</h4>
@@ -530,7 +578,6 @@
             </div>
         </div>
 
-        <!-- Time Range Tab -->
         <div class="tab-pane" data-tab="timerange">
             <div class="tab-section">
                 <h4>Time Range Mode</h4>
@@ -542,7 +589,6 @@
                 <input type="hidden" id="node-input-timeRange">
             </div>
             
-            <!-- Duration Configuration -->
             <div class="time-config-section duration">
                 <div class="tab-section">
                     <h4>Duration Settings</h4>
@@ -559,7 +605,6 @@
                 </div>
             </div>
             
-            <!-- Absolute Time Configuration -->
             <div class="time-config-section absolute">
                 <div class="tab-section">
                     <h4>Absolute Time Period</h4>
@@ -574,7 +619,6 @@
                 </div>
             </div>
             
-            <!-- Message Configuration Info -->
             <div class="time-config-section message">
                 <div class="tab-section">
                     <h4>Message Properties</h4>
@@ -590,7 +634,6 @@
             </div>
         </div>
 
-        <!-- Processing Tab -->
         <div class="tab-pane" data-tab="processing">
             <div class="tab-section">
                 <h4>Query Processing</h4>
@@ -602,7 +645,6 @@
                         <option value="drop">Drop - Discard new queries while one is running</option>
                     </select>
                     <div id="query-mode-info" style="margin-top: 8px; padding: 8px; background-color: #e8f4fd; border: 1px solid #bee5eb; border-radius: 4px; font-size: 12px; color: #0c5460;">
-                        <!-- Dynamic info will be populated here -->
                     </div>
                 </div>
             </div>
@@ -626,7 +668,6 @@
                     </select>
                 </div>
                 
-                <!-- Step Configuration -->
                 <div class="form-row" id="step-config" style="display: none;">
                     <label for="node-input-step"><i class="icon-clock-o"></i> Step Interval</label>
                     <input type="number" id="node-input-step" style="width: 100px;" min="1">
@@ -637,7 +678,6 @@
                     </select>
                 </div>
                 
-                <!-- Aggregation-specific options -->
                 <div class="form-row aggregate-option" id="percentile-config" style="display: none;">
                     <label for="node-input-percentile"><i class="icon-tag"></i> Percentile</label>
                     <input type="number" id="node-input-percentile" style="width: 100px;" min="0" max="100" value="50">
@@ -669,6 +709,42 @@
                     <span style="margin-left: 5px; font-size: 12px; color: #666;">Default: 2000</span>
                 </div>
             </div>
+        </div>
+
+        <div class="tab-pane" data-tab="output">
+            <div class="tab-section">
+                <h4>Output Configuration</h4>
+                <div class="form-row">
+                    <label for="node-input-outputProperty"><i class="icon-tag"></i> Output Property</label>
+                    <input type="text" id="node-input-outputProperty" placeholder="payload">
+                </div>
+                
+                <div class="form-row">
+                    <label for="node-input-outputFormat"><i class="icon-list-alt"></i> Output Format</label>
+                    <select id="node-input-outputFormat" style="width:100%">
+                        <option value="array">Array of Data Points</option>
+                        <option value="chart">Chart.js Format</option>
+                        <option value="dashboard2">Dashboard 2.0 Format</option>
+                        <option value="statistics">Statistics Summary</option>
+                    </select>
+                </div>
+                
+                <div class="output-format-info array" style="display: none;">
+                    <i class="fa fa-info-circle"></i> <strong>Array Format:</strong> Returns raw data points as array: <code>[{val, ts, ack, from}, ...]</code>
+                </div>
+                
+                <div class="output-format-info chart" style="display: none;">
+                    <i class="fa fa-info-circle"></i> <strong>Chart.js Format:</strong> Returns Chart.js dataset: <code>{labels: [], datasets: [{data: [], label: ""}]}</code>
+                </div>
+                
+                <div class="output-format-info dashboard2" style="display: none;">
+                    <i class="fa fa-info-circle"></i> <strong>Dashboard 2.0 Format:</strong> Returns ui-chart compatible data: <code>[{x: timestamp, y: value}, ...]</code> with <code>msg.topic</code> as series name. Configure ui-chart: X="x", Y="y"
+                </div>
+                
+                <div class="output-format-info statistics" style="display: none;">
+                    <i class="fa fa-info-circle"></i> <strong>Statistics Format:</strong> Returns summary: <code>{count, min, max, avg, first, last, timeRange}</code>
+                </div>
+            </div>
             
             <div class="tab-section">
                 <h4>Data Format Options</h4>
@@ -694,10 +770,29 @@
                     <label for="node-input-timestampFormat"><i class="icon-clock-o"></i> Timestamp Format</label>
                     <select id="node-input-timestampFormat" style="width:100%">
                         <option value="unix">Unix timestamp (milliseconds)</option>
-                        <option value="iso">ISO 8601 string</option>
+                        <option value="iso">ISO 8601 string (UTC)</option>
+                        <option value="local">Local time string</option>
+                        <option value="custom">Custom format</option>
                     </select>
                     <div id="timestamp-format-info" class="timestamp-format-info" style="display: none;">
-                        <!-- Dynamic info will be populated here -->
+                    </div>
+                </div>
+                
+                <div class="form-row" id="custom-format-config" style="display: none;">
+                    <label for="node-input-customTimeFormat"><i class="icon-clock-o"></i> Custom Format</label>
+                    <input type="text" id="node-input-customTimeFormat" style="width: 200px;" placeholder="DD.MM.YYYY HH:mm:ss">
+                    <select id="node-input-timezone" style="width: 150px; margin-left: 5px;">
+                        <option value="auto">Auto (local)</option>
+                        <option value="UTC">UTC</option>
+                        <option value="Europe/Berlin">Europe/Berlin</option>
+                        <option value="Europe/London">Europe/London</option>
+                        <option value="America/New_York">America/New_York</option>
+                        <option value="America/Los_Angeles">America/Los_Angeles</option>
+                        <option value="Asia/Tokyo">Asia/Tokyo</option>
+                        <option value="Australia/Sydney">Australia/Sydney</option>
+                    </select>
+                    <div style="margin-top: 4px; color: #6c757d; font-size: 12px;">
+                        Format examples: DD.MM.YYYY HH:mm:ss, MM/DD/YYYY h:mm A, YYYY-MM-DD HH:mm
                     </div>
                 </div>
                 
@@ -708,47 +803,8 @@
                         <option value="simple">Simple data (ts, val only)</option>
                     </select>
                     <div id="data-format-info" class="data-format-info" style="display: none;">
-                        <!-- Dynamic info will be populated here -->
                     </div>
                 </div>
-            </div>
-        </div>
-
-        <!-- Output Tab -->
-        <div class="tab-pane" data-tab="output">
-            <div class="tab-section">
-                <h4>Output Configuration</h4>
-                <div class="form-row">
-                    <label for="node-input-outputProperty"><i class="icon-tag"></i> Output Property</label>
-                    <input type="text" id="node-input-outputProperty" placeholder="payload">
-                </div>
-                
-                <div class="form-row">
-                    <label for="node-input-outputFormat"><i class="icon-list-alt"></i> Output Format</label>
-                    <select id="node-input-outputFormat" style="width:100%">
-                        <option value="array">Array of Data Points</option>
-                        <option value="chart">Chart.js Format</option>
-                        <option value="dashboard2">Dashboard 2.0 Format</option>
-                        <option value="statistics">Statistics Summary</option>
-                    </select>
-                </div>
-            </div>
-            
-            <!-- Output Format Information -->
-            <div class="output-format-info array" style="display: none;">
-                <i class="fa fa-info-circle"></i> <strong>Array Format:</strong> Returns raw data points as array: <code>[{val, ts, ack, from}, ...]</code>
-            </div>
-            
-            <div class="output-format-info chart" style="display: none;">
-                <i class="fa fa-info-circle"></i> <strong>Chart.js Format:</strong> Returns Chart.js dataset: <code>{labels: [], datasets: [{data: [], label: ""}]}</code>
-            </div>
-            
-            <div class="output-format-info dashboard2" style="display: none;">
-                <i class="fa fa-info-circle"></i> <strong>Dashboard 2.0 Format:</strong> Returns ui-chart compatible data: <code>[{x: timestamp, y: value}, ...]</code> with <code>msg.topic</code> as series name. Configure ui-chart: X="x", Y="y"
-            </div>
-            
-            <div class="output-format-info statistics" style="display: none;">
-                <i class="fa fa-info-circle"></i> <strong>Statistics Format:</strong> Returns summary: <code>{count, min, max, avg, first, last, timeRange}</code>
             </div>
         </div>
     </div>
@@ -786,16 +842,16 @@
         <li><b>Aggregation:</b> How to process the data (none, average, min/max, etc.)</li>
         <li><b>Step Interval:</b> Time interval for aggregation</li>
         <li><b>Max Entries:</b> Limit number of returned data points</li>
-        <li><b>Remove Border Values:</b> Exclude data points exactly at start/end boundaries</li>
-        <li><b>Sort Order:</b> Sort results ascending (oldest first) or descending (newest first)</li>
-        <li><b>Timestamp Format:</b> Unix timestamp in milliseconds or ISO 8601 string</li>
-        <li><b>Data Format:</b> Full data with all properties or simple data with only ts and val</li>
     </ul>
     
     <h4>📤 Output</h4>
     <ul>
         <li><b>Output Property:</b> Where to place the result in the message</li>
         <li><b>Output Format:</b> Format of the returned data (Array, Chart.js, Dashboard 2.0, Statistics)</li>
+        <li><b>Remove Border Values:</b> Exclude data points exactly at start/end boundaries</li>
+        <li><b>Sort Order:</b> Sort results ascending (oldest first) or descending (newest first)</li>
+        <li><b>Timestamp Format:</b> Unix timestamp in milliseconds or ISO 8601 string</li>
+        <li><b>Data Format:</b> Full data with all properties or simple data with only ts and val</li>
     </ul>
     
     <h3>Input</h3>
@@ -810,7 +866,9 @@
         <li><code>msg.maxEntries</code> - Override max entries limit</li>
         <li><code>msg.removeBorderValues</code> - Override border values setting</li>
         <li><code>msg.sortOrder</code> - Override sort order ("ascending" or "descending")</li>
-        <li><code>msg.timestampFormat</code> - Override timestamp format ("unix" or "iso")</li>
+        <li><code>msg.timestampFormat</code> - Override timestamp format ("unix", "iso", "local", "custom")</li>
+        <li><code>msg.customTimeFormat</code> - Custom format string (e.g., "DD.MM.YYYY HH:mm:ss")</li>
+        <li><code>msg.timezone</code> - Timezone for custom format ("auto", "UTC", "Europe/Berlin", etc.)</li>
         <li><code>msg.dataFormat</code> - Override data format ("full" or "simple")</li>
     </ul>
     
@@ -842,7 +900,30 @@
     <h4>Timestamp Format</h4>
     <ul>
         <li><b>Unix Timestamp:</b> Milliseconds since epoch (e.g., 1609459200000). Standard for JavaScript Date objects.</li>
-        <li><b>ISO 8601 String:</b> Human-readable format (e.g., "2021-01-01T00:00:00.000Z"). Better for debugging and logging.</li>
+        <li><b>ISO 8601 String:</b> UTC format (e.g., "2021-01-01T00:00:00.000Z"). International standard.</li>
+        <li><b>Local Time:</b> Formatted in local timezone (e.g., "01.01.2021 01:00:00"). Uses browser/system timezone.</li>
+        <li><b>Custom Format:</b> User-defined format with timezone support. Format tokens:
+            <ul>
+                <li>YYYY - 4-digit year</li>
+                <li>MM - 2-digit month</li>
+                <li>DD - 2-digit day</li>
+                <li>HH - 2-digit hour (24-hour)</li>
+                <li>mm - 2-digit minute</li>
+                <li>ss - 2-digit second</li>
+                <li>h - 12-hour format</li>
+                <li>A - AM/PM</li>
+            </ul>
+        </li>
+    </ul>
+    
+    <h4>Timezone Support</h4>
+    <p>Custom format supports timezone conversion with options like:</p>
+    <ul>
+        <li><b>auto:</b> Uses local system timezone</li>
+        <li><b>UTC:</b> Coordinated Universal Time</li>
+        <li><b>Europe/Berlin:</b> Central European Time</li>
+        <li><b>America/New_York:</b> Eastern Time</li>
+        <li><b>Asia/Tokyo:</b> Japan Standard Time</li>
     </ul>
     
     <h4>Data Format</h4>

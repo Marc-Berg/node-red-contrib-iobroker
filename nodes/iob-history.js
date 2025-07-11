@@ -5,8 +5,11 @@ module.exports = function (RED) {
     function iobhistory(config) {
         RED.nodes.createNode(this, config);
         const node = this;
+
+        // Use helper to create status functions
         const { setStatus, setError } = NodeHelpers.createStatusHelpers(node);
         
+        // Use helper to validate server config
         const serverConfig = NodeHelpers.validateServerConfig(RED, config, setError);
         if (!serverConfig) return;
 
@@ -34,6 +37,8 @@ module.exports = function (RED) {
             removeBorderValues: config.removeBorderValues || false,
             sortOrder: config.sortOrder || "ascending",
             timestampFormat: config.timestampFormat || "unix",
+            customTimeFormat: config.customTimeFormat || "DD.MM.YYYY HH:mm:ss",
+            timezone: config.timezone || "auto",
             dataFormat: config.dataFormat || "full",
             serverId,
             nodeId: node.id
@@ -137,6 +142,7 @@ module.exports = function (RED) {
             const stepMs = convertStepToMs(msg.step || settings.step, msg.stepUnit || settings.stepUnit);
             const maxEntries = msg.maxEntries || settings.maxEntries;
             const removeBorderValues = msg.removeBorderValues !== undefined ? msg.removeBorderValues : settings.removeBorderValues;
+            const sortOrder = msg.sortOrder || settings.sortOrder;
 
             const options = {
                 start: timeRange.start,
@@ -144,7 +150,8 @@ module.exports = function (RED) {
                 aggregate: aggregate,
                 count: maxEntries,
                 addId: true,
-                removeBorderValues: removeBorderValues
+                removeBorderValues: removeBorderValues,
+                order: sortOrder === 'descending' ? 'desc' : 'asc'
             };
 
             // Add step for aggregation methods that need it
@@ -165,15 +172,98 @@ module.exports = function (RED) {
             return options;
         }
 
+        function formatTimestamp(timestamp, format, customFormat, timezone) {
+            if (!timestamp) return timestamp;
+            
+            const date = new Date(timestamp);
+            
+            switch (format) {
+                case 'unix':
+                    return timestamp; // Keep as-is
+                    
+                case 'iso':
+                    return date.toISOString();
+                    
+                case 'local':
+                    return date.toLocaleString();
+                    
+                case 'custom':
+                    return formatCustomTimestamp(date, customFormat, timezone);
+                    
+                default:
+                    return timestamp;
+            }
+        }
+
+        function formatCustomTimestamp(date, formatString, timezone) {
+            // Get date in specified timezone
+            let targetDate = date;
+            
+            if (timezone && timezone !== 'auto') {
+                try {
+                    // Use Intl.DateTimeFormat for timezone conversion
+                    const options = { timeZone: timezone === 'UTC' ? 'UTC' : timezone };
+                    const parts = new Intl.DateTimeFormat('en-CA', {
+                        ...options,
+                        year: 'numeric',
+                        month: '2-digit',
+                        day: '2-digit',
+                        hour: '2-digit',
+                        minute: '2-digit',
+                        second: '2-digit',
+                        hour12: false
+                    }).formatToParts(date);
+                    
+                    const partsObj = {};
+                    parts.forEach(part => partsObj[part.type] = part.value);
+                    
+                    // Simple format string replacement
+                    return formatString
+                        .replace(/YYYY/g, partsObj.year)
+                        .replace(/MM/g, partsObj.month)
+                        .replace(/DD/g, partsObj.day)
+                        .replace(/HH/g, partsObj.hour)
+                        .replace(/mm/g, partsObj.minute)
+                        .replace(/ss/g, partsObj.second)
+                        .replace(/h/g, partsObj.hour12 || partsObj.hour)
+                        .replace(/A/g, partsObj.dayPeriod || '');
+                } catch (error) {
+                    // Fallback to local timezone
+                    targetDate = date;
+                }
+            }
+            
+            // Simple format string replacement for local timezone
+            const year = targetDate.getFullYear();
+            const month = String(targetDate.getMonth() + 1).padStart(2, '0');
+            const day = String(targetDate.getDate()).padStart(2, '0');
+            const hour = String(targetDate.getHours()).padStart(2, '0');
+            const minute = String(targetDate.getMinutes()).padStart(2, '0');
+            const second = String(targetDate.getSeconds()).padStart(2, '0');
+            const hour12 = targetDate.getHours() % 12 || 12;
+            const ampm = targetDate.getHours() >= 12 ? 'PM' : 'AM';
+            
+            return formatString
+                .replace(/YYYY/g, year)
+                .replace(/MM/g, month)
+                .replace(/DD/g, day)
+                .replace(/HH/g, hour)
+                .replace(/mm/g, minute)
+                .replace(/ss/g, second)
+                .replace(/h/g, hour12)
+                .replace(/A/g, ampm);
+        }
+
         function processDataFormat(data, msg) {
             if (!Array.isArray(data)) return data;
 
             const timestampFormat = msg.timestampFormat || settings.timestampFormat;
+            const customTimeFormat = msg.customTimeFormat || settings.customTimeFormat;
+            const timezone = msg.timezone || settings.timezone;
             const dataFormat = msg.dataFormat || settings.dataFormat;
-            const sortOrder = msg.sortOrder || settings.sortOrder;
 
             // Process each data point
-            let processedData = data.map(point => {
+            const processedData = data.map(point => {
                 let processed;
                 
                 // Data format: simple vs full
@@ -186,30 +276,15 @@ module.exports = function (RED) {
                     processed = { ...point };
                 }
                 
-                // Timestamp format: unix vs iso
-                if (timestampFormat === 'iso' && processed.ts) {
-                    processed.ts = new Date(processed.ts).toISOString();
+                // Timestamp formatting
+                if (processed.ts) {
+                    processed.ts = formatTimestamp(processed.ts, timestampFormat, customTimeFormat, timezone);
                 }
                 
                 return processed;
             });
 
-            // Sort data
-            if (sortOrder === 'descending') {
-                processedData.sort((a, b) => {
-                    const aTime = timestampFormat === 'iso' ? new Date(a.ts).getTime() : a.ts;
-                    const bTime = timestampFormat === 'iso' ? new Date(b.ts).getTime() : b.ts;
-                    return bTime - aTime; // Descending
-                });
-            } else {
-                // Ascending order (default) - most history adapters should already return this
-                processedData.sort((a, b) => {
-                    const aTime = timestampFormat === 'iso' ? new Date(a.ts).getTime() : a.ts;
-                    const bTime = timestampFormat === 'iso' ? new Date(b.ts).getTime() : b.ts;
-                    return aTime - bTime; // Ascending
-                });
-            }
-
+            // Sorting is handled entirely by the ioBroker history adapter via the 'order' parameter
             return processedData;
         }
 
@@ -219,7 +294,10 @@ module.exports = function (RED) {
 
             data.forEach(point => {
                 if (point.ts && point.val !== undefined) {
-                    const timestamp = typeof point.ts === 'string' ? point.ts : new Date(point.ts).toLocaleString();
+                    // For chart labels, use human-readable format regardless of ts format
+                    const timestamp = typeof point.ts === 'string' && !point.ts.match(/^\d+$/) 
+                        ? point.ts  // Already formatted string
+                        : new Date(point.ts).toLocaleString(); // Convert to readable format
                     labels.push(timestamp);
                     values.push(point.val);
                 }
@@ -242,7 +320,10 @@ module.exports = function (RED) {
 
             data.forEach(point => {
                 if (point.ts && point.val !== undefined) {
-                    const timestamp = typeof point.ts === 'string' ? new Date(point.ts).getTime() : point.ts;
+                    // Dashboard2 needs numeric timestamp for x-axis
+                    const timestamp = typeof point.ts === 'string' && !point.ts.match(/^\d+$/)
+                        ? new Date(point.ts).getTime()  // Convert formatted string back to number
+                        : typeof point.ts === 'string' ? parseInt(point.ts) : point.ts;
                     chartData.push({
                         x: timestamp,
                         y: point.val
@@ -502,6 +583,8 @@ module.exports = function (RED) {
                             removeBorderValues: settings.removeBorderValues,
                             sortOrder: settings.sortOrder,
                             timestampFormat: settings.timestampFormat,
+                            customTimeFormat: settings.customTimeFormat,
+                            timezone: settings.timezone,
                             dataFormat: settings.dataFormat
                         }
                     };
