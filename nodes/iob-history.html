@@ -40,12 +40,17 @@ RED.nodes.registerType('iobhistory', {
         step: { value: 300 },
         stepUnit: { value: "seconds" },
         maxEntries: { value: 2000 },
-        queryMode: { value: "parallel" }, // parallel, sequential, drop
+        queryMode: { value: "parallel" },
         outputProperty: { value: "payload" },
         outputFormat: { value: "array" },
         percentile: { value: 50 },
         quantile: { value: 0.5 },
         integralUnit: { value: 3600 },
+        removeBorderValues: { value: false },
+        timestampFormat: { value: "unix" },
+        customTimeFormat: { value: "DD.MM.YYYY HH:mm:ss" },
+        timezone: { value: "auto" },
+        dataFormat: { value: "full" },
         server: { value: "", type: "iob-config" }
     },
     inputs: 1,
@@ -257,13 +262,6 @@ RED.nodes.registerType('iobhistory', {
             $(`.output-format-info.${format}`).show();
         });
         
-        // Output format change handler
-        $('#node-input-outputFormat').on('change', function() {
-            const format = $(this).val();
-            $('.output-format-info').hide();
-            $(`.output-format-info.${format}`).show();
-        });
-        
         // Query mode change handler
         $('#node-input-queryMode').on('change', function() {
             const mode = $(this).val();
@@ -285,11 +283,64 @@ RED.nodes.registerType('iobhistory', {
             infoElement.html(infoText);
         });
         
+        // Data format change handler
+        $('#node-input-dataFormat').on('change', function() {
+            const format = $(this).val();
+            const infoElement = $('#data-format-info');
+            let infoText = '';
+            
+            switch(format) {
+                case 'full':
+                    infoText = '<i class="fa fa-info-circle"></i> <strong>Full Format:</strong> Complete data objects including ts, val, ack, from, q, lc and other metadata.';
+                    break;
+                case 'simple':
+                    infoText = '<i class="fa fa-compress"></i> <strong>Simple Format:</strong> Only timestamp (ts) and value (val) properties. Smaller payload, faster processing.';
+                    break;
+            }
+            
+            infoElement.html(infoText);
+        });
+        
+        // Timestamp format change handler
+        $('#node-input-timestampFormat').on('change', function() {
+            const format = $(this).val();
+            const infoElement = $('#timestamp-format-info');
+            const customConfig = $('#custom-format-config');
+            let infoText = '';
+            
+            switch(format) {
+                case 'unix':
+                    infoText = '<i class="fa fa-clock-o"></i> <strong>Unix Timestamp:</strong> Milliseconds since epoch (e.g., 1609459200000). Standard for JavaScript Date objects.';
+                    customConfig.hide();
+                    break;
+                case 'iso':
+                    infoText = '<i class="fa fa-calendar"></i> <strong>ISO 8601 String:</strong> UTC format (e.g., "2021-01-01T00:00:00.000Z"). International standard.';
+                    customConfig.hide();
+                    break;
+                case 'local':
+                    infoText = '<i class="fa fa-globe"></i> <strong>Local Time:</strong> Formatted in local timezone (e.g., "01.01.2021 01:00:00"). Browser/system timezone.';
+                    customConfig.hide();
+                    break;
+                case 'custom':
+                    infoText = '<i class="fa fa-cog"></i> <strong>Custom Format:</strong> User-defined format with timezone support. Use format tokens like DD, MM, YYYY, HH, mm, ss.';
+                    customConfig.show();
+                    break;
+            }
+            
+            infoElement.html(infoText);
+        });
+        
         // Initialize output format
         $('#node-input-outputFormat').trigger('change');
         
         // Initialize query mode
         $('#node-input-queryMode').trigger('change');
+        
+        // Initialize data format
+        $('#node-input-dataFormat').trigger('change');
+        
+        // Initialize timestamp format
+        $('#node-input-timestampFormat').trigger('change');
         
         // History adapter suggestions
         initializeHistoryAdapterSuggestions();
@@ -466,7 +517,7 @@ RED.nodes.registerType('iobhistory', {
             margin-right: 15px;
         }
         
-        .output-format-info {
+        .output-format-info, .data-format-info, .timestamp-format-info {
             margin-top: 8px;
             padding: 8px;
             background-color: #e8f4fd;
@@ -475,15 +526,19 @@ RED.nodes.registerType('iobhistory', {
             font-size: 12px;
             color: #0c5460;
         }
+        
+        .checkbox-help {
+            margin-top: 4px;
+            color: #6c757d;
+            font-size: 12px;
+        }
     </style>
 
-    <!-- Basic Info -->
     <div class="form-row">
         <label for="node-input-name"><i class="icon-tag"></i> Name</label>
         <input type="text" id="node-input-name" placeholder="Optional node name">
     </div>
 
-    <!-- Tab Navigation -->
     <ul class="node-config-tabs">
         <li data-tab="datasource">📊 Data Source</li>
         <li data-tab="timerange">🕐 Time Range</li>
@@ -491,9 +546,7 @@ RED.nodes.registerType('iobhistory', {
         <li data-tab="output">📤 Output</li>
     </ul>
 
-    <!-- Tab Content -->
     <div class="tab-content">
-        <!-- Data Source Tab -->
         <div class="tab-pane" data-tab="datasource">
             <div class="tab-section">
                 <h4>State Configuration</h4>
@@ -524,7 +577,6 @@ RED.nodes.registerType('iobhistory', {
             </div>
         </div>
 
-        <!-- Time Range Tab -->
         <div class="tab-pane" data-tab="timerange">
             <div class="tab-section">
                 <h4>Time Range Mode</h4>
@@ -536,7 +588,6 @@ RED.nodes.registerType('iobhistory', {
                 <input type="hidden" id="node-input-timeRange">
             </div>
             
-            <!-- Duration Configuration -->
             <div class="time-config-section duration">
                 <div class="tab-section">
                     <h4>Duration Settings</h4>
@@ -553,7 +604,6 @@ RED.nodes.registerType('iobhistory', {
                 </div>
             </div>
             
-            <!-- Absolute Time Configuration -->
             <div class="time-config-section absolute">
                 <div class="tab-section">
                     <h4>Absolute Time Period</h4>
@@ -568,7 +618,6 @@ RED.nodes.registerType('iobhistory', {
                 </div>
             </div>
             
-            <!-- Message Configuration Info -->
             <div class="time-config-section message">
                 <div class="tab-section">
                     <h4>Message Properties</h4>
@@ -584,7 +633,6 @@ RED.nodes.registerType('iobhistory', {
             </div>
         </div>
 
-        <!-- Processing Tab -->
         <div class="tab-pane" data-tab="processing">
             <div class="tab-section">
                 <h4>Query Processing</h4>
@@ -596,7 +644,6 @@ RED.nodes.registerType('iobhistory', {
                         <option value="drop">Drop - Discard new queries while one is running</option>
                     </select>
                     <div id="query-mode-info" style="margin-top: 8px; padding: 8px; background-color: #e8f4fd; border: 1px solid #bee5eb; border-radius: 4px; font-size: 12px; color: #0c5460;">
-                        <!-- Dynamic info will be populated here -->
                     </div>
                 </div>
             </div>
@@ -620,7 +667,6 @@ RED.nodes.registerType('iobhistory', {
                     </select>
                 </div>
                 
-                <!-- Step Configuration -->
                 <div class="form-row" id="step-config" style="display: none;">
                     <label for="node-input-step"><i class="icon-clock-o"></i> Step Interval</label>
                     <input type="number" id="node-input-step" style="width: 100px;" min="1">
@@ -631,7 +677,6 @@ RED.nodes.registerType('iobhistory', {
                     </select>
                 </div>
                 
-                <!-- Aggregation-specific options -->
                 <div class="form-row aggregate-option" id="percentile-config" style="display: none;">
                     <label for="node-input-percentile"><i class="icon-tag"></i> Percentile</label>
                     <input type="number" id="node-input-percentile" style="width: 100px;" min="0" max="100" value="50">
@@ -665,7 +710,6 @@ RED.nodes.registerType('iobhistory', {
             </div>
         </div>
 
-        <!-- Output Tab -->
         <div class="tab-pane" data-tab="output">
             <div class="tab-section">
                 <h4>Output Configuration</h4>
@@ -683,23 +727,75 @@ RED.nodes.registerType('iobhistory', {
                         <option value="statistics">Statistics Summary</option>
                     </select>
                 </div>
+                
+                <div class="output-format-info array" style="display: none;">
+                    <i class="fa fa-info-circle"></i> <strong>Array Format:</strong> Returns raw data points as array: <code>[{val, ts, ack, from}, ...]</code>
+                </div>
+                
+                <div class="output-format-info chart" style="display: none;">
+                    <i class="fa fa-info-circle"></i> <strong>Chart.js Format:</strong> Returns Chart.js dataset: <code>{labels: [], datasets: [{data: [], label: ""}]}</code>
+                </div>
+                
+                <div class="output-format-info dashboard2" style="display: none;">
+                    <i class="fa fa-info-circle"></i> <strong>Dashboard 2.0 Format:</strong> Returns ui-chart compatible data: <code>[{x: timestamp, y: value}, ...]</code> with <code>msg.topic</code> as series name. Configure ui-chart: X="x", Y="y"
+                </div>
+                
+                <div class="output-format-info statistics" style="display: none;">
+                    <i class="fa fa-info-circle"></i> <strong>Statistics Format:</strong> Returns summary: <code>{count, min, max, avg, first, last, timeRange}</code>
+                </div>
             </div>
             
-            <!-- Output Format Information -->
-            <div class="output-format-info array" style="display: none;">
-                <i class="fa fa-info-circle"></i> <strong>Array Format:</strong> Returns raw data points as array: <code>[{val, ts, ack, from}, ...]</code>
-            </div>
-            
-            <div class="output-format-info chart" style="display: none;">
-                <i class="fa fa-info-circle"></i> <strong>Chart.js Format:</strong> Returns Chart.js dataset: <code>{labels: [], datasets: [{data: [], label: ""}]}</code>
-            </div>
-            
-            <div class="output-format-info dashboard2" style="display: none;">
-                <i class="fa fa-info-circle"></i> <strong>Dashboard 2.0 Format:</strong> Returns ui-chart compatible data: <code>[{x: timestamp, y: value}, ...]</code> with <code>msg.topic</code> as series name. Configure ui-chart: X="x", Y="y"
-            </div>
-            
-            <div class="output-format-info statistics" style="display: none;">
-                <i class="fa fa-info-circle"></i> <strong>Statistics Format:</strong> Returns summary: <code>{count, min, max, avg, first, last, timeRange}</code>
+            <div class="tab-section">
+                <h4>Data Format Options</h4>
+                <div class="form-row">
+                    <label for="node-input-removeBorderValues" style="width: auto;">
+                        <input type="checkbox" id="node-input-removeBorderValues" style="width: auto; margin-right: 5px;">
+                        Remove Border Values
+                    </label>
+                    <div class="checkbox-help">
+                        Exclude data points exactly at start/end boundaries
+                    </div>
+                </div>
+                              
+                <div class="form-row">
+                    <label for="node-input-timestampFormat"><i class="icon-clock-o"></i> Timestamp Format</label>
+                    <select id="node-input-timestampFormat" style="width:100%">
+                        <option value="unix">Unix timestamp (milliseconds)</option>
+                        <option value="iso">ISO 8601 string (UTC)</option>
+                        <option value="local">Local time string</option>
+                        <option value="custom">Custom format</option>
+                    </select>
+                    <div id="timestamp-format-info" class="timestamp-format-info" style="display: none;">
+                    </div>
+                </div>
+                
+                <div class="form-row" id="custom-format-config" style="display: none;">
+                    <label for="node-input-customTimeFormat"><i class="icon-clock-o"></i> Custom Format</label>
+                    <input type="text" id="node-input-customTimeFormat" style="width: 200px;" placeholder="DD.MM.YYYY HH:mm:ss">
+                    <select id="node-input-timezone" style="width: 150px; margin-left: 5px;">
+                        <option value="auto">Auto (local)</option>
+                        <option value="UTC">UTC</option>
+                        <option value="Europe/Berlin">Europe/Berlin</option>
+                        <option value="Europe/London">Europe/London</option>
+                        <option value="America/New_York">America/New_York</option>
+                        <option value="America/Los_Angeles">America/Los_Angeles</option>
+                        <option value="Asia/Tokyo">Asia/Tokyo</option>
+                        <option value="Australia/Sydney">Australia/Sydney</option>
+                    </select>
+                    <div style="margin-top: 4px; color: #6c757d; font-size: 12px;">
+                        Format examples: DD.MM.YYYY HH:mm:ss, MM/DD/YYYY h:mm A, YYYY-MM-DD HH:mm
+                    </div>
+                </div>
+                
+                <div class="form-row">
+                    <label for="node-input-dataFormat"><i class="icon-list"></i> Data Format</label>
+                    <select id="node-input-dataFormat" style="width:100%">
+                        <option value="full">Full data (ts, val, ack, from, ...)</option>
+                        <option value="simple">Simple data (ts, val only)</option>
+                    </select>
+                    <div id="data-format-info" class="data-format-info" style="display: none;">
+                    </div>
+                </div>
             </div>
         </div>
     </div>
@@ -743,6 +839,9 @@ RED.nodes.registerType('iobhistory', {
     <ul>
         <li><b>Output Property:</b> Where to place the result in the message</li>
         <li><b>Output Format:</b> Format of the returned data (Array, Chart.js, Dashboard 2.0, Statistics)</li>
+        <li><b>Remove Border Values:</b> Exclude data points exactly at start/end boundaries</li>
+        <li><b>Timestamp Format:</b> Unix timestamp in milliseconds or ISO 8601 string</li>
+        <li><b>Data Format:</b> Full data with all properties or simple data with only ts and val</li>
     </ul>
     
     <h3>Input</h3>
@@ -755,6 +854,11 @@ RED.nodes.registerType('iobhistory', {
         <li><code>msg.aggregate</code> - Override aggregation method</li>
         <li><code>msg.step</code> - Override step interval (in seconds)</li>
         <li><code>msg.maxEntries</code> - Override max entries limit</li>
+        <li><code>msg.removeBorderValues</code> - Override border values setting</li>
+        <li><code>msg.timestampFormat</code> - Override timestamp format ("unix", "iso", "local", "custom")</li>
+        <li><code>msg.customTimeFormat</code> - Custom format string (e.g., "DD.MM.YYYY HH:mm:ss")</li>
+        <li><code>msg.timezone</code> - Timezone for custom format ("auto", "UTC", "Europe/Berlin", etc.)</li>
+        <li><code>msg.dataFormat</code> - Override data format ("full" or "simple")</li>
     </ul>
     
     <h3>Output</h3>
@@ -769,6 +873,46 @@ RED.nodes.registerType('iobhistory', {
         <li><code>msg.queryMode</code> - Query processing mode used</li>
         <li><code>msg.dropped</code> - True if query was dropped (drop mode only)</li>
         <li><code>msg.error</code> - Error message if query failed</li>
+    </ul>
+    
+    <h3>Data Format Options</h3>
+    
+    <h4>Remove Border Values</h4>
+    <p>When enabled, excludes data points that fall exactly on the start or end time boundaries. Useful for preventing duplicate values when querying consecutive time periods.</p>
+        
+    <h4>Timestamp Format</h4>
+    <ul>
+        <li><b>Unix Timestamp:</b> Milliseconds since epoch (e.g., 1609459200000). Standard for JavaScript Date objects.</li>
+        <li><b>ISO 8601 String:</b> UTC format (e.g., "2021-01-01T00:00:00.000Z"). International standard.</li>
+        <li><b>Local Time:</b> Formatted in local timezone (e.g., "01.01.2021 01:00:00"). Uses browser/system timezone.</li>
+        <li><b>Custom Format:</b> User-defined format with timezone support. Format tokens:
+            <ul>
+                <li>YYYY - 4-digit year</li>
+                <li>MM - 2-digit month</li>
+                <li>DD - 2-digit day</li>
+                <li>HH - 2-digit hour (24-hour)</li>
+                <li>mm - 2-digit minute</li>
+                <li>ss - 2-digit second</li>
+                <li>h - 12-hour format</li>
+                <li>A - AM/PM</li>
+            </ul>
+        </li>
+    </ul>
+    
+    <h4>Timezone Support</h4>
+    <p>Custom format supports timezone conversion with options like:</p>
+    <ul>
+        <li><b>auto:</b> Uses local system timezone</li>
+        <li><b>UTC:</b> Coordinated Universal Time</li>
+        <li><b>Europe/Berlin:</b> Central European Time</li>
+        <li><b>America/New_York:</b> Eastern Time</li>
+        <li><b>Asia/Tokyo:</b> Japan Standard Time</li>
+    </ul>
+    
+    <h4>Data Format</h4>
+    <ul>
+        <li><b>Full Format:</b> Complete data objects including ts, val, ack, from, q, lc and other metadata</li>
+        <li><b>Simple Format:</b> Only timestamp (ts) and value (val) properties. Smaller payload, faster processing</li>
     </ul>
     
     <h3>Query Modes</h3>

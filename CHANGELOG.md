@@ -2,6 +2,13 @@
 
 ## [0.13.1] - 2025-xx-xx
 
+### Added
+- **Advanced data format options for iobhistory node**
+  - Remove Border Values option to exclude data points at start/end boundaries
+  - Timestamp Format option: Unix milliseconds vs ISO 8601 string format
+  - Data Format option: Full metadata vs Simple (ts/val only) for reduced payload
+  - All options configurable via node settings and message property overrides
+
 ### Fixed
 - **Event-based graceful OAuth token renewal** - Rewrite of authentication token refresh mechanism
   - Replaced full session rebuild with parallel connection strategy
