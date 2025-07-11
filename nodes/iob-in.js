@@ -5,17 +5,12 @@ module.exports = function (RED) {
     function iobin(config) {
         RED.nodes.createNode(this, config);
         const node = this;
-
-        // Use helper to create status functions
         const { setStatus, setError } = NodeHelpers.createStatusHelpers(node);
-        
-        // Use helper to validate server config
-        const serverConfig = NodeHelpers.validateServerConfig(RED, config, setError);
+                const serverConfig = NodeHelpers.validateServerConfig(RED, config, setError);
         if (!serverConfig) return;
 
         const { globalConfig, connectionDetails, serverId } = serverConfig;
 
-        // Node-specific configuration
         const inputMode = config.inputMode || 'single';
         let stateList = [];
         let subscriptionPattern = '';
@@ -61,9 +56,7 @@ module.exports = function (RED) {
         node.initialValueCount = 0;
         node.expectedInitialValues = 0;
         node.initialGroupedMessageSent = false;
-        
-        // Simple fallback timeout for grouped mode
-        node.fallbackTimeout = null;
+                node.fallbackTimeout = null;
 
         function shouldSendMessage(ack, filter) {
             switch (filter) {
@@ -160,7 +153,6 @@ module.exports = function (RED) {
                 return;
             }
 
-            // Clear any fallback timeout
             if (node.fallbackTimeout) {
                 clearTimeout(node.fallbackTimeout);
                 node.fallbackTimeout = null;
@@ -256,14 +248,10 @@ module.exports = function (RED) {
                         node.initialValueCount++;
 
                         if (settings.outputMode === 'grouped') {
-                            // Simple logic: Wait until we have ALL expected values
                             if (node.initialValueCount >= node.expectedInitialValues) {
-                                // Perfect! All values received - send immediately
                                 sendGroupedInitialMessage();
                             } else {
-                                // Not all values yet - set fallback timeout only once
                                 if (!node.fallbackTimeout) {
-                                    // Generous fallback timeout: 2 seconds max wait
                                     node.fallbackTimeout = setTimeout(() => {
                                         node.warn(`Fallback timeout: sending grouped message with ${node.currentStateValues.size}/${node.expectedInitialValues} states`);
                                         sendGroupedInitialMessage();
@@ -284,7 +272,6 @@ module.exports = function (RED) {
                 }
             };
 
-            // Custom status texts for input subscription
             const statusTexts = {
                 ready: isMultipleStates 
                     ? `${stateList.length} states (${settings.outputMode})`
@@ -294,7 +281,6 @@ module.exports = function (RED) {
                 disconnected: "Disconnected"
             };
 
-            // Use helper for subscription event handling
             const baseCallback = NodeHelpers.createSubscriptionEventCallback(
                 node, 
                 setStatus,
@@ -304,10 +290,8 @@ module.exports = function (RED) {
                 statusTexts
             );
 
-            // Merge the callbacks
             Object.assign(callback, baseCallback);
 
-            // Override reconnect to handle resubscription with state reset
             callback.onReconnect = function() {
                 node.isSubscribed = false;
                 node.initialValueCount = 0;
@@ -375,7 +359,6 @@ module.exports = function (RED) {
                     node.fallbackTimeout = null;
                 }
 
-                // Handle config changes using helper
                 await NodeHelpers.handleConfigChange(node, config, RED, settings);
 
                 await subscribeToStates();
