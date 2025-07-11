@@ -47,7 +47,6 @@ RED.nodes.registerType('iobhistory', {
         quantile: { value: 0.5 },
         integralUnit: { value: 3600 },
         removeBorderValues: { value: false },
-        sortOrder: { value: "ascending" },
         timestampFormat: { value: "unix" },
         customTimeFormat: { value: "DD.MM.YYYY HH:mm:ss" },
         timezone: { value: "auto" },
@@ -757,15 +756,7 @@ RED.nodes.registerType('iobhistory', {
                         Exclude data points exactly at start/end boundaries
                     </div>
                 </div>
-                
-                <div class="form-row">
-                    <label for="node-input-sortOrder"><i class="icon-sort"></i> Sort Order</label>
-                    <select id="node-input-sortOrder" style="width:100%">
-                        <option value="ascending">Ascending (oldest first)</option>
-                        <option value="descending">Descending (newest first)</option>
-                    </select>
-                </div>
-                
+                              
                 <div class="form-row">
                     <label for="node-input-timestampFormat"><i class="icon-clock-o"></i> Timestamp Format</label>
                     <select id="node-input-timestampFormat" style="width:100%">
@@ -849,7 +840,6 @@ RED.nodes.registerType('iobhistory', {
         <li><b>Output Property:</b> Where to place the result in the message</li>
         <li><b>Output Format:</b> Format of the returned data (Array, Chart.js, Dashboard 2.0, Statistics)</li>
         <li><b>Remove Border Values:</b> Exclude data points exactly at start/end boundaries</li>
-        <li><b>Sort Order:</b> Sort results ascending (oldest first) or descending (newest first)</li>
         <li><b>Timestamp Format:</b> Unix timestamp in milliseconds or ISO 8601 string</li>
         <li><b>Data Format:</b> Full data with all properties or simple data with only ts and val</li>
     </ul>
@@ -865,7 +855,6 @@ RED.nodes.registerType('iobhistory', {
         <li><code>msg.step</code> - Override step interval (in seconds)</li>
         <li><code>msg.maxEntries</code> - Override max entries limit</li>
         <li><code>msg.removeBorderValues</code> - Override border values setting</li>
-        <li><code>msg.sortOrder</code> - Override sort order ("ascending" or "descending")</li>
         <li><code>msg.timestampFormat</code> - Override timestamp format ("unix", "iso", "local", "custom")</li>
         <li><code>msg.customTimeFormat</code> - Custom format string (e.g., "DD.MM.YYYY HH:mm:ss")</li>
         <li><code>msg.timezone</code> - Timezone for custom format ("auto", "UTC", "Europe/Berlin", etc.)</li>
@@ -890,13 +879,7 @@ RED.nodes.registerType('iobhistory', {
     
     <h4>Remove Border Values</h4>
     <p>When enabled, excludes data points that fall exactly on the start or end time boundaries. Useful for preventing duplicate values when querying consecutive time periods.</p>
-    
-    <h4>Sort Order</h4>
-    <ul>
-        <li><b>Ascending:</b> Oldest data points first (chronological order)</li>
-        <li><b>Descending:</b> Newest data points first (reverse chronological order)</li>
-    </ul>
-    
+        
     <h4>Timestamp Format</h4>
     <ul>
         <li><b>Unix Timestamp:</b> Milliseconds since epoch (e.g., 1609459200000). Standard for JavaScript Date objects.</li>

@@ -6,16 +6,13 @@ module.exports = function (RED) {
         RED.nodes.createNode(this, config);
         const node = this;
 
-        // Use helper to create status functions
         const { setStatus, setError } = NodeHelpers.createStatusHelpers(node);
         
-        // Use helper to validate server config
         const serverConfig = NodeHelpers.validateServerConfig(RED, config, setError);
         if (!serverConfig) return;
 
         const { globalConfig, connectionDetails, serverId } = serverConfig;
 
-        // Configuration with defaults
         const settings = {
             stateId: config.stateId?.trim() || "",
             historyAdapter: config.historyAdapter || "history.0",
@@ -35,7 +32,6 @@ module.exports = function (RED) {
             integralUnit: parseInt(config.integralUnit) || 3600,
             queryMode: config.queryMode || "parallel",
             removeBorderValues: config.removeBorderValues || false,
-            sortOrder: config.sortOrder || "ascending",
             timestampFormat: config.timestampFormat || "unix",
             customTimeFormat: config.customTimeFormat || "DD.MM.YYYY HH:mm:ss",
             timezone: config.timezone || "auto",
@@ -46,26 +42,19 @@ module.exports = function (RED) {
 
         node.currentConfig = connectionDetails;
         node.isInitialized = false;
-
-        // Query management state
         node.isQueryRunning = false;
         node.queryQueue = [];
         node.currentQueryId = 0;
 
         function parseTimeInput(timeInput) {
             if (!timeInput) return null;
-
-            // If it's already a number (timestamp), return it
             if (typeof timeInput === 'number') {
-                return timeInput > 10000000000 ? timeInput : timeInput * 1000; // Convert seconds to ms if needed
+                return timeInput > 10000000000 ? timeInput : timeInput * 1000;
             }
-
-            // If it's a string, try to parse it
             if (typeof timeInput === 'string') {
                 const parsed = new Date(timeInput).getTime();
                 return isNaN(parsed) ? null : parsed;
             }
-
             return null;
         }
 
@@ -79,7 +68,6 @@ module.exports = function (RED) {
                     start = now - durationMs;
                     end = now;
                     break;
-
                 case 'absolute':
                     start = parseTimeInput(settings.startTime);
                     end = parseTimeInput(settings.endTime);
@@ -87,25 +75,20 @@ module.exports = function (RED) {
                         throw new Error('Invalid absolute start or end time');
                     }
                     break;
-
                 case 'message':
                     start = parseTimeInput(msg.start);
                     end = parseTimeInput(msg.end);
-
                     if (!start) {
                         throw new Error('msg.start is required for message time range mode');
                     }
-
                     if (!end && msg.duration) {
                         const durationMs = convertDurationToMs(parseFloat(msg.duration), 'hours');
                         end = start + durationMs;
                     }
-
                     if (!end) {
                         end = now;
                     }
                     break;
-
                 default:
                     throw new Error(`Invalid time range mode: ${settings.timeRange}`);
             }
@@ -142,7 +125,6 @@ module.exports = function (RED) {
             const stepMs = convertStepToMs(msg.step || settings.step, msg.stepUnit || settings.stepUnit);
             const maxEntries = msg.maxEntries || settings.maxEntries;
             const removeBorderValues = msg.removeBorderValues !== undefined ? msg.removeBorderValues : settings.removeBorderValues;
-            const sortOrder = msg.sortOrder || settings.sortOrder;
 
             const options = {
                 start: timeRange.start,
@@ -150,17 +132,14 @@ module.exports = function (RED) {
                 aggregate: aggregate,
                 count: maxEntries,
                 addId: true,
-                removeBorderValues: removeBorderValues,
-                order: sortOrder === 'descending' ? 'desc' : 'asc'
+                removeBorderValues: removeBorderValues
             };
 
-            // Add step for aggregation methods that need it
             const needsStep = ['average', 'min', 'max', 'total', 'count', 'percentile', 'quantile', 'integral'];
             if (needsStep.includes(aggregate)) {
                 options.step = stepMs;
             }
 
-            // Add special parameters
             if (aggregate === 'percentile') {
                 options.percentile = msg.percentile || settings.percentile;
             } else if (aggregate === 'quantile') {
@@ -179,29 +158,23 @@ module.exports = function (RED) {
             
             switch (format) {
                 case 'unix':
-                    return timestamp; // Keep as-is
-                    
+                    return timestamp;
                 case 'iso':
                     return date.toISOString();
-                    
                 case 'local':
                     return date.toLocaleString();
-                    
                 case 'custom':
                     return formatCustomTimestamp(date, customFormat, timezone);
-                    
                 default:
                     return timestamp;
             }
         }
 
         function formatCustomTimestamp(date, formatString, timezone) {
-            // Get date in specified timezone
             let targetDate = date;
             
             if (timezone && timezone !== 'auto') {
                 try {
-                    // Use Intl.DateTimeFormat for timezone conversion
                     const options = { timeZone: timezone === 'UTC' ? 'UTC' : timezone };
                     const parts = new Intl.DateTimeFormat('en-CA', {
                         ...options,
@@ -217,7 +190,6 @@ module.exports = function (RED) {
                     const partsObj = {};
                     parts.forEach(part => partsObj[part.type] = part.value);
                     
-                    // Simple format string replacement
                     return formatString
                         .replace(/YYYY/g, partsObj.year)
                         .replace(/MM/g, partsObj.month)
@@ -228,12 +200,10 @@ module.exports = function (RED) {
                         .replace(/h/g, partsObj.hour12 || partsObj.hour)
                         .replace(/A/g, partsObj.dayPeriod || '');
                 } catch (error) {
-                    // Fallback to local timezone
                     targetDate = date;
                 }
             }
             
-            // Simple format string replacement for local timezone
             const year = targetDate.getFullYear();
             const month = String(targetDate.getMonth() + 1).padStart(2, '0');
             const day = String(targetDate.getDate()).padStart(2, '0');
@@ -262,11 +232,9 @@ module.exports = function (RED) {
             const timezone = msg.timezone || settings.timezone;
             const dataFormat = msg.dataFormat || settings.dataFormat;
 
-            // Process each data point
             const processedData = data.map(point => {
                 let processed;
                 
-                // Data format: simple vs full
                 if (dataFormat === 'simple') {
                     processed = {
                         ts: point.ts,
@@ -276,7 +244,6 @@ module.exports = function (RED) {
                     processed = { ...point };
                 }
                 
-                // Timestamp formatting
                 if (processed.ts) {
                     processed.ts = formatTimestamp(processed.ts, timestampFormat, customTimeFormat, timezone);
                 }
@@ -284,7 +251,6 @@ module.exports = function (RED) {
                 return processed;
             });
 
-            // Sorting is handled entirely by the ioBroker history adapter via the 'order' parameter
             return processedData;
         }
 
@@ -294,10 +260,9 @@ module.exports = function (RED) {
 
             data.forEach(point => {
                 if (point.ts && point.val !== undefined) {
-                    // For chart labels, use human-readable format regardless of ts format
                     const timestamp = typeof point.ts === 'string' && !point.ts.match(/^\d+$/) 
-                        ? point.ts  // Already formatted string
-                        : new Date(point.ts).toLocaleString(); // Convert to readable format
+                        ? point.ts
+                        : new Date(point.ts).toLocaleString();
                     labels.push(timestamp);
                     values.push(point.val);
                 }
@@ -320,9 +285,8 @@ module.exports = function (RED) {
 
             data.forEach(point => {
                 if (point.ts && point.val !== undefined) {
-                    // Dashboard2 needs numeric timestamp for x-axis
                     const timestamp = typeof point.ts === 'string' && !point.ts.match(/^\d+$/)
-                        ? new Date(point.ts).getTime()  // Convert formatted string back to number
+                        ? new Date(point.ts).getTime()
                         : typeof point.ts === 'string' ? parseInt(point.ts) : point.ts;
                     chartData.push({
                         x: timestamp,
@@ -384,7 +348,6 @@ module.exports = function (RED) {
                 };
             }
 
-            // Process data format first (this handles sorting, timestamp format, and data structure)
             const processedData = processDataFormat(data, msg);
 
             let output;
@@ -415,13 +378,11 @@ module.exports = function (RED) {
                 formatOptions: {
                     timestampFormat: msg.timestampFormat || settings.timestampFormat,
                     dataFormat: msg.dataFormat || settings.dataFormat,
-                    sortOrder: msg.sortOrder || settings.sortOrder,
                     removeBorderValues: msg.removeBorderValues !== undefined ? msg.removeBorderValues : settings.removeBorderValues
                 }
             };
         }
 
-        // Query queue management functions
         function getQueueStatusText() {
             if (settings.queryMode === 'parallel') {
                 return node.isQueryRunning ? "Processing..." : "Ready";
@@ -430,7 +391,7 @@ module.exports = function (RED) {
                     return `Queue: ${node.queryQueue.length}`;
                 }
                 return node.isQueryRunning ? "Processing..." : "Ready";
-            } else { // drop mode
+            } else {
                 return node.isQueryRunning ? "Running (dropping)" : "Ready";
             }
         }
@@ -454,37 +415,27 @@ module.exports = function (RED) {
 
             switch (settings.queryMode) {
                 case 'parallel':
-                    // Execute immediately
                     executeQuery(queueItem);
                     break;
-
                 case 'sequential':
                     node.queryQueue.push(queueItem);
                     updateQueueStatus();
-                    
-                    // Process queue if not already running
                     if (!node.isQueryRunning) {
                         processNextQuery();
                     }
                     break;
-
                 case 'drop':
                     if (node.isQueryRunning) {
-                        // Drop the query
                         node.warn(`Query ${queryId} dropped - another query is running`);
-                        
-                        // Send error response
                         const errorMsg = { ...queueItem.msg };
                         errorMsg.error = "Query dropped - another query was already running";
                         errorMsg[settings.outputProperty] = null;
                         errorMsg.queryTime = 0;
                         errorMsg.dropped = true;
-                        
                         queueItem.send(errorMsg);
                         queueItem.done && queueItem.done(new Error("Query dropped"));
                         return;
                     } else {
-                        // Execute immediately
                         executeQuery(queueItem);
                     }
                     break;
@@ -496,7 +447,6 @@ module.exports = function (RED) {
                 updateQueueStatus();
                 return;
             }
-
             const nextQuery = node.queryQueue.shift();          
             updateQueueStatus();
             executeQuery(nextQuery);
@@ -519,7 +469,6 @@ module.exports = function (RED) {
                 );
 
                 const queryTime = Date.now() - queryStartTime;
-
                 const outputFormat = msg.outputFormat || settings.outputFormat;
                 const formattedResult = formatOutput(result, stateId, queryOptions, queryTime, outputFormat, msg);
 
@@ -552,7 +501,6 @@ module.exports = function (RED) {
                 node.isQueryRunning = false;
 
                 if (settings.queryMode === 'sequential') {
-                    // Small delay to prevent overwhelming the system
                     setTimeout(() => {
                         processNextQuery();
                     }, 50);
@@ -581,7 +529,6 @@ module.exports = function (RED) {
                         currentQueryId: node.currentQueryId,
                         formatOptions: {
                             removeBorderValues: settings.removeBorderValues,
-                            sortOrder: settings.sortOrder,
                             timestampFormat: settings.timestampFormat,
                             customTimeFormat: settings.customTimeFormat,
                             timezone: settings.timezone,
@@ -598,13 +545,9 @@ module.exports = function (RED) {
                 }
 
                 try {
-                    // Calculate time range
                     const timeRange = calculateTimeRange(msg);
-
-                    // Build query options
                     const queryOptions = buildQueryOptions(msg, timeRange);
 
-                    // Enqueue the query based on the selected mode
                     enqueueQuery({
                         msg: msg,
                         send: send,
@@ -618,7 +561,6 @@ module.exports = function (RED) {
                     setError("Query error", "Query error");
                     node.error(`History query preparation failed for ${stateId}: ${queryError.message}`);
 
-                    // Send error message with details
                     msg.error = queryError.message;
                     msg[settings.outputProperty] = null;
                     msg.stateId = stateId;
