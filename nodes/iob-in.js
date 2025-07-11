@@ -5,17 +5,12 @@ module.exports = function (RED) {
     function iobin(config) {
         RED.nodes.createNode(this, config);
         const node = this;
-
-        // Use helper to create status functions
         const { setStatus, setError } = NodeHelpers.createStatusHelpers(node);
-        
-        // Use helper to validate server config
-        const serverConfig = NodeHelpers.validateServerConfig(RED, config, setError);
+                const serverConfig = NodeHelpers.validateServerConfig(RED, config, setError);
         if (!serverConfig) return;
 
         const { globalConfig, connectionDetails, serverId } = serverConfig;
 
-        // Node-specific configuration
         const inputMode = config.inputMode || 'single';
         let stateList = [];
         let subscriptionPattern = '';
@@ -61,6 +56,7 @@ module.exports = function (RED) {
         node.initialValueCount = 0;
         node.expectedInitialValues = 0;
         node.initialGroupedMessageSent = false;
+                node.fallbackTimeout = null;
 
         function shouldSendMessage(ack, filter) {
             switch (filter) {
@@ -152,6 +148,25 @@ module.exports = function (RED) {
             return message;
         }
 
+        function sendGroupedInitialMessage() {
+            if (node.initialGroupedMessageSent) {
+                return;
+            }
+
+            if (node.fallbackTimeout) {
+                clearTimeout(node.fallbackTimeout);
+                node.fallbackTimeout = null;
+            }
+
+            const message = createGroupedMessage(null, null, true);
+            node.send(message);
+            node.initialGroupedMessageSent = true;
+            
+            const currentCount = node.currentStateValues.size;
+            const expectedCount = node.expectedInitialValues;
+            node.debug(`Grouped initial message sent with ${currentCount}/${expectedCount} states`);
+        }
+
         function onStateChange(stateId, state) {
             try {
                 if (!state || state.val === undefined) {
@@ -233,18 +248,15 @@ module.exports = function (RED) {
                         node.initialValueCount++;
 
                         if (settings.outputMode === 'grouped') {
-                            if (node.initialValueCount >= node.expectedInitialValues && !node.initialGroupedMessageSent) {
-                                const message = createGroupedMessage(null, null, true);
-                                node.send(message);
-                                node.initialGroupedMessageSent = true;
-                            } else if (node.initialValueCount === 1) {
-                                setTimeout(() => {
-                                    if (!node.initialGroupedMessageSent && node.currentStateValues.size > 0) {
-                                        const message = createGroupedMessage(null, null, true);
-                                        node.send(message);
-                                        node.initialGroupedMessageSent = true;
-                                    }
-                                }, 3000);
+                            if (node.initialValueCount >= node.expectedInitialValues) {
+                                sendGroupedInitialMessage();
+                            } else {
+                                if (!node.fallbackTimeout) {
+                                    node.fallbackTimeout = setTimeout(() => {
+                                        node.warn(`Fallback timeout: sending grouped message with ${node.currentStateValues.size}/${node.expectedInitialValues} states`);
+                                        sendGroupedInitialMessage();
+                                    }, 2000);
+                                }
                             }
                         } else {
                             const message = createMessage(stateId, state, true);
@@ -260,7 +272,6 @@ module.exports = function (RED) {
                 }
             };
 
-            // Custom status texts for input subscription
             const statusTexts = {
                 ready: isMultipleStates 
                     ? `${stateList.length} states (${settings.outputMode})`
@@ -270,7 +281,6 @@ module.exports = function (RED) {
                 disconnected: "Disconnected"
             };
 
-            // Use helper for subscription event handling
             const baseCallback = NodeHelpers.createSubscriptionEventCallback(
                 node, 
                 setStatus,
@@ -280,14 +290,16 @@ module.exports = function (RED) {
                 statusTexts
             );
 
-            // Merge the callbacks
             Object.assign(callback, baseCallback);
 
-            // Override reconnect to handle resubscription with state reset
             callback.onReconnect = function() {
                 node.isSubscribed = false;
                 node.initialValueCount = 0;
                 node.initialGroupedMessageSent = false;
+                if (node.fallbackTimeout) {
+                    clearTimeout(node.fallbackTimeout);
+                    node.fallbackTimeout = null;
+                }
                 setStatus("yellow", "ring", "Resubscribing...");
             };
 
@@ -342,8 +354,11 @@ module.exports = function (RED) {
                 node.subscribedStates.clear();
                 node.initialValueCount = 0;
                 node.initialGroupedMessageSent = false;
+                if (node.fallbackTimeout) {
+                    clearTimeout(node.fallbackTimeout);
+                    node.fallbackTimeout = null;
+                }
 
-                // Handle config changes using helper
                 await NodeHelpers.handleConfigChange(node, config, RED, settings);
 
                 await subscribeToStates();
@@ -380,6 +395,11 @@ module.exports = function (RED) {
         node.on("close", async function (removed, done) {
             node.isInitialized = false;
             node.isSubscribed = false;
+            
+            if (node.fallbackTimeout) {
+                clearTimeout(node.fallbackTimeout);
+                node.fallbackTimeout = null;
+            }
 
             try {
                 if (isMultipleStates) {

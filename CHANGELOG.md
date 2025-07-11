@@ -14,6 +14,18 @@
   - Replaced full session rebuild with parallel connection strategy
   - Implemented subscribe-first overlap strategy to prevent missed events during token renewal
 
+### Changed
+- **Optimized multiple states subscription performance for iob-in**
+  - Parallel subscription processing with concurrency limit
+  - Optimized initial value loading with parallel batches for faster startup
+  - Enhanced error handling with per-state retry logic
+
+### Changed  
+- **Improved grouped mode logic for iob-in**
+  - Fallback timeout if some states are unavailable or do not exist
+  - Cleaner handling of initial grouped messages
+  - Better performance for large multiple state configurations
+
 ## [0.13.0] - 2025-07-10
 
 ### Changed
