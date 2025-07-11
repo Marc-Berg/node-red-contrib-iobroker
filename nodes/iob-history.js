@@ -5,11 +5,8 @@ module.exports = function (RED) {
     function iobhistory(config) {
         RED.nodes.createNode(this, config);
         const node = this;
-
-        // Use helper to create status functions
         const { setStatus, setError } = NodeHelpers.createStatusHelpers(node);
         
-        // Use helper to validate server config
         const serverConfig = NodeHelpers.validateServerConfig(RED, config, setError);
         if (!serverConfig) return;
 
@@ -34,6 +31,10 @@ module.exports = function (RED) {
             quantile: parseFloat(config.quantile) || 0.5,
             integralUnit: parseInt(config.integralUnit) || 3600,
             queryMode: config.queryMode || "parallel",
+            removeBorderValues: config.removeBorderValues || false,
+            sortOrder: config.sortOrder || "ascending",
+            timestampFormat: config.timestampFormat || "unix",
+            dataFormat: config.dataFormat || "full",
             serverId,
             nodeId: node.id
         };
@@ -45,8 +46,6 @@ module.exports = function (RED) {
         node.isQueryRunning = false;
         node.queryQueue = [];
         node.currentQueryId = 0;
-
-        // Log configuration
 
         function parseTimeInput(timeInput) {
             if (!timeInput) return null;
@@ -137,6 +136,7 @@ module.exports = function (RED) {
             const aggregate = msg.aggregate || settings.aggregate;
             const stepMs = convertStepToMs(msg.step || settings.step, msg.stepUnit || settings.stepUnit);
             const maxEntries = msg.maxEntries || settings.maxEntries;
+            const removeBorderValues = msg.removeBorderValues !== undefined ? msg.removeBorderValues : settings.removeBorderValues;
 
             const options = {
                 start: timeRange.start,
@@ -144,7 +144,7 @@ module.exports = function (RED) {
                 aggregate: aggregate,
                 count: maxEntries,
                 addId: true,
-                removeBorderValues: false
+                removeBorderValues: removeBorderValues
             };
 
             // Add step for aggregation methods that need it
@@ -165,13 +165,62 @@ module.exports = function (RED) {
             return options;
         }
 
+        function processDataFormat(data, msg) {
+            if (!Array.isArray(data)) return data;
+
+            const timestampFormat = msg.timestampFormat || settings.timestampFormat;
+            const dataFormat = msg.dataFormat || settings.dataFormat;
+            const sortOrder = msg.sortOrder || settings.sortOrder;
+
+            // Process each data point
+            let processedData = data.map(point => {
+                let processed;
+                
+                // Data format: simple vs full
+                if (dataFormat === 'simple') {
+                    processed = {
+                        ts: point.ts,
+                        val: point.val
+                    };
+                } else {
+                    processed = { ...point };
+                }
+                
+                // Timestamp format: unix vs iso
+                if (timestampFormat === 'iso' && processed.ts) {
+                    processed.ts = new Date(processed.ts).toISOString();
+                }
+                
+                return processed;
+            });
+
+            // Sort data
+            if (sortOrder === 'descending') {
+                processedData.sort((a, b) => {
+                    const aTime = timestampFormat === 'iso' ? new Date(a.ts).getTime() : a.ts;
+                    const bTime = timestampFormat === 'iso' ? new Date(b.ts).getTime() : b.ts;
+                    return bTime - aTime; // Descending
+                });
+            } else {
+                // Ascending order (default) - most history adapters should already return this
+                processedData.sort((a, b) => {
+                    const aTime = timestampFormat === 'iso' ? new Date(a.ts).getTime() : a.ts;
+                    const bTime = timestampFormat === 'iso' ? new Date(b.ts).getTime() : b.ts;
+                    return aTime - bTime; // Ascending
+                });
+            }
+
+            return processedData;
+        }
+
         function formatForChart(data, stateId) {
             const labels = [];
             const values = [];
 
             data.forEach(point => {
                 if (point.ts && point.val !== undefined) {
-                    labels.push(new Date(point.ts).toLocaleString());
+                    const timestamp = typeof point.ts === 'string' ? point.ts : new Date(point.ts).toLocaleString();
+                    labels.push(timestamp);
                     values.push(point.val);
                 }
             });
@@ -193,8 +242,9 @@ module.exports = function (RED) {
 
             data.forEach(point => {
                 if (point.ts && point.val !== undefined) {
+                    const timestamp = typeof point.ts === 'string' ? new Date(point.ts).getTime() : point.ts;
                     chartData.push({
-                        x: point.ts,
+                        x: timestamp,
                         y: point.val
                     });
                 }
@@ -240,7 +290,7 @@ module.exports = function (RED) {
             };
         }
 
-        function formatOutput(data, stateId, queryOptions, queryTime, format) {
+        function formatOutput(data, stateId, queryOptions, queryTime, format, msg) {
             if (!data || !Array.isArray(data)) {
                 return {
                     [settings.outputProperty]: null,
@@ -253,20 +303,23 @@ module.exports = function (RED) {
                 };
             }
 
+            // Process data format first (this handles sorting, timestamp format, and data structure)
+            const processedData = processDataFormat(data, msg);
+
             let output;
             switch (format) {
                 case 'chart':
-                    output = formatForChart(data, stateId);
+                    output = formatForChart(processedData, stateId);
                     break;
                 case 'dashboard2':
-                    output = formatForDashboard2(data, stateId);
+                    output = formatForDashboard2(processedData, stateId);
                     break;
                 case 'statistics':
-                    output = formatStatistics(data, queryOptions);
+                    output = formatStatistics(processedData, queryOptions);
                     break;
                 case 'array':
                 default:
-                    output = data;
+                    output = processedData;
                     break;
             }
 
@@ -276,8 +329,14 @@ module.exports = function (RED) {
                 adapter: settings.historyAdapter,
                 queryOptions: queryOptions,
                 queryTime: queryTime,
-                count: data.length,
-                timestamp: Date.now()
+                count: processedData.length,
+                timestamp: Date.now(),
+                formatOptions: {
+                    timestampFormat: msg.timestampFormat || settings.timestampFormat,
+                    dataFormat: msg.dataFormat || settings.dataFormat,
+                    sortOrder: msg.sortOrder || settings.sortOrder,
+                    removeBorderValues: msg.removeBorderValues !== undefined ? msg.removeBorderValues : settings.removeBorderValues
+                }
             };
         }
 
@@ -381,7 +440,7 @@ module.exports = function (RED) {
                 const queryTime = Date.now() - queryStartTime;
 
                 const outputFormat = msg.outputFormat || settings.outputFormat;
-                const formattedResult = formatOutput(result, stateId, queryOptions, queryTime, outputFormat);
+                const formattedResult = formatOutput(result, stateId, queryOptions, queryTime, outputFormat, msg);
 
                 Object.assign(msg, formattedResult);
                 msg.queryId = id;
@@ -390,7 +449,6 @@ module.exports = function (RED) {
                 if (outputFormat === 'dashboard2') {
                     msg.topic = stateId;
                 }
-
 
                 send(msg);
                 done && done();
@@ -439,7 +497,13 @@ module.exports = function (RED) {
                         queryMode: settings.queryMode,
                         isQueryRunning: node.isQueryRunning,
                         queueLength: node.queryQueue.length,
-                        currentQueryId: node.currentQueryId
+                        currentQueryId: node.currentQueryId,
+                        formatOptions: {
+                            removeBorderValues: settings.removeBorderValues,
+                            sortOrder: settings.sortOrder,
+                            timestampFormat: settings.timestampFormat,
+                            dataFormat: settings.dataFormat
+                        }
                     };
                     send(msg);
                     return;
