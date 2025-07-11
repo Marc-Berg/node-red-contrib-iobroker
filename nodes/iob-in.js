@@ -61,6 +61,9 @@ module.exports = function (RED) {
         node.initialValueCount = 0;
         node.expectedInitialValues = 0;
         node.initialGroupedMessageSent = false;
+        
+        // Simple fallback timeout for grouped mode
+        node.fallbackTimeout = null;
 
         function shouldSendMessage(ack, filter) {
             switch (filter) {
@@ -152,6 +155,26 @@ module.exports = function (RED) {
             return message;
         }
 
+        function sendGroupedInitialMessage() {
+            if (node.initialGroupedMessageSent) {
+                return;
+            }
+
+            // Clear any fallback timeout
+            if (node.fallbackTimeout) {
+                clearTimeout(node.fallbackTimeout);
+                node.fallbackTimeout = null;
+            }
+
+            const message = createGroupedMessage(null, null, true);
+            node.send(message);
+            node.initialGroupedMessageSent = true;
+            
+            const currentCount = node.currentStateValues.size;
+            const expectedCount = node.expectedInitialValues;
+            node.debug(`Grouped initial message sent with ${currentCount}/${expectedCount} states`);
+        }
+
         function onStateChange(stateId, state) {
             try {
                 if (!state || state.val === undefined) {
@@ -233,18 +256,19 @@ module.exports = function (RED) {
                         node.initialValueCount++;
 
                         if (settings.outputMode === 'grouped') {
-                            if (node.initialValueCount >= node.expectedInitialValues && !node.initialGroupedMessageSent) {
-                                const message = createGroupedMessage(null, null, true);
-                                node.send(message);
-                                node.initialGroupedMessageSent = true;
-                            } else if (node.initialValueCount === 1) {
-                                setTimeout(() => {
-                                    if (!node.initialGroupedMessageSent && node.currentStateValues.size > 0) {
-                                        const message = createGroupedMessage(null, null, true);
-                                        node.send(message);
-                                        node.initialGroupedMessageSent = true;
-                                    }
-                                }, 3000);
+                            // Simple logic: Wait until we have ALL expected values
+                            if (node.initialValueCount >= node.expectedInitialValues) {
+                                // Perfect! All values received - send immediately
+                                sendGroupedInitialMessage();
+                            } else {
+                                // Not all values yet - set fallback timeout only once
+                                if (!node.fallbackTimeout) {
+                                    // Generous fallback timeout: 2 seconds max wait
+                                    node.fallbackTimeout = setTimeout(() => {
+                                        node.warn(`Fallback timeout: sending grouped message with ${node.currentStateValues.size}/${node.expectedInitialValues} states`);
+                                        sendGroupedInitialMessage();
+                                    }, 2000);
+                                }
                             }
                         } else {
                             const message = createMessage(stateId, state, true);
@@ -288,6 +312,10 @@ module.exports = function (RED) {
                 node.isSubscribed = false;
                 node.initialValueCount = 0;
                 node.initialGroupedMessageSent = false;
+                if (node.fallbackTimeout) {
+                    clearTimeout(node.fallbackTimeout);
+                    node.fallbackTimeout = null;
+                }
                 setStatus("yellow", "ring", "Resubscribing...");
             };
 
@@ -342,6 +370,10 @@ module.exports = function (RED) {
                 node.subscribedStates.clear();
                 node.initialValueCount = 0;
                 node.initialGroupedMessageSent = false;
+                if (node.fallbackTimeout) {
+                    clearTimeout(node.fallbackTimeout);
+                    node.fallbackTimeout = null;
+                }
 
                 // Handle config changes using helper
                 await NodeHelpers.handleConfigChange(node, config, RED, settings);
@@ -380,6 +412,11 @@ module.exports = function (RED) {
         node.on("close", async function (removed, done) {
             node.isInitialized = false;
             node.isSubscribed = false;
+            
+            if (node.fallbackTimeout) {
+                clearTimeout(node.fallbackTimeout);
+                node.fallbackTimeout = null;
+            }
 
             try {
                 if (isMultipleStates) {
