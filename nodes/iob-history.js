@@ -34,7 +34,8 @@ module.exports = function (RED) {
             removeBorderValues: config.removeBorderValues || false,
             timestampFormat: config.timestampFormat || "unix",
             customTimeFormat: config.customTimeFormat || "DD.MM.YYYY HH:mm:ss",
-            timezone: config.timezone || "auto",
+            timezone: config.timezone || "Berlin",
+            customTimezone: config.customTimezone?.trim() || "",
             dataFormat: config.dataFormat || "full",
             serverId,
             nodeId: node.id
@@ -151,7 +152,32 @@ module.exports = function (RED) {
             return options;
         }
 
-        function formatTimestamp(timestamp, format, customFormat, timezone) {
+        function resolveTimezone(timezone, customTimezone) {
+            switch (timezone) {
+                case 'auto':
+                    return 'auto';
+                case 'Berlin':
+                    return 'Europe/Berlin';
+                case 'custom':
+                    if (!customTimezone) {
+                        throw new Error('Custom timezone specified but no timezone value provided');
+                    }
+                    return validateTimezone(customTimezone);
+                default:
+                    return 'auto';
+            }
+        }
+
+        function validateTimezone(timezone) {
+            try {
+                Intl.DateTimeFormat(undefined, { timeZone: timezone });
+                return timezone;
+            } catch (error) {
+                throw new Error(`Invalid timezone: ${timezone}`);
+            }
+        }
+
+        function formatTimestamp(timestamp, format, customFormat, timezone, customTimezone) {
             if (!timestamp) return timestamp;
             
             const date = new Date(timestamp);
@@ -162,7 +188,8 @@ module.exports = function (RED) {
                 case 'iso':
                     return date.toISOString();
                 case 'custom':
-                    return formatCustomTimestamp(date, customFormat, timezone);
+                    const resolvedTimezone = resolveTimezone(timezone, customTimezone);
+                    return formatCustomTimestamp(date, customFormat, resolvedTimezone);
                 default:
                     return timestamp;
             }
@@ -206,6 +233,7 @@ module.exports = function (RED) {
             const timestampFormat = msg.timestampFormat || settings.timestampFormat;
             const customTimeFormat = msg.customTimeFormat || settings.customTimeFormat;
             const timezone = msg.timezone || settings.timezone;
+            const customTimezone = msg.customTimezone || settings.customTimezone;
             const dataFormat = msg.dataFormat || settings.dataFormat;
 
             const processedData = data.map(point => {
@@ -221,7 +249,7 @@ module.exports = function (RED) {
                 }
                 
                 if (processed.ts) {
-                    processed.ts = formatTimestamp(processed.ts, timestampFormat, customTimeFormat, timezone);
+                    processed.ts = formatTimestamp(processed.ts, timestampFormat, customTimeFormat, timezone, customTimezone);
                 }
                 
                 return processed;
@@ -354,7 +382,9 @@ module.exports = function (RED) {
                 formatOptions: {
                     timestampFormat: msg.timestampFormat || settings.timestampFormat,
                     dataFormat: msg.dataFormat || settings.dataFormat,
-                    removeBorderValues: msg.removeBorderValues !== undefined ? msg.removeBorderValues : settings.removeBorderValues
+                    removeBorderValues: msg.removeBorderValues !== undefined ? msg.removeBorderValues : settings.removeBorderValues,
+                    timezone: msg.timezone || settings.timezone,
+                    customTimezone: msg.customTimezone || settings.customTimezone
                 }
             };
         }
@@ -508,6 +538,7 @@ module.exports = function (RED) {
                             timestampFormat: settings.timestampFormat,
                             customTimeFormat: settings.customTimeFormat,
                             timezone: settings.timezone,
+                            customTimezone: settings.customTimezone,
                             dataFormat: settings.dataFormat
                         }
                     };

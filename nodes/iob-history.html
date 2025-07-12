@@ -49,7 +49,8 @@ RED.nodes.registerType('iobhistory', {
         removeBorderValues: { value: false },
         timestampFormat: { value: "unix" },
         customTimeFormat: { value: "DD.MM.YYYY HH:mm:ss" },
-        timezone: { value: "auto" },
+        timezone: { value: "Berlin" },
+        customTimezone: { value: "" },
         dataFormat: { value: "full" },
         server: { value: "", type: "iob-config" }
     },
@@ -306,25 +307,44 @@ RED.nodes.registerType('iobhistory', {
             const format = $(this).val();
             const infoElement = $('#timestamp-format-info');
             const customConfig = $('#custom-format-config');
+            const timezoneConfig = $('#timezone-config');
             let infoText = '';
             
             switch(format) {
                 case 'unix':
                     infoText = '<i class="fa fa-clock-o"></i> <strong>Unix Timestamp:</strong> Milliseconds since epoch (e.g., 1609459200000). Standard for JavaScript Date objects.';
                     customConfig.hide();
+                    timezoneConfig.hide();
                     break;
                 case 'iso':
                     infoText = '<i class="fa fa-calendar"></i> <strong>ISO 8601 String:</strong> UTC format (e.g., "2021-01-01T00:00:00.000Z"). International standard.';
                     customConfig.hide();
+                    timezoneConfig.hide();
                     break;
                 case 'custom':
                     infoText = '<i class="fa fa-cog"></i> <strong>Custom Format:</strong> User-defined format with timezone support. Use format tokens like DD, MM, YYYY, HH, mm, ss.';
                     customConfig.show();
+                    timezoneConfig.show();
                     break;
             }
             
             infoElement.html(infoText);
         });
+        
+        // Timezone selection change handler
+        $('#node-input-timezone').on('change', function() {
+            const timezone = $(this).val();
+            const customTimezoneConfig = $('#custom-timezone-config');
+            
+            if (timezone === 'custom') {
+                customTimezoneConfig.show();
+            } else {
+                customTimezoneConfig.hide();
+            }
+        });
+        
+        // Initialize timezone selection
+        $('#node-input-timezone').trigger('change');
         
         // Initialize output format
         $('#node-input-outputFormat').trigger('change');
@@ -524,6 +544,12 @@ RED.nodes.registerType('iobhistory', {
         }
         
         .checkbox-help {
+            margin-top: 4px;
+            color: #6c757d;
+            font-size: 12px;
+        }
+        
+        .timezone-help {
             margin-top: 4px;
             color: #6c757d;
             font-size: 12px;
@@ -767,18 +793,25 @@ RED.nodes.registerType('iobhistory', {
                 <div class="form-row" id="custom-format-config" style="display: none;">
                     <label for="node-input-customTimeFormat"><i class="icon-clock-o"></i> Custom Format</label>
                     <input type="text" id="node-input-customTimeFormat" style="width: 200px;" placeholder="DD.MM.YYYY HH:mm:ss">
-                    <select id="node-input-timezone" style="width: 150px; margin-left: 5px;">
-                        <option value="auto">Auto (local)</option>
-                        <option value="UTC">UTC</option>
-                        <option value="Europe/Berlin">Europe/Berlin</option>
-                        <option value="Europe/London">Europe/London</option>
-                        <option value="America/New_York">America/New_York</option>
-                        <option value="America/Los_Angeles">America/Los_Angeles</option>
-                        <option value="Asia/Tokyo">Asia/Tokyo</option>
-                        <option value="Australia/Sydney">Australia/Sydney</option>
-                    </select>
                     <div style="margin-top: 4px; color: #6c757d; font-size: 12px;">
                         Format examples: DD.MM.YYYY HH:mm:ss, MM/DD/YYYY h:mm A, YYYY-MM-DD HH:mm
+                    </div>
+                </div>
+                
+                <div class="form-row" id="timezone-config" style="display: none;">
+                    <label for="node-input-timezone"><i class="icon-globe"></i> Timezone</label>
+                    <select id="node-input-timezone" style="width: 200px;">
+                        <option value="auto">Auto (local)</option>
+                        <option value="Berlin">Berlin (Europe/Berlin)</option>
+                        <option value="custom">Custom...</option>
+                    </select>
+                </div>
+                
+                <div class="form-row" id="custom-timezone-config" style="display: none;">
+                    <label for="node-input-customTimezone"><i class="icon-edit"></i> Custom Timezone</label>
+                    <input type="text" id="node-input-customTimezone" style="width: 200px;" placeholder="e.g. America/New_York, Asia/Tokyo, UTC">
+                    <div class="timezone-help">
+                        Enter IANA timezone name (e.g., America/New_York, Asia/Tokyo, Europe/London, UTC)
                     </div>
                 </div>
                 
@@ -852,7 +885,8 @@ RED.nodes.registerType('iobhistory', {
         <li><code>msg.removeBorderValues</code> - Override border values setting</li>
         <li><code>msg.timestampFormat</code> - Override timestamp format ("unix", "iso", "custom")</li>
         <li><code>msg.customTimeFormat</code> - Custom format string (e.g., "DD.MM.YYYY HH:mm:ss")</li>
-        <li><code>msg.timezone</code> - Timezone for custom format ("auto", "UTC", "Europe/Berlin", etc.)</li>
+        <li><code>msg.timezone</code> - Timezone ("auto", "Berlin", "custom")</li>
+        <li><code>msg.customTimezone</code> - Custom IANA timezone name (e.g., "America/New_York")</li>
         <li><code>msg.dataFormat</code> - Override data format ("full" or "simple")</li>
     </ul>
     
@@ -868,6 +902,22 @@ RED.nodes.registerType('iobhistory', {
         <li><code>msg.queryMode</code> - Query processing mode used</li>
         <li><code>msg.dropped</code> - True if query was dropped (drop mode only)</li>
         <li><code>msg.error</code> - Error message if query failed</li>
+    </ul>
+    
+    <h3>Timezone Options</h3>
+    <ul>
+        <li><b>Auto:</b> Uses the local timezone of the Node-RED server</li>
+        <li><b>Berlin (Europe/Berlin):</b> Central European Time with automatic DST handling</li>
+        <li><b>Custom:</b> Enter any IANA timezone name for global timezone support</li>
+    </ul>
+    
+    <h4>Popular IANA Timezone Examples</h4>
+    <ul>
+        <li><b>Europe:</b> Europe/London, Europe/Paris, Europe/Rome, Europe/Zurich</li>
+        <li><b>Americas:</b> America/New_York, America/Los_Angeles, America/Chicago, America/Toronto</li>
+        <li><b>Asia:</b> Asia/Tokyo, Asia/Shanghai, Asia/Kolkata, Asia/Dubai</li>
+        <li><b>Others:</b> Australia/Sydney, Africa/Cairo, Pacific/Auckland</li>
+        <li><b>UTC:</b> Use "UTC" for Coordinated Universal Time</li>
     </ul>
     
     <h3>Timestamp Format Options</h3>
