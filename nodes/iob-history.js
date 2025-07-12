@@ -34,7 +34,8 @@ module.exports = function (RED) {
             removeBorderValues: config.removeBorderValues || false,
             timestampFormat: config.timestampFormat || "unix",
             customTimeFormat: config.customTimeFormat || "DD.MM.YYYY HH:mm:ss",
-            timezone: config.timezone || "auto",
+            timezone: config.timezone || "Berlin",
+            customTimezone: config.customTimezone?.trim() || "",
             dataFormat: config.dataFormat || "full",
             serverId,
             nodeId: node.id
@@ -151,7 +152,32 @@ module.exports = function (RED) {
             return options;
         }
 
-        function formatTimestamp(timestamp, format, customFormat, timezone) {
+        function resolveTimezone(timezone, customTimezone) {
+            switch (timezone) {
+                case 'auto':
+                    return 'auto';
+                case 'Berlin':
+                    return 'Europe/Berlin';
+                case 'custom':
+                    if (!customTimezone) {
+                        throw new Error('Custom timezone specified but no timezone value provided');
+                    }
+                    return validateTimezone(customTimezone);
+                default:
+                    return 'auto';
+            }
+        }
+
+        function validateTimezone(timezone) {
+            try {
+                Intl.DateTimeFormat(undefined, { timeZone: timezone });
+                return timezone;
+            } catch (error) {
+                throw new Error(`Invalid timezone: ${timezone}`);
+            }
+        }
+
+        function formatTimestamp(timestamp, format, customFormat, timezone, customTimezone) {
             if (!timestamp) return timestamp;
             
             const date = new Date(timestamp);
@@ -161,67 +187,44 @@ module.exports = function (RED) {
                     return timestamp;
                 case 'iso':
                     return date.toISOString();
-                case 'local':
-                    return date.toLocaleString();
                 case 'custom':
-                    return formatCustomTimestamp(date, customFormat, timezone);
+                    const resolvedTimezone = resolveTimezone(timezone, customTimezone);
+                    return formatCustomTimestamp(date, customFormat, resolvedTimezone);
                 default:
                     return timestamp;
             }
         }
 
         function formatCustomTimestamp(date, formatString, timezone) {
-            let targetDate = date;
+            const options = parseFormatString(formatString);
             
             if (timezone && timezone !== 'auto') {
-                try {
-                    const options = { timeZone: timezone === 'UTC' ? 'UTC' : timezone };
-                    const parts = new Intl.DateTimeFormat('en-CA', {
-                        ...options,
-                        year: 'numeric',
-                        month: '2-digit',
-                        day: '2-digit',
-                        hour: '2-digit',
-                        minute: '2-digit',
-                        second: '2-digit',
-                        hour12: false
-                    }).formatToParts(date);
-                    
-                    const partsObj = {};
-                    parts.forEach(part => partsObj[part.type] = part.value);
-                    
-                    return formatString
-                        .replace(/YYYY/g, partsObj.year)
-                        .replace(/MM/g, partsObj.month)
-                        .replace(/DD/g, partsObj.day)
-                        .replace(/HH/g, partsObj.hour)
-                        .replace(/mm/g, partsObj.minute)
-                        .replace(/ss/g, partsObj.second)
-                        .replace(/h/g, partsObj.hour12 || partsObj.hour)
-                        .replace(/A/g, partsObj.dayPeriod || '');
-                } catch (error) {
-                    targetDate = date;
-                }
+                options.timeZone = timezone === 'UTC' ? 'UTC' : timezone;
             }
             
-            const year = targetDate.getFullYear();
-            const month = String(targetDate.getMonth() + 1).padStart(2, '0');
-            const day = String(targetDate.getDate()).padStart(2, '0');
-            const hour = String(targetDate.getHours()).padStart(2, '0');
-            const minute = String(targetDate.getMinutes()).padStart(2, '0');
-            const second = String(targetDate.getSeconds()).padStart(2, '0');
-            const hour12 = targetDate.getHours() % 12 || 12;
-            const ampm = targetDate.getHours() >= 12 ? 'PM' : 'AM';
+            const locale = formatString.includes('.') ? 'de-DE' : 'en-US';
+            return new Intl.DateTimeFormat(locale, options).format(date);
+        }
+
+        function parseFormatString(formatString) {
+            const options = {};
             
-            return formatString
-                .replace(/YYYY/g, year)
-                .replace(/MM/g, month)
-                .replace(/DD/g, day)
-                .replace(/HH/g, hour)
-                .replace(/mm/g, minute)
-                .replace(/ss/g, second)
-                .replace(/h/g, hour12)
-                .replace(/A/g, ampm);
+            if (formatString.includes('YYYY')) options.year = 'numeric';
+            if (formatString.includes('MM')) options.month = '2-digit';
+            if (formatString.includes('DD')) options.day = '2-digit';
+            
+            if (formatString.includes('HH')) {
+                options.hour = '2-digit';
+                options.hour12 = false;
+            } else if (formatString.includes('h')) {
+                options.hour = 'numeric';
+                options.hour12 = true;
+            }
+            
+            if (formatString.includes('mm')) options.minute = '2-digit';
+            if (formatString.includes('ss')) options.second = '2-digit';
+            
+            return options;
         }
 
         function processDataFormat(data, msg) {
@@ -230,6 +233,7 @@ module.exports = function (RED) {
             const timestampFormat = msg.timestampFormat || settings.timestampFormat;
             const customTimeFormat = msg.customTimeFormat || settings.customTimeFormat;
             const timezone = msg.timezone || settings.timezone;
+            const customTimezone = msg.customTimezone || settings.customTimezone;
             const dataFormat = msg.dataFormat || settings.dataFormat;
 
             const processedData = data.map(point => {
@@ -245,7 +249,7 @@ module.exports = function (RED) {
                 }
                 
                 if (processed.ts) {
-                    processed.ts = formatTimestamp(processed.ts, timestampFormat, customTimeFormat, timezone);
+                    processed.ts = formatTimestamp(processed.ts, timestampFormat, customTimeFormat, timezone, customTimezone);
                 }
                 
                 return processed;
@@ -378,7 +382,9 @@ module.exports = function (RED) {
                 formatOptions: {
                     timestampFormat: msg.timestampFormat || settings.timestampFormat,
                     dataFormat: msg.dataFormat || settings.dataFormat,
-                    removeBorderValues: msg.removeBorderValues !== undefined ? msg.removeBorderValues : settings.removeBorderValues
+                    removeBorderValues: msg.removeBorderValues !== undefined ? msg.removeBorderValues : settings.removeBorderValues,
+                    timezone: msg.timezone || settings.timezone,
+                    customTimezone: msg.customTimezone || settings.customTimezone
                 }
             };
         }
@@ -532,6 +538,7 @@ module.exports = function (RED) {
                             timestampFormat: settings.timestampFormat,
                             customTimeFormat: settings.customTimeFormat,
                             timezone: settings.timezone,
+                            customTimezone: settings.customTimezone,
                             dataFormat: settings.dataFormat
                         }
                     };

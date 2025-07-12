@@ -26,6 +26,12 @@
   - Cleaner handling of initial grouped messages
   - Better performance for large multiple state configurations
 
+### Fixed
+- **Improved timestamp formatting in iobhistory node**
+  - Removed redundant "Local Time" format option - use "Custom Format" with "auto" timezone instead
+  - Simplified custom timestamp formatting using native Intl.DateTimeFormat
+  - Enhanced timezone handling with better internationalization support
+
 ## [0.13.0] - 2025-07-10
 
 ### Changed
