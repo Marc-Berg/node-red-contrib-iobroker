@@ -317,10 +317,6 @@ RED.nodes.registerType('iobhistory', {
                     infoText = '<i class="fa fa-calendar"></i> <strong>ISO 8601 String:</strong> UTC format (e.g., "2021-01-01T00:00:00.000Z"). International standard.';
                     customConfig.hide();
                     break;
-                case 'local':
-                    infoText = '<i class="fa fa-globe"></i> <strong>Local Time:</strong> Formatted in local timezone (e.g., "01.01.2021 01:00:00"). Browser/system timezone.';
-                    customConfig.hide();
-                    break;
                 case 'custom':
                     infoText = '<i class="fa fa-cog"></i> <strong>Custom Format:</strong> User-defined format with timezone support. Use format tokens like DD, MM, YYYY, HH, mm, ss.';
                     customConfig.show();
@@ -762,7 +758,6 @@ RED.nodes.registerType('iobhistory', {
                     <select id="node-input-timestampFormat" style="width:100%">
                         <option value="unix">Unix timestamp (milliseconds)</option>
                         <option value="iso">ISO 8601 string (UTC)</option>
-                        <option value="local">Local time string</option>
                         <option value="custom">Custom format</option>
                     </select>
                     <div id="timestamp-format-info" class="timestamp-format-info" style="display: none;">
@@ -840,7 +835,7 @@ RED.nodes.registerType('iobhistory', {
         <li><b>Output Property:</b> Where to place the result in the message</li>
         <li><b>Output Format:</b> Format of the returned data (Array, Chart.js, Dashboard 2.0, Statistics)</li>
         <li><b>Remove Border Values:</b> Exclude data points exactly at start/end boundaries</li>
-        <li><b>Timestamp Format:</b> Unix timestamp in milliseconds or ISO 8601 string</li>
+        <li><b>Timestamp Format:</b> Unix timestamp, ISO 8601 string, or custom format</li>
         <li><b>Data Format:</b> Full data with all properties or simple data with only ts and val</li>
     </ul>
     
@@ -855,7 +850,7 @@ RED.nodes.registerType('iobhistory', {
         <li><code>msg.step</code> - Override step interval (in seconds)</li>
         <li><code>msg.maxEntries</code> - Override max entries limit</li>
         <li><code>msg.removeBorderValues</code> - Override border values setting</li>
-        <li><code>msg.timestampFormat</code> - Override timestamp format ("unix", "iso", "local", "custom")</li>
+        <li><code>msg.timestampFormat</code> - Override timestamp format ("unix", "iso", "custom")</li>
         <li><code>msg.customTimeFormat</code> - Custom format string (e.g., "DD.MM.YYYY HH:mm:ss")</li>
         <li><code>msg.timezone</code> - Timezone for custom format ("auto", "UTC", "Europe/Berlin", etc.)</li>
         <li><code>msg.dataFormat</code> - Override data format ("full" or "simple")</li>
@@ -875,16 +870,10 @@ RED.nodes.registerType('iobhistory', {
         <li><code>msg.error</code> - Error message if query failed</li>
     </ul>
     
-    <h3>Data Format Options</h3>
-    
-    <h4>Remove Border Values</h4>
-    <p>When enabled, excludes data points that fall exactly on the start or end time boundaries. Useful for preventing duplicate values when querying consecutive time periods.</p>
-        
-    <h4>Timestamp Format</h4>
+    <h3>Timestamp Format Options</h3>
     <ul>
         <li><b>Unix Timestamp:</b> Milliseconds since epoch (e.g., 1609459200000). Standard for JavaScript Date objects.</li>
         <li><b>ISO 8601 String:</b> UTC format (e.g., "2021-01-01T00:00:00.000Z"). International standard.</li>
-        <li><b>Local Time:</b> Formatted in local timezone (e.g., "01.01.2021 01:00:00"). Uses browser/system timezone.</li>
         <li><b>Custom Format:</b> User-defined format with timezone support. Format tokens:
             <ul>
                 <li>YYYY - 4-digit year</li>
@@ -897,22 +886,6 @@ RED.nodes.registerType('iobhistory', {
                 <li>A - AM/PM</li>
             </ul>
         </li>
-    </ul>
-    
-    <h4>Timezone Support</h4>
-    <p>Custom format supports timezone conversion with options like:</p>
-    <ul>
-        <li><b>auto:</b> Uses local system timezone</li>
-        <li><b>UTC:</b> Coordinated Universal Time</li>
-        <li><b>Europe/Berlin:</b> Central European Time</li>
-        <li><b>America/New_York:</b> Eastern Time</li>
-        <li><b>Asia/Tokyo:</b> Japan Standard Time</li>
-    </ul>
-    
-    <h4>Data Format</h4>
-    <ul>
-        <li><b>Full Format:</b> Complete data objects including ts, val, ack, from, q, lc and other metadata</li>
-        <li><b>Simple Format:</b> Only timestamp (ts) and value (val) properties. Smaller payload, faster processing</li>
     </ul>
     
     <h3>Query Modes</h3>

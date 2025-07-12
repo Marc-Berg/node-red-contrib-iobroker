@@ -161,8 +161,6 @@ module.exports = function (RED) {
                     return timestamp;
                 case 'iso':
                     return date.toISOString();
-                case 'local':
-                    return date.toLocaleString();
                 case 'custom':
                     return formatCustomTimestamp(date, customFormat, timezone);
                 default:
@@ -171,57 +169,35 @@ module.exports = function (RED) {
         }
 
         function formatCustomTimestamp(date, formatString, timezone) {
-            let targetDate = date;
+            const options = parseFormatString(formatString);
             
             if (timezone && timezone !== 'auto') {
-                try {
-                    const options = { timeZone: timezone === 'UTC' ? 'UTC' : timezone };
-                    const parts = new Intl.DateTimeFormat('en-CA', {
-                        ...options,
-                        year: 'numeric',
-                        month: '2-digit',
-                        day: '2-digit',
-                        hour: '2-digit',
-                        minute: '2-digit',
-                        second: '2-digit',
-                        hour12: false
-                    }).formatToParts(date);
-                    
-                    const partsObj = {};
-                    parts.forEach(part => partsObj[part.type] = part.value);
-                    
-                    return formatString
-                        .replace(/YYYY/g, partsObj.year)
-                        .replace(/MM/g, partsObj.month)
-                        .replace(/DD/g, partsObj.day)
-                        .replace(/HH/g, partsObj.hour)
-                        .replace(/mm/g, partsObj.minute)
-                        .replace(/ss/g, partsObj.second)
-                        .replace(/h/g, partsObj.hour12 || partsObj.hour)
-                        .replace(/A/g, partsObj.dayPeriod || '');
-                } catch (error) {
-                    targetDate = date;
-                }
+                options.timeZone = timezone === 'UTC' ? 'UTC' : timezone;
             }
             
-            const year = targetDate.getFullYear();
-            const month = String(targetDate.getMonth() + 1).padStart(2, '0');
-            const day = String(targetDate.getDate()).padStart(2, '0');
-            const hour = String(targetDate.getHours()).padStart(2, '0');
-            const minute = String(targetDate.getMinutes()).padStart(2, '0');
-            const second = String(targetDate.getSeconds()).padStart(2, '0');
-            const hour12 = targetDate.getHours() % 12 || 12;
-            const ampm = targetDate.getHours() >= 12 ? 'PM' : 'AM';
+            const locale = formatString.includes('.') ? 'de-DE' : 'en-US';
+            return new Intl.DateTimeFormat(locale, options).format(date);
+        }
+
+        function parseFormatString(formatString) {
+            const options = {};
             
-            return formatString
-                .replace(/YYYY/g, year)
-                .replace(/MM/g, month)
-                .replace(/DD/g, day)
-                .replace(/HH/g, hour)
-                .replace(/mm/g, minute)
-                .replace(/ss/g, second)
-                .replace(/h/g, hour12)
-                .replace(/A/g, ampm);
+            if (formatString.includes('YYYY')) options.year = 'numeric';
+            if (formatString.includes('MM')) options.month = '2-digit';
+            if (formatString.includes('DD')) options.day = '2-digit';
+            
+            if (formatString.includes('HH')) {
+                options.hour = '2-digit';
+                options.hour12 = false;
+            } else if (formatString.includes('h')) {
+                options.hour = 'numeric';
+                options.hour12 = true;
+            }
+            
+            if (formatString.includes('mm')) options.minute = '2-digit';
+            if (formatString.includes('ss')) options.second = '2-digit';
+            
+            return options;
         }
 
         function processDataFormat(data, msg) {
