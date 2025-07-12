@@ -322,7 +322,7 @@ RED.nodes.registerType('iobhistory', {
                     timezoneConfig.hide();
                     break;
                 case 'custom':
-                    infoText = '<i class="fa fa-cog"></i> <strong>Custom Format:</strong> User-defined format with timezone support. Use format tokens like DD, MM, YYYY, HH, mm, ss.';
+                    infoText = '<i class="fa fa-cog"></i> <strong>Custom Format:</strong> User-defined format with timezone support. Uses day.js format tokens like DD, MM, YYYY, HH, mm, ss.';
                     customConfig.show();
                     timezoneConfig.show();
                     break;
@@ -794,7 +794,7 @@ RED.nodes.registerType('iobhistory', {
                     <label for="node-input-customTimeFormat"><i class="icon-clock-o"></i> Custom Format</label>
                     <input type="text" id="node-input-customTimeFormat" style="width: 200px;" placeholder="DD.MM.YYYY HH:mm:ss">
                     <div style="margin-top: 4px; color: #6c757d; font-size: 12px;">
-                        Format examples: DD.MM.YYYY HH:mm:ss, MM/DD/YYYY h:mm A, YYYY-MM-DD HH:mm
+                        Format examples: DD.MM.YYYY HH:mm:ss, MM/DD/YYYY h:mm A, YYYY-MM-DD HH:mm, DD/MM/YY HH:mm
                     </div>
                 </div>
                 
@@ -926,14 +926,14 @@ RED.nodes.registerType('iobhistory', {
         <li><b>ISO 8601 String:</b> UTC format (e.g., "2021-01-01T00:00:00.000Z"). International standard.</li>
         <li><b>Custom Format:</b> User-defined format with timezone support. Format tokens:
             <ul>
-                <li>YYYY - 4-digit year</li>
-                <li>MM - 2-digit month</li>
-                <li>DD - 2-digit day</li>
-                <li>HH - 2-digit hour (24-hour)</li>
-                <li>mm - 2-digit minute</li>
-                <li>ss - 2-digit second</li>
-                <li>h - 12-hour format</li>
-                <li>A - AM/PM</li>
+                <li>YYYY - 4-digit year, YY - 2-digit year</li>
+                <li>MM - 2-digit month, M - month</li>
+                <li>DD - 2-digit day, D - day</li>
+                <li>HH - 2-digit hour (24-hour), H - hour (24-hour)</li>
+                <li>mm - 2-digit minute, m - minute</li>
+                <li>ss - 2-digit second, s - second</li>
+                <li>h - 12-hour format, hh - 2-digit 12-hour</li>
+                <li>A - AM/PM, a - am/pm</li>
             </ul>
         </li>
     </ul>

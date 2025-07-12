@@ -1,5 +1,11 @@
 const connectionManager = require('../lib/manager/websocket-manager');
 const { NodeHelpers } = require('../lib/utils/node-helpers');
+const dayjs = require('dayjs');
+const utc = require('dayjs/plugin/utc');
+const timezone = require('dayjs/plugin/timezone');
+
+dayjs.extend(utc);
+dayjs.extend(timezone);
 
 module.exports = function (RED) {
     function iobhistory(config) {
@@ -170,7 +176,7 @@ module.exports = function (RED) {
 
         function validateTimezone(timezone) {
             try {
-                Intl.DateTimeFormat(undefined, { timeZone: timezone });
+                dayjs().tz(timezone);
                 return timezone;
             } catch (error) {
                 throw new Error(`Invalid timezone: ${timezone}`);
@@ -196,35 +202,17 @@ module.exports = function (RED) {
         }
 
         function formatCustomTimestamp(date, formatString, timezone) {
-            const options = parseFormatString(formatString);
+            let dayjsDate = dayjs(date);
             
             if (timezone && timezone !== 'auto') {
-                options.timeZone = timezone === 'UTC' ? 'UTC' : timezone;
+                try {
+                    dayjsDate = dayjsDate.tz(timezone);
+                } catch (error) {
+                    throw new Error(`Invalid timezone: ${timezone}`);
+                }
             }
             
-            const locale = formatString.includes('.') ? 'de-DE' : 'en-US';
-            return new Intl.DateTimeFormat(locale, options).format(date);
-        }
-
-        function parseFormatString(formatString) {
-            const options = {};
-            
-            if (formatString.includes('YYYY')) options.year = 'numeric';
-            if (formatString.includes('MM')) options.month = '2-digit';
-            if (formatString.includes('DD')) options.day = '2-digit';
-            
-            if (formatString.includes('HH')) {
-                options.hour = '2-digit';
-                options.hour12 = false;
-            } else if (formatString.includes('h')) {
-                options.hour = 'numeric';
-                options.hour12 = true;
-            }
-            
-            if (formatString.includes('mm')) options.minute = '2-digit';
-            if (formatString.includes('ss')) options.second = '2-digit';
-            
-            return options;
+            return dayjsDate.format(formatString);
         }
 
         function processDataFormat(data, msg) {
