@@ -27,7 +27,8 @@
   },
   "dependencies": {
     "express": "^4.19.0",
-    "ws": "^8.18.0"
+    "ws": "^8.18.0",
+    "dayjs": "^1.0.0"
   },
   "peerDependencies": {
     "node-red": ">=2.0.0"
