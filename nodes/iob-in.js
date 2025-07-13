@@ -6,7 +6,8 @@ module.exports = function (RED) {
         RED.nodes.createNode(this, config);
         const node = this;
         const { setStatus, setError } = NodeHelpers.createStatusHelpers(node);
-                const serverConfig = NodeHelpers.validateServerConfig(RED, config, setError);
+        
+        const serverConfig = NodeHelpers.validateServerConfig(RED, config, setError);
         if (!serverConfig) return;
 
         const { globalConfig, connectionDetails, serverId } = serverConfig;
@@ -40,6 +41,7 @@ module.exports = function (RED) {
             ackFilter: config.ackFilter || "both",
             sendInitialValue: config.sendInitialValue && !isWildcardPattern,
             outputMode: config.outputMode || "individual",
+            filterMode: config.filterMode || "all",
             serverId,
             nodeId: node.id,
             useWildcard: isWildcardPattern,
@@ -56,13 +58,99 @@ module.exports = function (RED) {
         node.initialValueCount = 0;
         node.expectedInitialValues = 0;
         node.initialGroupedMessageSent = false;
-                node.fallbackTimeout = null;
+        node.fallbackTimeout = null;
+        
+        // Store previous values for change filtering
+        node.previous = new Map();
 
         function shouldSendMessage(ack, filter) {
             switch (filter) {
                 case "ack": return ack === true;
                 case "noack": return ack === false;
                 default: return true;
+            }
+        }
+
+        function shouldSendByValue(stateId, newValue, filterMode, isInitialValue = false) {
+            // Initial values always bypass change filter
+            if (isInitialValue) {
+                return true;
+            }
+            
+            if (filterMode !== 'changes-only' && filterMode !== 'changes-smart') {
+                return true; // Send all changes when not in change-filter mode
+            }
+
+            // Get previous value
+            const previousValue = node.previous.get(stateId);
+            
+            // For standard change filter: if no previous value exists, always send (first change)
+            if (filterMode === 'changes-only' && previousValue === undefined) {
+                return true;
+            }
+            
+            // For smart change filter or when previous value exists: only send if changed
+            // Deep comparison for objects and arrays
+            if (typeof newValue === 'object' && newValue !== null) {
+                const currentJSON = JSON.stringify(newValue);
+                const previousJSON = previousValue !== undefined ? JSON.stringify(previousValue) : undefined;
+                return currentJSON !== previousJSON;
+            }
+            
+            // Simple comparison for primitive values
+            return newValue !== previousValue;
+        }
+
+        function updatePreviousValue(stateId, value) {
+            if (settings.filterMode === 'changes-only' || settings.filterMode === 'changes-smart') {
+                // Store a deep copy for objects, or the value directly for primitives
+                if (typeof value === 'object' && value !== null) {
+                    try {
+                        node.previous.set(stateId, JSON.parse(JSON.stringify(value)));
+                    } catch (e) {
+                        // Fallback for non-serializable objects
+                        node.previous.set(stateId, value);
+                    }
+                } else {
+                    node.previous.set(stateId, value);
+                }
+            }
+        }
+
+        // Smart Change Filter: Pre-load current values to initialize baseline
+        async function initializeSmartChangeFilter() {
+            if (settings.filterMode !== 'changes-smart') {
+                return;
+            }
+
+            try {
+                if (isMultipleStates) {
+                    // Initialize multiple states
+                    for (const stateId of stateList) {
+                        try {
+                            const state = await connectionManager.getState(settings.serverId, stateId);
+                            if (state && state.val !== undefined) {
+                                updatePreviousValue(stateId, state.val);
+                                node.debug(`Smart filter: Pre-loaded ${stateId} = ${state.val}`);
+                            }
+                        } catch (error) {
+                            node.debug(`Smart filter: Could not load ${stateId}: ${error.message}`);
+                        }
+                    }
+                } else if (!isWildcardPattern) {
+                    // Initialize single state (not wildcards)
+                    try {
+                        const state = await connectionManager.getState(settings.serverId, subscriptionPattern);
+                        if (state && state.val !== undefined) {
+                            updatePreviousValue(subscriptionPattern, state.val);
+                            node.debug(`Smart filter: Pre-loaded ${subscriptionPattern} = ${state.val}`);
+                        }
+                    } catch (error) {
+                        node.debug(`Smart filter: Could not load ${subscriptionPattern}: ${error.message}`);
+                    }
+                }
+            } catch (error) {
+                node.warn(`Smart change filter initialization failed: ${error.message}`);
             }
         }
 
@@ -167,7 +255,7 @@ module.exports = function (RED) {
             node.debug(`Grouped initial message sent with ${currentCount}/${expectedCount} states`);
         }
 
-        function onStateChange(stateId, state) {
+        function onStateChange(stateId, state, isInitialValue = false) {
             try {
                 if (!state || state.val === undefined) {
                     node.warn(`Invalid state data received for ${stateId}`);
@@ -180,6 +268,17 @@ module.exports = function (RED) {
 
                 if (isMultipleStates && !node.subscribedStates.has(stateId)) {
                     return;
+                }
+
+                // Change filtering: check if we should send based on value change
+                if (!shouldSendByValue(stateId, state.val, settings.filterMode, isInitialValue)) {
+                    node.debug(`Change filter blocked duplicate value for ${stateId}: ${state.val}`);
+                    return;
+                }
+
+                // Update previous value for change filtering (but only if not initial value for smart mode)
+                if (!(isInitialValue && settings.filterMode === 'changes-smart')) {
+                    updatePreviousValue(stateId, state.val);
                 }
 
                 if (isMultipleStates) {
@@ -202,11 +301,11 @@ module.exports = function (RED) {
                             node.send(message);
                         }
                     } else {
-                        const message = createMessage(stateId, state);
+                        const message = createMessage(stateId, state, isInitialValue);
                         node.send(message);
                     }
                 } else {
-                    const message = createMessage(stateId, state, false);
+                    const message = createMessage(stateId, state, isInitialValue);
                     node.send(message);
                 }
 
@@ -216,11 +315,14 @@ module.exports = function (RED) {
                 if (isMultipleStates) {
                     const currentCount = node.currentStateValues.size;
                     const subscribedCount = node.subscribedStates.size;
-                    statusText = `${subscribedCount} states (${currentCount} current) - Last: ${timestamp}`;
+                    const filterLabel = (settings.filterMode === 'changes-only' || settings.filterMode === 'changes-smart') ? ' [Changes]' : '';
+                    statusText = `${subscribedCount} states (${currentCount} current)${filterLabel} - Last: ${timestamp}`;
                 } else if (isWildcardPattern) {
-                    statusText = `Pattern active - Last: ${timestamp}`;
+                    const filterLabel = (settings.filterMode === 'changes-only' || settings.filterMode === 'changes-smart') ? ' [Changes]' : '';
+                    statusText = `Pattern active${filterLabel} - Last: ${timestamp}`;
                 } else {
-                    statusText = `Last: ${timestamp}`;
+                    const filterLabel = (settings.filterMode === 'changes-only' || settings.filterMode === 'changes-smart') ? ' [Changes]' : '';
+                    statusText = `Last: ${timestamp}${filterLabel}`;
                 }
 
                 setStatus("green", "dot", statusText);
@@ -238,7 +340,6 @@ module.exports = function (RED) {
 
             callback.onInitialValue = function (stateId, state) {
                 try {
-
                     if (!shouldSendMessage(state.ack, settings.ackFilter)) {
                         return;
                     }
@@ -247,7 +348,13 @@ module.exports = function (RED) {
                         node.currentStateValues.set(stateId, state);
                         node.initialValueCount++;
 
+                        // Update previous value for change filtering (but not for smart mode to preserve baseline)
+                        if (settings.filterMode !== 'changes-smart') {
+                            updatePreviousValue(stateId, state.val);
+                        }
+
                         if (settings.outputMode === 'grouped') {
+                            // For grouped mode: collect all initial values, then send once
                             if (node.initialValueCount >= node.expectedInitialValues) {
                                 sendGroupedInitialMessage();
                             } else {
@@ -259,10 +366,17 @@ module.exports = function (RED) {
                                 }
                             }
                         } else {
+                            // For individual mode: send separate message for each initial value
                             const message = createMessage(stateId, state, true);
                             node.send(message);
                         }
                     } else {
+                        // Single state mode: send individual initial message
+                        // Update previous value for change filtering (but not for smart mode to preserve baseline)
+                        if (settings.filterMode !== 'changes-smart') {
+                            updatePreviousValue(stateId, state.val);
+                        }
+                        
                         const message = createMessage(stateId, state, true);
                         node.send(message);
                     }
@@ -274,10 +388,10 @@ module.exports = function (RED) {
 
             const statusTexts = {
                 ready: isMultipleStates 
-                    ? `${stateList.length} states (${settings.outputMode})`
+                    ? `${stateList.length} states (${settings.outputMode})${(settings.filterMode === 'changes-only' || settings.filterMode === 'changes-smart') ? ' [Changes]' : ''}`
                     : isWildcardPattern 
-                        ? `Pattern: ${subscriptionPattern}` 
-                        : "Ready",
+                        ? `Pattern: ${subscriptionPattern}${(settings.filterMode === 'changes-only' || settings.filterMode === 'changes-smart') ? ' [Changes]' : ''}` 
+                        : `Ready${(settings.filterMode === 'changes-only' || settings.filterMode === 'changes-smart') ? ' [Changes]' : ''}`,
                 disconnected: "Disconnected"
             };
 
@@ -296,6 +410,8 @@ module.exports = function (RED) {
                 node.isSubscribed = false;
                 node.initialValueCount = 0;
                 node.initialGroupedMessageSent = false;
+                // Clear previous values on reconnect for clean start
+                node.previous.clear();
                 if (node.fallbackTimeout) {
                     clearTimeout(node.fallbackTimeout);
                     node.fallbackTimeout = null;
@@ -354,6 +470,7 @@ module.exports = function (RED) {
                 node.subscribedStates.clear();
                 node.initialValueCount = 0;
                 node.initialGroupedMessageSent = false;
+                node.previous.clear(); // Clear previous values
                 if (node.fallbackTimeout) {
                     clearTimeout(node.fallbackTimeout);
                     node.fallbackTimeout = null;
@@ -363,15 +480,21 @@ module.exports = function (RED) {
 
                 await subscribeToStates();
 
+                // Initialize smart change filter with current values if requested
+                await initializeSmartChangeFilter();
+
                 node.isSubscribed = true;
 
                 let statusText;
                 if (isMultipleStates) {
-                    statusText = `${stateList.length} states (${settings.outputMode})`;
+                    const filterLabel = (settings.filterMode === 'changes-only' || settings.filterMode === 'changes-smart') ? ' [Changes]' : '';
+                    statusText = `${stateList.length} states (${settings.outputMode})${filterLabel}`;
                 } else if (isWildcardPattern) {
-                    statusText = `Pattern: ${subscriptionPattern}`;
+                    const filterLabel = (settings.filterMode === 'changes-only' || settings.filterMode === 'changes-smart') ? ' [Changes]' : '';
+                    statusText = `Pattern: ${subscriptionPattern}${filterLabel}`;
                 } else {
-                    statusText = "Ready";
+                    const filterLabel = (settings.filterMode === 'changes-only' || settings.filterMode === 'changes-smart') ? ' [Changes]' : '';
+                    statusText = `Ready${filterLabel}`;
                 }
 
                 setStatus("green", "dot", statusText);

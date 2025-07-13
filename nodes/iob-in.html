@@ -59,6 +59,7 @@ RED.nodes.registerType('iobin', {
         useWildcard: { value: false },
         inputMode: { value: "single" }, // "single" or "multiple"
         outputMode: { value: "individual" }, // "individual", "grouped", "array"
+        filterMode: { value: "all" }, // "all", "changes-only", "changes-smart"
         server: { value: "", type: "iob-config" }
     },
     inputs: 0,
@@ -71,15 +72,18 @@ RED.nodes.registerType('iobin', {
         if (this.inputMode === 'multiple') {
             const stateCount = this.multipleStates ? this.multipleStates.split('\n').filter(s => s.trim()).length : 0;
             const mode = this.outputMode || 'individual';
-            return `${stateCount} states (${mode})`;
+            const filter = (this.filterMode === 'changes-only' || this.filterMode === 'changes-smart') ? ' [Changes]' : '';
+            return `${stateCount} states (${mode})${filter}`;
         }
         
         // For single mode - check for wildcard
         if (this.state && this.state.includes('*')) {
-            return `${this.state} (wildcard)`;
+            const filter = (this.filterMode === 'changes-only' || this.filterMode === 'changes-smart') ? ' [Changes]' : '';
+            return `${this.state} (wildcard)${filter}`;
         }
         
-        return this.state || "iob-in";
+        const filter = (this.filterMode === 'changes-only' || this.filterMode === 'changes-smart') ? ' [Changes]' : '';
+        return (this.state || "iob-in") + filter;
     },
     
     oneditprepare: function() {
@@ -109,23 +113,18 @@ RED.nodes.registerType('iobin', {
             }
         }
         
-        // Initialize input mode for backward compatibility
+        // Initialize defaults for missing properties
         if (!this.inputMode) {
-            // For existing nodes, detect mode based on existing configuration
-            if (this.multipleStates && this.multipleStates.trim()) {
-                this.inputMode = 'multiple';
-            } else {
-                this.inputMode = 'single'; // Default for all old nodes
-            }
+            this.inputMode = 'single';
         }
         
-        // Ensure state value is preserved for backward compatibility
-        if (!$('#node-input-state').val() && this.state) {
-            $('#node-input-state').val(this.state);
+        if (!this.filterMode) {
+            this.filterMode = 'all';
         }
         
-        // Set correct input mode in dropdown - always ensure a value
-        $('#node-input-inputMode').val(this.inputMode || 'single');
+        // Set values in dropdowns
+        $('#node-input-inputMode').val(this.inputMode);
+        $('#node-input-filterMode').val(this.filterMode);
         
         // Setup input mode switching
         function updateInputModeDisplay() {
@@ -142,10 +141,31 @@ RED.nodes.registerType('iobin', {
                 $('#multiple-states-row').show();
                 $('#output-mode-row').show();
                 $('#initial-value-container').show();
-                // Enable initial values for multiple states now
                 $('#node-input-sendInitialValue').prop('disabled', false);
                 $('#initial-value-container').removeClass('wildcard-disabled');
             }
+        }
+        
+        // Setup filter mode display
+        function updateFilterModeDisplay() {
+            const filterMode = $('#node-input-filterMode').val();
+            let description = '';
+            
+            switch(filterMode) {
+                case 'all':
+                    description = 'Send all state changes';
+                    break;
+                case 'changes-only':
+                    description = 'Only send when value changes - first change is always sent (no pre-initialization)';
+                    break;
+                case 'changes-smart':
+                    description = 'Only send when value changes - pre-loads current value, first change may be blocked';
+                    break;
+                default:
+                    description = 'Send all state changes';
+            }
+            
+            $('#filter-mode-description').text(description);
         }
         
         // Wildcard detection for single mode
@@ -196,20 +216,28 @@ RED.nodes.registerType('iobin', {
         // Event handlers
         $('#node-input-inputMode').on('change', function() {
             updateInputModeDisplay();
-            // Re-check wildcard when switching back to single mode
             if ($(this).val() === 'single') {
                 setTimeout(checkForWildcard, 100);
             }
         });
-        $('#node-input-outputMode').on('change', updateOutputModeDisplay);
-        $('#node-input-state').on('input keyup change', checkForWildcard);
+        
+        $('#node-input-outputMode').on('change', function() {
+            updateOutputModeDisplay();
+        });
+        
+        $('#node-input-filterMode').on('change', function() {
+            updateFilterModeDisplay();
+        });
+        
+        $('#node-input-state').on('input keyup change', function() {
+            checkForWildcard();
+        });
         
         // Initialize display
         updateInputModeDisplay();
         updateOutputModeDisplay();
-        
-        // Check for wildcard on initial load
-        setTimeout(checkForWildcard, 100);
+        updateFilterModeDisplay();
+        checkForWildcard();
         
         // Load and initialize TreeView component for single state mode only
         loadSharedTreeView().then(() => {
@@ -329,7 +357,6 @@ RED.nodes.registerType('iobin', {
             }
         } else if (inputMode === 'multiple') {
             this.useWildcard = false;
-            // Initial values now allowed for multiple states
             
             const states = $('#node-input-multipleStates').val()
                 .split('\n')
@@ -402,13 +429,24 @@ RED.nodes.registerType('iobin', {
         </select>
     </div>
     
+    <div class="form-row">
+        <label for="node-input-filterMode"><i class="icon-tag"></i> Filter Mode</label>
+        <select id="node-input-filterMode" style="width:100%">
+            <option value="all">Send all events</option>
+            <option value="changes-only">Send only value changes</option>
+            <option value="changes-smart">Send only value changes (with baseline)</option>
+        </select>
+        <div style="margin-top: 5px; font-size: 12px; color: #666;" id="filter-mode-description"></div>
+    </div>
+    
     <div class="form-row" id="initial-value-container">
         <label for="node-input-sendInitialValue" style="width: auto;">
             <input type="checkbox" id="node-input-sendInitialValue" style="width: auto; margin-right: 5px;">
             <i class="icon-tag"></i> Send initial value on startup
         </label>
         <div style="margin-top: 5px; font-size: 12px; color: #666;">
-            Automatically disabled for wildcards. For multiple states: sends all current values at startup.
+            Automatically disabled for wildcards. For multiple states: sends all current values at startup. 
+            <strong>Note:</strong> Initial values always bypass change filtering.
         </div>
     </div>
     
@@ -431,6 +469,13 @@ RED.nodes.registerType('iobin', {
     <ul>
         <li><b>Individual Messages:</b> Each state change creates a separate message (like single state mode)</li>
         <li><b>Grouped Object:</b> All current values of subscribed states in one message object</li>
+    </ul>
+    
+    <h3>Filter Modes</h3>
+    <ul>
+        <li><b>Send all events:</b> Every state change triggers a message - no filtering</li>
+        <li><b>Send only value changes:</b> Only send when value actually changes - first change is always sent</li>
+        <li><b>Send only value changes (with baseline):</b> Pre-loads current value as baseline, then only sends actual changes - first change may be blocked if same as current</li>
     </ul>
     
     <h3>Wildcard Patterns (Single Mode)</h3>
@@ -486,11 +531,42 @@ msg = {
 }
     </pre>
     
+    <h3>Value Change Filtering</h3>
+    <ul>
+        <li><b>Send only value changes:</b> First state change is always sent, subsequent changes only if value differs</li>
+        <li><b>Send only value changes (with baseline):</b> Current value is pre-loaded as baseline, then only actual changes are sent</li>
+        <li><b>Initial Values:</b> Always bypass change filtering (when "Send initial value on startup" is enabled)</li>
+        <li>Identical consecutive values are blocked</li>
+        <li>Works with all data types (numbers, strings, booleans, objects)</li>
+        <li>Useful for reducing message volume and avoiding unnecessary processing</li>
+    </ul>
+    
+    <h4>Filter Mode Comparison (without "Send initial value")</h4>
+    <pre>
+Current state value: 25
+
+Send only value changes:
+1. First change: 25 → SENT (no baseline yet)
+2. Second change: 25 → BLOCKED (same value)  
+3. Third change: 26 → SENT (value changed)
+
+Send only value changes (with baseline):
+1. Startup: Load baseline 25 (stored, not sent)
+2. First change: 25 → BLOCKED (same as baseline)
+3. Second change: 26 → SENT (value changed)
+    </pre>
+    
+    <h4>With "Send initial value" enabled</h4>
+    <pre>
+Both modes behave identically because initial values bypass change filtering.
+    </pre>
+    
     <h3>Performance Notes</h3>
     <ul>
         <li>Avoid overly broad patterns like <code>*</code> or <code>*.*</code></li>
         <li>Initial values are automatically disabled for wildcards only</li>
         <li>Grouped mode always sends ALL current values when any subscribed state changes</li>
         <li>Initial values for multiple states: all current values sent at startup</li>
+        <li>Change filtering reduces message volume but requires storing previous values</li>
     </ul>
 </script>
