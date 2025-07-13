@@ -36,21 +36,12 @@ module.exports = function (RED) {
         const isWildcardPattern = inputMode === 'single' && subscriptionPattern.includes('*');
         const isMultipleStates = inputMode === 'multiple';
 
-        // Migrate old RBE filter mode values for backward compatibility
-        function migrateFilterMode(filterMode) {
-            switch(filterMode) {
-                case 'rbe': return 'changes-only';
-                case 'rbe-init': return 'changes-smart';
-                default: return filterMode;
-            }
-        }
-
         const settings = {
             outputProperty: config.outputProperty?.trim() || "payload",
             ackFilter: config.ackFilter || "both",
             sendInitialValue: config.sendInitialValue && !isWildcardPattern,
             outputMode: config.outputMode || "individual",
-            filterMode: migrateFilterMode(config.filterMode) || "all",
+            filterMode: config.filterMode || "all",
             serverId,
             nodeId: node.id,
             useWildcard: isWildcardPattern,
@@ -69,7 +60,7 @@ module.exports = function (RED) {
         node.initialGroupedMessageSent = false;
         node.fallbackTimeout = null;
         
-        // RBE (Report by Exception) support - store previous values
+        // Store previous values for change filtering
         node.previous = new Map();
 
         function shouldSendMessage(ack, filter) {
@@ -279,7 +270,7 @@ module.exports = function (RED) {
                     return;
                 }
 
-                // RBE filtering: check if we should send based on value change
+                // Change filtering: check if we should send based on value change
                 if (!shouldSendByValue(stateId, state.val, settings.filterMode, isInitialValue)) {
                     node.debug(`Change filter blocked duplicate value for ${stateId}: ${state.val}`);
                     return;
@@ -419,7 +410,7 @@ module.exports = function (RED) {
                 node.isSubscribed = false;
                 node.initialValueCount = 0;
                 node.initialGroupedMessageSent = false;
-                // Clear previous values on reconnect for clean RBE start
+                // Clear previous values on reconnect for clean start
                 node.previous.clear();
                 if (node.fallbackTimeout) {
                     clearTimeout(node.fallbackTimeout);

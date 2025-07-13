@@ -59,7 +59,7 @@ RED.nodes.registerType('iobin', {
         useWildcard: { value: false },
         inputMode: { value: "single" }, // "single" or "multiple"
         outputMode: { value: "individual" }, // "individual", "grouped", "array"
-        filterMode: { value: "all" }, // "all", "rbe"
+        filterMode: { value: "all" }, // "all", "changes-only", "changes-smart"
         server: { value: "", type: "iob-config" }
     },
     inputs: 0,
@@ -113,33 +113,18 @@ RED.nodes.registerType('iobin', {
             }
         }
         
-        // Initialize input mode for backward compatibility
+        // Initialize defaults for missing properties
         if (!this.inputMode) {
-            // For existing nodes, detect mode based on existing configuration
-            if (this.multipleStates && this.multipleStates.trim()) {
-                this.inputMode = 'multiple';
-            } else {
-                this.inputMode = 'single'; // Default for all old nodes
-            }
+            this.inputMode = 'single';
         }
         
-        // Initialize filter mode for backward compatibility
         if (!this.filterMode) {
-            this.filterMode = 'all'; // Default
-        } else if (this.filterMode === 'rbe') {
-            this.filterMode = 'changes-only'; // Migrate old value
-        } else if (this.filterMode === 'rbe-init') {
-            this.filterMode = 'changes-smart'; // Migrate old value
+            this.filterMode = 'all';
         }
         
-        // Ensure state value is preserved for backward compatibility
-        if (!$('#node-input-state').val() && this.state) {
-            $('#node-input-state').val(this.state);
-        }
-        
-        // Set correct input mode in dropdown - always ensure a value
-        $('#node-input-inputMode').val(this.inputMode || 'single');
-        $('#node-input-filterMode').val(this.filterMode || 'all');
+        // Set values in dropdowns
+        $('#node-input-inputMode').val(this.inputMode);
+        $('#node-input-filterMode').val(this.filterMode);
         
         // Setup input mode switching
         function updateInputModeDisplay() {
@@ -156,7 +141,6 @@ RED.nodes.registerType('iobin', {
                 $('#multiple-states-row').show();
                 $('#output-mode-row').show();
                 $('#initial-value-container').show();
-                // Enable initial values for multiple states now
                 $('#node-input-sendInitialValue').prop('disabled', false);
                 $('#initial-value-container').removeClass('wildcard-disabled');
             }
@@ -171,10 +155,10 @@ RED.nodes.registerType('iobin', {
                 case 'all':
                     description = 'Send all state changes';
                     break;
-                case 'rbe':
+                case 'changes-only':
                     description = 'Only send when value changes - first change is always sent (no pre-initialization)';
                     break;
-                case 'rbe-init':
+                case 'changes-smart':
                     description = 'Only send when value changes - pre-loads current value, first change may be blocked';
                     break;
                 default:
@@ -229,38 +213,31 @@ RED.nodes.registerType('iobin', {
             $('#output-mode-description').text(description);
         }
         
-        // Event handlers with small delay to ensure DOM is ready
-        setTimeout(function() {
-            $('#node-input-inputMode').off('change').on('change', function() {
-                updateInputModeDisplay();
-                // Re-check wildcard when switching back to single mode
-                if ($(this).val() === 'single') {
-                    setTimeout(checkForWildcard, 100);
-                }
-            });
-            
-            $('#node-input-outputMode').off('change').on('change', function() {
-                updateOutputModeDisplay();
-            });
-            
-            $('#node-input-filterMode').off('change').on('change', function() {
-                updateFilterModeDisplay();
-            });
-            
-            $('#node-input-state').off('input keyup change').on('input keyup change', function() {
-                checkForWildcard();
-            });
-        }, 50);
+        // Event handlers
+        $('#node-input-inputMode').on('change', function() {
+            updateInputModeDisplay();
+            if ($(this).val() === 'single') {
+                setTimeout(checkForWildcard, 100);
+            }
+        });
+        
+        $('#node-input-outputMode').on('change', function() {
+            updateOutputModeDisplay();
+        });
+        
+        $('#node-input-filterMode').on('change', function() {
+            updateFilterModeDisplay();
+        });
+        
+        $('#node-input-state').on('input keyup change', function() {
+            checkForWildcard();
+        });
         
         // Initialize display
-        setTimeout(function() {
-            updateInputModeDisplay();
-            updateOutputModeDisplay();
-            updateFilterModeDisplay();
-        }, 100);
-        
-        // Check for wildcard on initial load
-        setTimeout(checkForWildcard, 100);
+        updateInputModeDisplay();
+        updateOutputModeDisplay();
+        updateFilterModeDisplay();
+        checkForWildcard();
         
         // Load and initialize TreeView component for single state mode only
         loadSharedTreeView().then(() => {
@@ -380,7 +357,6 @@ RED.nodes.registerType('iobin', {
             }
         } else if (inputMode === 'multiple') {
             this.useWildcard = false;
-            // Initial values now allowed for multiple states
             
             const states = $('#node-input-multipleStates').val()
                 .split('\n')
