@@ -3,6 +3,13 @@
 ## [0.13.1] - 2025-xx-xx
 
 ### Added
+- **Value change filtering for iob-in node**
+  - Three filter modes: send all events, send only value changes, send only value changes with baseline
+  - Initial values always bypass change filtering to ensure reliable startup behavior
+  - Enhanced status indicators showing active filter mode with [Changes] label
+  - Deep object comparison with JSON.stringify and fallback for non-serializable objects
+
+### Added
 - **Advanced data format options for iobhistory node**
   - Remove Border Values option to exclude data points at start/end boundaries
   - Timestamp Format option: Unix milliseconds vs ISO 8601 string format

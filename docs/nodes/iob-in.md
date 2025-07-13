@@ -1,10 +1,10 @@
 # WS ioB in - State Subscription
 
-Subscribe to ioBroker state changes in real-time using WebSocket communication with support for single states, wildcard patterns, and multiple predefined states.
+Subscribe to ioBroker state changes in real-time using WebSocket communication with support for single states, wildcard patterns, multiple predefined states, and intelligent value change filtering.
 
 ## Purpose
 
-The WS ioB in node allows you to monitor ioBroker states and receive notifications whenever they change. It supports three input modes: single state monitoring, wildcard patterns for monitoring multiple states simultaneously, and multiple predefined states with flexible output formats.
+The WS ioB in node allows you to monitor ioBroker states and receive notifications whenever they change. It supports three input modes: single state monitoring, wildcard patterns for monitoring multiple states simultaneously, and multiple predefined states with flexible output formats. Additionally, it offers intelligent value change filtering to reduce message volume and optimize downstream processing.
 
 ## Input Modes
 
@@ -26,6 +26,42 @@ Monitor a predefined list of specific states:
 - **Configuration**: List of exact state IDs (one per line)
 - **Output Options**: Individual messages OR grouped object
 - **Use Case**: Monitor specific related states efficiently
+
+## Value Change Filtering
+
+### Filter Modes
+
+**Send all events** (Default)
+- Every state change triggers a message
+- No filtering applied
+- Use for: Real-time monitoring, debugging, full event streams
+
+**Send only value changes**
+- Only sends messages when the state value actually changes
+- First change after startup is always sent (no baseline)
+- Identical consecutive values are blocked
+- Use for: Reducing message volume, avoiding unnecessary processing
+
+**Send only value changes (with baseline)**
+- Pre-loads current state value as baseline during startup
+- Only sends messages when value differs from baseline/previous value
+- First change may be blocked if same as current value
+- Use for: Consistent change detection, matching node-red adapter behavior
+
+### Value Comparison
+
+The node performs intelligent value comparison:
+- **Primitive values** (numbers, strings, booleans): Direct equality comparison
+- **Objects and arrays**: Deep comparison using JSON serialization
+- **Non-serializable objects**: Fallback to reference comparison
+- **Null/undefined values**: Handled consistently across all modes
+
+### Filter Behavior with Initial Values
+
+When "Send initial value on startup" is enabled:
+- **Initial values always bypass change filtering** to ensure reliable startup
+- Change filtering only applies to subsequent state changes
+- Both filter modes behave identically when initial values are enabled
 
 ## Configuration
 
@@ -57,6 +93,13 @@ Monitor a predefined list of specific states:
 - **Individual Messages**: Each state change creates separate message (like single mode)
 - **Grouped Object**: All current values combined in single message object
 
+### Filter Settings
+
+**Filter Mode**
+- **Send all events**: No filtering - all state changes trigger messages
+- **Send only value changes**: Block duplicate values, first change always sent
+- **Send only value changes (with baseline)**: Pre-load current value, then block duplicates
+
 ### Common Settings
 
 **Output Property**
@@ -74,6 +117,7 @@ Monitor a predefined list of specific states:
 - **Single State**: Sends one initial message
 - **Multiple States**: Sends all current values (individually or grouped based on output mode)
 - **Wildcard**: Automatically disabled for performance reasons
+- **Important**: Initial values always bypass change filtering
 
 ## Output Message Formats
 
@@ -151,19 +195,50 @@ Single message containing all current values:
 - **Related sensors**: Group of sensors in same room/category
 - **System health**: Predefined list of critical system states
 
+### Value Change Filtering Use Cases
+
+**Send all events**
+- Real-time dashboards requiring every update
+- Debugging and development scenarios
+- Systems that need timestamp/acknowledge information even for unchanged values
+
+**Send only value changes**
+- Battery-powered devices (reduce unnecessary transmissions)
+- High-frequency sensors where only actual changes matter
+- Downstream processing that shouldn't run on duplicate values
+
+**Send only value changes (with baseline)**
+- Consistent behavior across Node-RED restarts
+- Systems requiring clean change detection without startup noise
+- Migration from node-red adapter with RBE functionality
+
 ## Performance Considerations
 
 ### Message Frequency
 - **Individual mode**: Can generate many messages with high-frequency states
 - **Grouped mode**: Generates one message per any state change
 - **Wildcard patterns**: Monitor count shown in node status
+- **Change filtering**: Significantly reduces message volume for stable values
 
 ### Optimization Tips
 - Use **specific patterns** instead of broad wildcards: `lights.*` vs `*`
 - Choose **appropriate output mode** based on downstream processing needs
 - **Limit scope** of wildcard patterns to reduce subscription count
 - Use **grouped mode** for dashboard-type applications
-- Consider **rate limiting** in downstream nodes for high-frequency states
+- Consider **change filtering** for high-frequency or stable value states
+- Use **rate limiting** in downstream nodes for remaining high-frequency states
+
+### Filter Mode Performance Impact
+
+**Memory Usage**
+- Change filtering requires storing previous values in memory
+- Memory usage scales with number of monitored states
+- Previous values are cleared on reconnection for clean restart
+
+**CPU Usage**
+- Object comparison uses JSON serialization for deep equality
+- Primitive value comparison is highly optimized
+- Overall CPU impact is minimal for typical use cases
 
 ## Initial Values Behavior
 
@@ -171,6 +246,7 @@ Single message containing all current values:
 - Sends current value immediately after subscription
 - Message includes `initial: true` property
 - Respects ack filter settings
+- **Always bypasses change filtering** for reliable startup
 
 ### Wildcard Pattern Mode
 - **Automatically disabled** for performance reasons
@@ -182,6 +258,31 @@ Single message containing all current values:
 - **Grouped Output**: Sends single initial message with all current values
 - Only sends initial values for states that actually exist and have values
 - Includes `initial: true` property in messages
+- **Always bypasses change filtering** regardless of filter mode
+
+## Filter Mode Comparison Examples
+
+### Without "Send initial value on startup":
+
+**Current state value: 25**
+
+**Send only value changes:**
+```
+1. First change: 25 → SENT (no baseline yet)
+2. Second change: 25 → BLOCKED (same value)  
+3. Third change: 26 → SENT (value changed)
+```
+
+**Send only value changes (with baseline):**
+```
+1. Startup: Load baseline 25 (stored, not sent)
+2. First change: 25 → BLOCKED (same as baseline)
+3. Second change: 26 → SENT (value changed)
+```
+
+### With "Send initial value on startup":
+
+Both modes behave identically because initial values bypass change filtering.
 
 ## Troubleshooting
 
@@ -190,16 +291,25 @@ Single message containing all current values:
 2. **Verify pattern syntax** for wildcards (only `*` supported)
 3. **Test with simpler pattern** or single state first
 4. **Check trigger settings** (all/ack/unack)
+5. **Verify change filtering** - try "Send all events" mode for testing
 
 ### Missing State Changes
 1. **Check trigger filter** settings (all/ack/unack)
 2. **Verify state actually changes** in ioBroker
 3. **Test with different ack filter** to isolate issue
+4. **Check change filtering** - ensure values are actually different
+5. **Compare with/without baseline** to understand filter behavior
 
 ### Grouped Mode Issues
 1. **Check all states exist** - non-existent states are skipped
 2. **Verify state subscription** - check node status for subscription count
 3. **Monitor initial values** - may not include states without values
+
+### Change Filtering Issues
+1. **Check filter mode** - ensure correct mode selected for your use case
+2. **Test without filtering** - use "Send all events" to verify basic functionality
+3. **Monitor node status** - [Changes] indicator shows when filtering is active
+4. **Check data types** - complex objects may need careful comparison logic
 
 ## Connection Status
 
@@ -208,6 +318,7 @@ The node status indicator shows:
 - **Yellow ring**: Connecting or reconnecting
 - **Red ring**: Connection failed or authentication error
 - **Number in status**: Count of active subscriptions (for wildcards/multiple states)
+- **[Changes] label**: Indicates active value change filtering
 
 ## Related Nodes
 
