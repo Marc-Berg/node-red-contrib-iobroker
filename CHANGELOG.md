@@ -32,6 +32,9 @@
   - Simplified custom timestamp formatting using native Intl.DateTimeFormat
   - Enhanced timezone handling with better internationalization support
 
+### Fixed
+  - Enhance coordination between ConnectionManager, RecoveryManager and WebSocketManager during reconnections
+
 ## [0.13.0] - 2025-07-10
 
 ### Changed
