@@ -35,6 +35,7 @@ module.exports = function (RED) {
 
         const isWildcardPattern = inputMode === 'single' && subscriptionPattern.includes('*');
         const isMultipleStates = inputMode === 'multiple';
+        const isSingleState = inputMode === 'single' && !isWildcardPattern;
 
         const settings = {
             outputProperty: config.outputProperty?.trim() || "payload",
@@ -59,9 +60,74 @@ module.exports = function (RED) {
         node.expectedInitialValues = 0;
         node.initialGroupedMessageSent = false;
         node.fallbackTimeout = null;
+        node.lastValue = undefined;
+        node.hasReceivedValue = false;
         
-        // Store previous values for change filtering
         node.previous = new Map();
+
+        function formatValueForStatus(value) {
+            let displayValue;
+            
+            if (value === null) {
+                displayValue = "null";
+            } else if (value === undefined) {
+                displayValue = "undefined";
+            } else if (typeof value === 'boolean') {
+                displayValue = value ? "true" : "false";
+            } else if (typeof value === 'object') {
+                try {
+                    displayValue = JSON.stringify(value);
+                } catch (e) {
+                    displayValue = "[Object]";
+                }
+            } else {
+                displayValue = String(value);
+            }
+            
+            if (displayValue.length > 20) {
+                return "..." + displayValue.slice(-20);
+            }
+            
+            return displayValue;
+        }
+
+        function updateStatusWithValue(isInitialValue = false) {
+            if (isSingleState && node.hasReceivedValue && node.lastValue !== undefined) {
+                const formattedValue = formatValueForStatus(node.lastValue);
+                const filterLabel = (settings.filterMode === 'changes-only' || settings.filterMode === 'changes-smart') ? ' [Changes]' : '';
+                const timestamp = new Date().toLocaleTimeString(undefined, { hour12: false });
+                const initialLabel = isInitialValue ? ' (initial)' : '';
+                setStatus("green", "dot", `${formattedValue}${filterLabel}${initialLabel}`);
+            } else {
+                const timestamp = new Date().toLocaleTimeString(undefined, { hour12: false });
+                let statusText;
+
+                if (isMultipleStates) {
+                    const currentCount = node.currentStateValues.size;
+                    const subscribedCount = node.subscribedStates.size;
+                    const filterLabel = (settings.filterMode === 'changes-only' || settings.filterMode === 'changes-smart') ? ' [Changes]' : '';
+                    
+                    if (node.hasReceivedValue) {
+                        statusText = `${subscribedCount} states (${currentCount} current)${filterLabel} - Last: ${timestamp}`;
+                    } else {
+                        statusText = `${stateList.length} states (${settings.outputMode})${filterLabel}`;
+                    }
+                } else if (isWildcardPattern) {
+                    const filterLabel = (settings.filterMode === 'changes-only' || settings.filterMode === 'changes-smart') ? ' [Changes]' : '';
+                    
+                    if (node.hasReceivedValue) {
+                        statusText = `Pattern active${filterLabel} - Last: ${timestamp}`;
+                    } else {
+                        statusText = `Pattern: ${subscriptionPattern}${filterLabel}`;
+                    }
+                } else {
+                    const filterLabel = (settings.filterMode === 'changes-only' || settings.filterMode === 'changes-smart') ? ' [Changes]' : '';
+                    statusText = `Ready${filterLabel}`;
+                }
+
+                setStatus("green", "dot", statusText);
+            }
+        }
 
         function shouldSendMessage(ack, filter) {
             switch (filter) {
@@ -72,43 +138,35 @@ module.exports = function (RED) {
         }
 
         function shouldSendByValue(stateId, newValue, filterMode, isInitialValue = false) {
-            // Initial values always bypass change filter
             if (isInitialValue) {
                 return true;
             }
             
             if (filterMode !== 'changes-only' && filterMode !== 'changes-smart') {
-                return true; // Send all changes when not in change-filter mode
+                return true;
             }
 
-            // Get previous value
             const previousValue = node.previous.get(stateId);
             
-            // For standard change filter: if no previous value exists, always send (first change)
             if (filterMode === 'changes-only' && previousValue === undefined) {
                 return true;
             }
             
-            // For smart change filter or when previous value exists: only send if changed
-            // Deep comparison for objects and arrays
             if (typeof newValue === 'object' && newValue !== null) {
                 const currentJSON = JSON.stringify(newValue);
                 const previousJSON = previousValue !== undefined ? JSON.stringify(previousValue) : undefined;
                 return currentJSON !== previousJSON;
             }
             
-            // Simple comparison for primitive values
             return newValue !== previousValue;
         }
 
         function updatePreviousValue(stateId, value) {
             if (settings.filterMode === 'changes-only' || settings.filterMode === 'changes-smart') {
-                // Store a deep copy for objects, or the value directly for primitives
                 if (typeof value === 'object' && value !== null) {
                     try {
                         node.previous.set(stateId, JSON.parse(JSON.stringify(value)));
                     } catch (e) {
-                        // Fallback for non-serializable objects
                         node.previous.set(stateId, value);
                     }
                 } else {
@@ -117,7 +175,6 @@ module.exports = function (RED) {
             }
         }
 
-        // Smart Change Filter: Pre-load current values to initialize baseline
         async function initializeSmartChangeFilter() {
             if (settings.filterMode !== 'changes-smart') {
                 return;
@@ -125,7 +182,6 @@ module.exports = function (RED) {
 
             try {
                 if (isMultipleStates) {
-                    // Initialize multiple states
                     for (const stateId of stateList) {
                         try {
                             const state = await connectionManager.getState(settings.serverId, stateId);
@@ -138,7 +194,6 @@ module.exports = function (RED) {
                         }
                     }
                 } else if (!isWildcardPattern) {
-                    // Initialize single state (not wildcards)
                     try {
                         const state = await connectionManager.getState(settings.serverId, subscriptionPattern);
                         if (state && state.val !== undefined) {
@@ -249,10 +304,13 @@ module.exports = function (RED) {
             const message = createGroupedMessage(null, null, true);
             node.send(message);
             node.initialGroupedMessageSent = true;
+            node.hasReceivedValue = true;
             
             const currentCount = node.currentStateValues.size;
             const expectedCount = node.expectedInitialValues;
             node.debug(`Grouped initial message sent with ${currentCount}/${expectedCount} states`);
+            
+            updateStatusWithValue(true);
         }
 
         function onStateChange(stateId, state, isInitialValue = false) {
@@ -270,13 +328,11 @@ module.exports = function (RED) {
                     return;
                 }
 
-                // Change filtering: check if we should send based on value change
                 if (!shouldSendByValue(stateId, state.val, settings.filterMode, isInitialValue)) {
                     node.debug(`Change filter blocked duplicate value for ${stateId}: ${state.val}`);
                     return;
                 }
 
-                // Update previous value for change filtering (but only if not initial value for smart mode)
                 if (!(isInitialValue && settings.filterMode === 'changes-smart')) {
                     updatePreviousValue(stateId, state.val);
                 }
@@ -285,47 +341,43 @@ module.exports = function (RED) {
                     node.currentStateValues.set(stateId, state);
                 }
 
+                if (isSingleState) {
+                    node.lastValue = state.val;
+                    node.hasReceivedValue = true;
+                }
+
                 if (isMultipleStates) {
                     if (settings.outputMode === 'grouped') {
                         if (node.currentStateValues.size < node.subscribedStates.size) {
                             ensureAllStatesLoaded().then(() => {
                                 const message = createGroupedMessage(stateId, state);
                                 node.send(message);
+                                node.hasReceivedValue = true;
+                                updateStatusWithValue();
                             }).catch(error => {
                                 node.warn(`Error loading all states: ${error.message}, sending available states`);
                                 const message = createGroupedMessage(stateId, state);
                                 node.send(message);
+                                node.hasReceivedValue = true;
+                                updateStatusWithValue();
                             });
                         } else {
                             const message = createGroupedMessage(stateId, state);
                             node.send(message);
+                            node.hasReceivedValue = true;
+                            updateStatusWithValue();
                         }
                     } else {
                         const message = createMessage(stateId, state, isInitialValue);
                         node.send(message);
+                        node.hasReceivedValue = true;
+                        updateStatusWithValue();
                     }
                 } else {
                     const message = createMessage(stateId, state, isInitialValue);
                     node.send(message);
+                    updateStatusWithValue(isInitialValue);
                 }
-
-                const timestamp = new Date().toLocaleTimeString(undefined, { hour12: false });
-                let statusText;
-
-                if (isMultipleStates) {
-                    const currentCount = node.currentStateValues.size;
-                    const subscribedCount = node.subscribedStates.size;
-                    const filterLabel = (settings.filterMode === 'changes-only' || settings.filterMode === 'changes-smart') ? ' [Changes]' : '';
-                    statusText = `${subscribedCount} states (${currentCount} current)${filterLabel} - Last: ${timestamp}`;
-                } else if (isWildcardPattern) {
-                    const filterLabel = (settings.filterMode === 'changes-only' || settings.filterMode === 'changes-smart') ? ' [Changes]' : '';
-                    statusText = `Pattern active${filterLabel} - Last: ${timestamp}`;
-                } else {
-                    const filterLabel = (settings.filterMode === 'changes-only' || settings.filterMode === 'changes-smart') ? ' [Changes]' : '';
-                    statusText = `Last: ${timestamp}${filterLabel}`;
-                }
-
-                setStatus("green", "dot", statusText);
 
             } catch (error) {
                 node.error(`State change processing error: ${error.message}`);
@@ -348,13 +400,11 @@ module.exports = function (RED) {
                         node.currentStateValues.set(stateId, state);
                         node.initialValueCount++;
 
-                        // Update previous value for change filtering (but not for smart mode to preserve baseline)
                         if (settings.filterMode !== 'changes-smart') {
                             updatePreviousValue(stateId, state.val);
                         }
 
                         if (settings.outputMode === 'grouped') {
-                            // For grouped mode: collect all initial values, then send once
                             if (node.initialValueCount >= node.expectedInitialValues) {
                                 sendGroupedInitialMessage();
                             } else {
@@ -366,19 +416,24 @@ module.exports = function (RED) {
                                 }
                             }
                         } else {
-                            // For individual mode: send separate message for each initial value
                             const message = createMessage(stateId, state, true);
                             node.send(message);
+                            node.hasReceivedValue = true;
+                            updateStatusWithValue(true);
                         }
                     } else {
-                        // Single state mode: send individual initial message
-                        // Update previous value for change filtering (but not for smart mode to preserve baseline)
                         if (settings.filterMode !== 'changes-smart') {
                             updatePreviousValue(stateId, state.val);
                         }
                         
+                        if (isSingleState) {
+                            node.lastValue = state.val;
+                            node.hasReceivedValue = true;
+                        }
+                        
                         const message = createMessage(stateId, state, true);
                         node.send(message);
+                        updateStatusWithValue(true);
                     }
 
                 } catch (error) {
@@ -410,7 +465,8 @@ module.exports = function (RED) {
                 node.isSubscribed = false;
                 node.initialValueCount = 0;
                 node.initialGroupedMessageSent = false;
-                // Clear previous values on reconnect for clean start
+                node.hasReceivedValue = false;
+                node.lastValue = undefined;
                 node.previous.clear();
                 if (node.fallbackTimeout) {
                     clearTimeout(node.fallbackTimeout);
@@ -470,7 +526,9 @@ module.exports = function (RED) {
                 node.subscribedStates.clear();
                 node.initialValueCount = 0;
                 node.initialGroupedMessageSent = false;
-                node.previous.clear(); // Clear previous values
+                node.hasReceivedValue = false;
+                node.lastValue = undefined;
+                node.previous.clear();
                 if (node.fallbackTimeout) {
                     clearTimeout(node.fallbackTimeout);
                     node.fallbackTimeout = null;
@@ -480,24 +538,11 @@ module.exports = function (RED) {
 
                 await subscribeToStates();
 
-                // Initialize smart change filter with current values if requested
                 await initializeSmartChangeFilter();
 
                 node.isSubscribed = true;
 
-                let statusText;
-                if (isMultipleStates) {
-                    const filterLabel = (settings.filterMode === 'changes-only' || settings.filterMode === 'changes-smart') ? ' [Changes]' : '';
-                    statusText = `${stateList.length} states (${settings.outputMode})${filterLabel}`;
-                } else if (isWildcardPattern) {
-                    const filterLabel = (settings.filterMode === 'changes-only' || settings.filterMode === 'changes-smart') ? ' [Changes]' : '';
-                    statusText = `Pattern: ${subscriptionPattern}${filterLabel}`;
-                } else {
-                    const filterLabel = (settings.filterMode === 'changes-only' || settings.filterMode === 'changes-smart') ? ' [Changes]' : '';
-                    statusText = `Ready${filterLabel}`;
-                }
-
-                setStatus("green", "dot", statusText);
+                updateStatusWithValue();
                 node.isInitialized = true;
 
             } catch (error) {

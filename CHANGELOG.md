@@ -2,6 +2,17 @@
 
 ## [0.13.1] - 2025-xx-xx
 
+### Added
+- **Current value display in node status indicators**
+  - iob-get: Shows last successfully retrieved value in status
+  - iob-out: Shows last successfully set value in status
+  - iob-in: Shows last received value in status (single state mode only)
+  - 20-character truncation with "..." prefix for long values
+  - JSON stringification for objects/arrays, explicit "null"/"undefined" display
+  - Only displays values that passed all filters and were forwarded
+  - Preserves error/connecting status text with higher priority
+  - Falls back to "Ready" when no value has been processed yet
+
 ### Changed
 - **Security: Credentials now properly encrypted** - Username and password are now stored as encrypted credentials in flows_cred.json instead of plain text in flows.json
   - **⚠️ BREAKING CHANGE**: Existing users must re-enter their username and password in server configuration nodes

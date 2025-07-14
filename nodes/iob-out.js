@@ -6,23 +6,19 @@ module.exports = function(RED) {
         RED.nodes.createNode(this, config);
         const node = this;
 
-        // Use helper to create status functions
         const { setStatus, setError } = NodeHelpers.createStatusHelpers(node);
         
-        // Use helper to validate server config
         const serverConfig = NodeHelpers.validateServerConfig(RED, config, setError);
         if (!serverConfig) return;
 
         const { globalConfig, connectionDetails, serverId } = serverConfig;
 
-        // Node-specific configuration
         const settings = {
             inputProperty: config.inputProperty?.trim() || "payload",
             setMode: config.setMode || "value",
             autoCreate: config.autoCreate || false,
             serverId,
             nodeId: node.id,
-            // Object creation settings
             stateName: config.stateName?.trim() || "",
             stateRole: config.stateRole?.trim() || "",
             payloadType: config.payloadType?.trim() || "",
@@ -35,19 +31,55 @@ module.exports = function(RED) {
         const configState = config.state?.trim();
         node.currentConfig = connectionDetails;
         node.isInitialized = false;
+        node.lastValue = undefined;
+        node.hasSetValue = false;
 
-        // Custom status texts for auto-create mode
+        function formatValueForStatus(value) {
+            let displayValue;
+            
+            if (value === null) {
+                displayValue = "null";
+            } else if (value === undefined) {
+                displayValue = "undefined";
+            } else if (typeof value === 'boolean') {
+                displayValue = value ? "true" : "false";
+            } else if (typeof value === 'object') {
+                try {
+                    displayValue = JSON.stringify(value);
+                } catch (e) {
+                    displayValue = "[Object]";
+                }
+            } else {
+                displayValue = String(value);
+            }
+            
+            if (displayValue.length > 20) {
+                return "..." + displayValue.slice(-20);
+            }
+            
+            return displayValue;
+        }
+
+        function updateStatusWithValue() {
+            if (node.hasSetValue && node.lastValue !== undefined) {
+                const formattedValue = formatValueForStatus(node.lastValue);
+                const autoCreateStatus = settings.autoCreate ? " (auto-create)" : "";
+                setStatus("green", "dot", formattedValue + autoCreateStatus);
+            } else {
+                const autoCreateStatus = settings.autoCreate ? " (auto-create)" : "";
+                setStatus("green", "dot", "Ready" + autoCreateStatus);
+            }
+        }
+
         const statusTexts = {
             ready: settings.autoCreate ? "Ready (Auto-create enabled)" : "Ready",
             reconnected: settings.autoCreate ? "Reconnected (Auto-create)" : "Reconnected"
         };
 
-        // Initialize connection using helper
         NodeHelpers.initializeConnection(
             node, config, RED, settings, globalConfig, setStatus, statusTexts
         );
 
-        // Auto-detect payload type
         function detectPayloadType(value) {
             if (value === null || value === undefined) return "mixed";
             if (typeof value === "boolean") return "boolean";
@@ -65,7 +97,6 @@ module.exports = function(RED) {
             return "mixed";
         }
 
-        // Get object creation properties from message or config
         function getObjectProperties(msg, stateId, value) {
             const props = {
                 name: msg.stateName || settings.stateName || stateId.split('.').pop(),
@@ -76,7 +107,6 @@ module.exports = function(RED) {
                 max: msg.stateMax !== undefined ? msg.stateMax : settings.stateMax
             };
 
-            // Handle readonly setting
             let readonly = false;
             if (msg.stateReadonly !== undefined) {
                 readonly = msg.stateReadonly === true || msg.stateReadonly === "true";
@@ -88,7 +118,6 @@ module.exports = function(RED) {
             return props;
         }
 
-        // Create ioBroker object
         async function createObject(stateId, properties) {
             const objectDef = {
                 _id: stateId,
@@ -103,7 +132,6 @@ module.exports = function(RED) {
                 native: {}
             };
 
-            // Add optional properties
             if (properties.unit) objectDef.common.unit = properties.unit;
             if (properties.min !== undefined) objectDef.common.min = properties.min;
             if (properties.max !== undefined) objectDef.common.max = properties.max;
@@ -117,7 +145,6 @@ module.exports = function(RED) {
             }
         }
 
-        // Check if object exists and create if needed
         async function ensureObjectExists(stateId, msg, value) {
             if (!settings.autoCreate) {
                 return true;
@@ -150,10 +177,8 @@ module.exports = function(RED) {
             }
         }
 
-        // Input message handler
         this.on('input', async function(msg, send, done) {
             try {
-                // Handle status requests using helper
                 if (NodeHelpers.handleStatusRequest(msg, send, done, settings)) {
                     return;
                 }
@@ -175,7 +200,6 @@ module.exports = function(RED) {
                     setStatus("blue", "dot", "Checking object...");
                 }
 
-                // Ensure object exists if auto-create is enabled
                 try {
                     await ensureObjectExists(stateId, msg, value);
                 } catch (error) {
@@ -190,8 +214,9 @@ module.exports = function(RED) {
                 
                 await connectionManager.setState(settings.serverId, stateId, value, ack);
                 
-                const autoCreateStatus = settings.autoCreate ? " (auto-create)" : "";
-                setStatus("green", "dot", `Ready${autoCreateStatus}`);
+                node.lastValue = value;
+                node.hasSetValue = true;
+                updateStatusWithValue();
                 
                 done && done();
                 
@@ -202,7 +227,6 @@ module.exports = function(RED) {
             }
         });
 
-        // Cleanup on node close
         node.on("close", async function(done) {
             await NodeHelpers.handleNodeClose(node, settings, "Output");
             done();

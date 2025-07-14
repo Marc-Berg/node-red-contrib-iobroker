@@ -6,16 +6,13 @@ module.exports = function(RED) {
         RED.nodes.createNode(this, config);
         const node = this;
 
-        // Use helper to create status functions
         const { setStatus, setError } = NodeHelpers.createStatusHelpers(node);
         
-        // Use helper to validate server config
         const serverConfig = NodeHelpers.validateServerConfig(RED, config, setError);
         if (!serverConfig) return;
 
         const { globalConfig, connectionDetails, serverId } = serverConfig;
 
-        // Node-specific configuration
         const settings = {
             outputProperty: config.outputProperty?.trim() || "payload",
             serverId,
@@ -24,15 +21,50 @@ module.exports = function(RED) {
 
         node.currentConfig = connectionDetails;
         node.isInitialized = false;
+        node.lastValue = undefined;
+        node.hasRetrievedValue = false;
 
-        // Initialize connection using helper
+        function formatValueForStatus(value) {
+            let displayValue;
+            
+            if (value === null) {
+                displayValue = "null";
+            } else if (value === undefined) {
+                displayValue = "undefined";
+            } else if (typeof value === 'boolean') {
+                displayValue = value ? "true" : "false";
+            } else if (typeof value === 'object') {
+                try {
+                    displayValue = JSON.stringify(value);
+                } catch (e) {
+                    displayValue = "[Object]";
+                }
+            } else {
+                displayValue = String(value);
+            }
+            
+            if (displayValue.length > 20) {
+                return "..." + displayValue.slice(-20);
+            }
+            
+            return displayValue;
+        }
+
+        function updateStatusWithValue() {
+            if (node.hasRetrievedValue && node.lastValue !== undefined) {
+                const formattedValue = formatValueForStatus(node.lastValue);
+                setStatus("green", "dot", formattedValue);
+            } else {
+                setStatus("green", "dot", "Ready");
+            }
+        }
+
         NodeHelpers.initializeConnection(
             node, config, RED, settings, globalConfig, setStatus
         );
 
         node.on('input', async function(msg, send, done) {
             try {
-                // Handle status requests using helper
                 if (NodeHelpers.handleStatusRequest(msg, send, done, settings)) {
                     return;
                 }
@@ -48,11 +80,15 @@ module.exports = function(RED) {
 
                 const state = await connectionManager.getState(settings.serverId, stateId);
                 
-                msg[settings.outputProperty] = state?.val !== undefined ? state.val : state;
+                const valueToSet = state?.val !== undefined ? state.val : state;
+                msg[settings.outputProperty] = valueToSet;
                 msg.state = state;
                 msg.timestamp = Date.now();
                 
-                setStatus("green", "dot", "Ready");
+                node.lastValue = valueToSet;
+                node.hasRetrievedValue = true;
+                updateStatusWithValue();
+                
                 send(msg);
                 done && done();
                 
