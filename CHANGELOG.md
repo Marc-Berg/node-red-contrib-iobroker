@@ -2,6 +2,10 @@
 
 ## [0.13.1] - 2025-xx-xx
 
+### Changed
+- **Security: Credentials now properly encrypted** - Username and password are now stored as encrypted credentials in flows_cred.json instead of plain text in flows.json
+  - **⚠️ BREAKING CHANGE**: Existing users must re-enter their username and password in server configuration nodes
+
 ### Added
 - **Value change filtering for iob-in node**
   - Three filter modes: send all events, send only value changes, send only value changes with baseline
