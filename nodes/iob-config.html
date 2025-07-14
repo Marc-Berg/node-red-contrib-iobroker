@@ -5,9 +5,11 @@ RED.nodes.registerType('iob-config', {
         name:     { value: "config1", required: true },
         iobhost:  { value: "iobroker.local", required: true },
         iobport:  { value: 8082, required: true, validate: RED.validators.number() },
-        user:     { value: "" },
-        password: { value: "" },
         usessl:   { value: false }
+    },
+    credentials: {
+        user:     { type: "text" },
+        password: { type: "password" }
     },
     label: function() {
         return this.name;

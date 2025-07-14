@@ -1,329 +1,215 @@
 # WS ioB in - State Subscription
 
-Subscribe to ioBroker state changes in real-time using WebSocket communication with support for single states, wildcard patterns, multiple predefined states, and intelligent value change filtering.
-
-## Purpose
-
-The WS ioB in node allows you to monitor ioBroker states and receive notifications whenever they change. It supports three input modes: single state monitoring, wildcard patterns for monitoring multiple states simultaneously, and multiple predefined states with flexible output formats. Additionally, it offers intelligent value change filtering to reduce message volume and optimize downstream processing.
+Subscribe to ioBroker state changes in real-time using WebSocket communication with support for single states, wildcard patterns, multiple predefined states, and value change filtering.
 
 ## Input Modes
 
 ### Single State Mode
-Monitor one specific state:
-- **State**: `0_userdata.0.temperature`
-- **Output**: Individual message per state change
-- **Use Case**: Simple state monitoring
+- **State**: `0_userdata.0.temperature`  
+- **Use Case**: Simple state monitoring, critical alerts, testing
 
 ### Wildcard Pattern Mode (Auto-detected)
-Monitor multiple states matching a pattern:
 - **Pattern**: `system.adapter.*.alive`
-- **Output**: Individual message per matching state change
-- **Use Case**: Monitor related states dynamically
+- **Use Case**: Monitor related states dynamically, category monitoring
 - **Auto-detection**: Automatically enabled when `*` is present
 
 ### Multiple States Mode
-Monitor a predefined list of specific states:
 - **Configuration**: List of exact state IDs (one per line)
 - **Output Options**: Individual messages OR grouped object
-- **Use Case**: Monitor specific related states efficiently
+- **Use Case**: Dashboard data, related sensors, system health monitoring
+
+## State vs Value Changes
+
+**State Update**: Any change to the state object (timestamp, quality, source, acknowledge, etc.)
+```javascript
+// Only timestamp changed, value stays the same
+{ val: 23.5, ts: 1640995200000, ack: true }  // Before
+{ val: 23.5, ts: 1640995210000, ack: true }  // After (timestamp-only update)
+
+// Only metadata changed, value stays the same  
+{ val: 23.5, ts: 1640995200000, from: "adapter.0" }  // Before
+{ val: 23.5, ts: 1640995210000, from: "adapter.1" }  // After (source changed)
+```
+
+**Value Update**: The actual `val` property changes
+```javascript
+// Value actually changed
+{ val: 23.5, ts: 1640995200000, ack: true }  // Before  
+{ val: 24.1, ts: 1640995210000, ack: true }  // After
+```
+
+**Note**: Pure timestamp updates (same value, only `ts` changed) are very common in ioBroker and count as metadata-only changes.
 
 ## Value Change Filtering
 
 ### Filter Modes
 
 **Send all events** (Default)
-- Every state change triggers a message
-- No filtering applied
-- Use for: Real-time monitoring, debugging, full event streams
+- Every **state update** triggers a message (metadata changes too)
+- Use for: Real-time monitoring, debugging, systems needing all timestamp/ack info
 
 **Send only value changes**
-- Only sends messages when the state value actually changes
-- First change after startup is always sent (no baseline)
-- Identical consecutive values are blocked
-- Use for: Reducing message volume, avoiding unnecessary processing
+- Only sends when **value actually changes** (ignores metadata-only updates)
+- First change always sent (no baseline), subsequent identical values blocked
+- Use for: Reducing message volume, high-frequency sensors, battery-powered devices
 
 **Send only value changes (with baseline)**
-- Pre-loads current state value as baseline during startup
-- Only sends messages when value differs from baseline/previous value
+- Pre-loads current value as baseline, only sends actual **value changes**
 - First change may be blocked if same as current value
-- Use for: Consistent change detection, matching node-red adapter behavior
+- Use for: Consistent behavior across restarts, clean change detection
 
 ### Value Comparison
-
-The node performs intelligent value comparison:
-- **Primitive values** (numbers, strings, booleans): Direct equality comparison
-- **Objects and arrays**: Deep comparison using JSON serialization
-- **Non-serializable objects**: Fallback to reference comparison
-- **Null/undefined values**: Handled consistently across all modes
-
-### Filter Behavior with Initial Values
-
-When "Send initial value on startup" is enabled:
-- **Initial values always bypass change filtering** to ensure reliable startup
-- Change filtering only applies to subsequent state changes
-- Both filter modes behave identically when initial values are enabled
+- **Filtering compares only `state.val`** - metadata changes are ignored
+- **Primitive values**: Direct equality comparison
+- **Objects/arrays**: Deep comparison using JSON serialization
+- **Initial values always bypass filtering** for reliable startup
 
 ## Configuration
 
 ### Basic Settings
 
 **Input Mode**
-- **Single State / Wildcard Pattern**: Supporting one state or wildcard pattern
-- **Multiple States**: Predefined list of states
+- Single State / Wildcard Pattern
+- Multiple States
 
-#### Single State / Wildcard Configuration
-**State ID / Pattern**
-- Single state ID (e.g., `0_userdata.0.temperature`)
-- Wildcard pattern (e.g., `system.adapter.*.alive`)
-- Auto-detects wildcard mode when `*` is present
+**State ID / Pattern** (Single Mode)
+- Single state ID: `0_userdata.0.temperature`
+- Wildcard pattern: `system.adapter.*.alive`
 
-#### Multiple States Configuration
-**Multiple States**
-- Enter one state ID per line
-- Supports exact state IDs only (no wildcards in this mode)
-- Example:
-  ```
-  0_userdata.0.temperature
-  0_userdata.0.humidity
-  lights.living.state
-  sensors.kitchen.temperature
-  ```
+**Multiple States** (Multiple Mode)
+```
+0_userdata.0.temperature
+0_userdata.0.humidity
+lights.living.state
+```
 
 **Output Mode** (Multiple States only)
-- **Individual Messages**: Each state change creates separate message (like single mode)
-- **Grouped Object**: All current values combined in single message object
+- **Individual Messages**: Each change creates separate message
+- **Grouped Object**: All current values in single message
 
-### Filter Settings
+### Filter & Trigger Settings
 
 **Filter Mode**
-- **Send all events**: No filtering - all state changes trigger messages
-- **Send only value changes**: Block duplicate values, first change always sent
-- **Send only value changes (with baseline)**: Pre-load current value, then block duplicates
-
-### Common Settings
-
-**Output Property**
-- Target message property for the state value
-- Default: `payload`
-- Can be set to any valid message property
+- Send all events / Send only value changes / Send only value changes (with baseline)
 
 **Trigger On**
-- **Both (ack and no-ack)**: Receive all state changes regardless of acknowledgment
-- **Acknowledged only**: Only changes with `ack=true`
-- **Unacknowledged only**: Only changes with `ack=false` (commands)
+- Both (ack and no-ack) / Acknowledged only / Unacknowledged only
 
 **Send Initial Value on Startup**
-- When enabled, emits current state value(s) immediately after subscription
-- **Single State**: Sends one initial message
-- **Multiple States**: Sends all current values (individually or grouped based on output mode)
-- **Wildcard**: Automatically disabled for performance reasons
-- **Important**: Initial values always bypass change filtering
+- Single State: Sends one initial message
+- Multiple States: Sends all current values (individual or grouped)
+- Wildcard: Automatically disabled for performance
+
+**Output Property**
+- Target message property for state value (default: `payload`)
 
 ## Output Message Formats
 
-### Individual Messages (Single State, Wildcard, Multiple States Individual Mode)
-
-Standard message format for each state change:
-
+### Individual Messages
 ```javascript
 {
-  payload: 23.5,                    // State value
-  topic: "0_userdata.0.temperature", // State ID
-  timestamp: 1640995200000,         // Change timestamp
-  state: {                          // Complete state object
-    val: 23.5,
-    ack: true,
-    ts: 1640995200000,
-    from: "system.adapter.javascript.0",
-    lc: 1640995190000,
-    q: 0
-  }
+  payload: 23.5,
+  topic: "0_userdata.0.temperature",
+  timestamp: 1640995200000,
+  state: { val: 23.5, ack: true, ts: 1640995200000, ... },
+  pattern: "system.adapter.*",  // Only for wildcards
+  initial: true                 // Only for initial values
 }
 ```
 
-**Additional Properties for Wildcard:**
-- `pattern`: The original wildcard pattern that matched
-
-**Additional Properties for Initial Values:**
-- `initial`: `true` when message is an initial value
-
-### Grouped Object (Multiple States Grouped Mode)
-
-Single message containing all current values:
-
+### Grouped Object (Multiple States)
 ```javascript
 {
   topic: "grouped_states",
-  payload: {                        // All current state values
+  payload: {
     "0_userdata.0.temperature": 23.5,
-    "0_userdata.0.humidity": 65,
-    "lights.living.state": true,
-    "sensors.kitchen.temperature": 22.1
+    "0_userdata.0.humidity": 65
   },
-  states: {                         // Complete state objects
-    "0_userdata.0.temperature": {
-      val: 23.5,
-      ack: true,
-      ts: 1640995200000,
-      from: "system.adapter.javascript.0",
-      lc: 1640995190000,
-      q: 0
-    },
-    // ... other state objects
-  },
-  timestamp: 1640995200000,         // Message timestamp
-  changedState: "0_userdata.0.temperature", // Which state triggered this message
-  changedValue: 23.5,               // New value of changed state
-  initial: true                     // Present for initial value messages
+  states: { /* Complete state objects */ },
+  timestamp: 1640995200000,
+  changedState: "0_userdata.0.temperature",
+  changedValue: 23.5,
+  initial: true  // For initial values
 }
 ```
 
-## Use Cases by Mode
+## Filter Mode Comparison
 
-### Single State Mode
-- **Simple monitoring**: One specific sensor or device
-- **Critical alerts**: Monitor single important state
-- **Testing**: Quick state monitoring during development
-
-### Wildcard Pattern Mode
-- **Dynamic discovery**: Monitor states that may be added/removed
-- **Category monitoring**: All states of specific type
-- **System overview**: Monitor related system states
-
-### Multiple States Mode
-- **Dashboard data**: Fixed set of states for UI display
-- **Related sensors**: Group of sensors in same room/category
-- **System health**: Predefined list of critical system states
-
-### Value Change Filtering Use Cases
-
-**Send all events**
-- Real-time dashboards requiring every update
-- Debugging and development scenarios
-- Systems that need timestamp/acknowledge information even for unchanged values
-
-**Send only value changes**
-- Battery-powered devices (reduce unnecessary transmissions)
-- High-frequency sensors where only actual changes matter
-- Downstream processing that shouldn't run on duplicate values
-
-**Send only value changes (with baseline)**
-- Consistent behavior across Node-RED restarts
-- Systems requiring clean change detection without startup noise
-- Migration from node-red adapter with RBE functionality
-
-## Performance Considerations
-
-### Message Frequency
-- **Individual mode**: Can generate many messages with high-frequency states
-- **Grouped mode**: Generates one message per any state change
-- **Wildcard patterns**: Monitor count shown in node status
-- **Change filtering**: Significantly reduces message volume for stable values
-
-### Optimization Tips
-- Use **specific patterns** instead of broad wildcards: `lights.*` vs `*`
-- Choose **appropriate output mode** based on downstream processing needs
-- **Limit scope** of wildcard patterns to reduce subscription count
-- Use **grouped mode** for dashboard-type applications
-- Consider **change filtering** for high-frequency or stable value states
-- Use **rate limiting** in downstream nodes for remaining high-frequency states
-
-### Filter Mode Performance Impact
-
-**Memory Usage**
-- Change filtering requires storing previous values in memory
-- Memory usage scales with number of monitored states
-- Previous values are cleared on reconnection for clean restart
-
-**CPU Usage**
-- Object comparison uses JSON serialization for deep equality
-- Primitive value comparison is highly optimized
-- Overall CPU impact is minimal for typical use cases
-
-## Initial Values Behavior
-
-### Single State Mode
-- Sends current value immediately after subscription
-- Message includes `initial: true` property
-- Respects ack filter settings
-- **Always bypasses change filtering** for reliable startup
-
-### Wildcard Pattern Mode
-- **Automatically disabled** for performance reasons
-- Many matching states could flood the system at startup
-- Consider using **Multiple States mode** if initial values needed
-
-### Multiple States Mode
-- **Individual Output**: Sends separate initial message for each state
-- **Grouped Output**: Sends single initial message with all current values
-- Only sends initial values for states that actually exist and have values
-- Includes `initial: true` property in messages
-- **Always bypasses change filtering** regardless of filter mode
-
-## Filter Mode Comparison Examples
-
-### Without "Send initial value on startup":
-
-**Current state value: 25**
-
-**Send only value changes:**
+**State vs Value Changes Example**:
 ```
-1. First change: 25 → SENT (no baseline yet)
-2. Second change: 25 → BLOCKED (same value)  
-3. Third change: 26 → SENT (value changed)
+Current state: { val: 25, ts: 1000, ack: true }
+
+1. Timestamp update: { val: 25, ts: 1001, ack: true }
+   - Send all events: SENT (state changed)
+   - Value filters: BLOCKED (value unchanged)
+
+2. Metadata update: { val: 25, ts: 1002, from: "adapter.1" }
+   - Send all events: SENT (state changed)
+   - Value filters: BLOCKED (value unchanged)
+
+3. Value update: { val: 26, ts: 1003, ack: true }
+   - Send all events: SENT (state changed)  
+   - Value filters: SENT (value changed)
 ```
 
-**Send only value changes (with baseline):**
+**Without "Send initial value"** (Current value: 25):
+
 ```
+Send only value changes:
+1. First value change: 25 → SENT (no baseline)
+2. Timestamp update: 25 → BLOCKED (same value)
+3. Second value change: 25 → BLOCKED (same value)
+4. Third value change: 26 → SENT (value changed)
+
+Send only value changes (with baseline):
 1. Startup: Load baseline 25 (stored, not sent)
-2. First change: 25 → BLOCKED (same as baseline)
-3. Second change: 26 → SENT (value changed)
+2. Timestamp update: 25 → BLOCKED (same value)
+3. First value change: 25 → BLOCKED (same as baseline)
+4. Second value change: 26 → SENT (value changed)
 ```
 
-### With "Send initial value on startup":
+**With "Send initial value"**: Both modes behave identically (initial values bypass filtering).
 
-Both modes behave identically because initial values bypass change filtering.
+## Performance & Optimization
+
+### Tips
+- Use **specific patterns**: `lights.*` vs `*`
+- Choose **appropriate output mode** for your use case
+- Consider **change filtering** for high-frequency/stable states
+- Use **grouped mode** for dashboard applications
+- **Rate limit** downstream for remaining high-frequency states
 
 ## Troubleshooting
 
 ### No Messages Received
-1. **Check state exists** in ioBroker objects view
-2. **Verify pattern syntax** for wildcards (only `*` supported)
-3. **Test with simpler pattern** or single state first
-4. **Check trigger settings** (all/ack/unack)
-5. **Verify change filtering** - try "Send all events" mode for testing
+1. Check state exists in ioBroker
+2. Verify wildcard syntax (only `*` supported)  
+3. Test with simpler pattern first
+4. Check trigger settings (all/ack/unack)
+5. Try "Send all events" to test filtering
 
 ### Missing State Changes
-1. **Check trigger filter** settings (all/ack/unack)
-2. **Verify state actually changes** in ioBroker
-3. **Test with different ack filter** to isolate issue
-4. **Check change filtering** - ensure values are actually different
-5. **Compare with/without baseline** to understand filter behavior
-
-### Grouped Mode Issues
-1. **Check all states exist** - non-existent states are skipped
-2. **Verify state subscription** - check node status for subscription count
-3. **Monitor initial values** - may not include states without values
+1. Verify trigger filter settings
+2. Check state actually changes in ioBroker
+3. Ensure values are actually different
+4. Compare filter modes to understand behavior
 
 ### Change Filtering Issues
-1. **Check filter mode** - ensure correct mode selected for your use case
-2. **Test without filtering** - use "Send all events" to verify basic functionality
-3. **Monitor node status** - [Changes] indicator shows when filtering is active
-4. **Check data types** - complex objects may need careful comparison logic
+1. Ensure correct filter mode for use case
+2. Monitor node status for [Changes] indicator
+3. Test with "Send all events" first
+4. Check data types for complex objects
 
 ## Connection Status
 
-The node status indicator shows:
-- **Green dot**: Connected and subscribed successfully
-- **Yellow ring**: Connecting or reconnecting
-- **Red ring**: Connection failed or authentication error
-- **Number in status**: Count of active subscriptions (for wildcards/multiple states)
-- **[Changes] label**: Indicates active value change filtering
+- **Green dot**: Connected and subscribed
+- **Yellow ring**: Connecting/reconnecting
+- **Red ring**: Connection/authentication failed
+- **[Changes] label**: Active value change filtering
+- **Number**: Active subscription count (wildcards/multiple states)
 
 ## Related Nodes
 
 - **WS ioB out**: Send values to states
-- **WS ioB get**: Read current state values
+- **WS ioB get**: Read current state values  
 - **WS ioB inObj**: Monitor object changes
-
-See [Common Use Cases](../use-cases.md) for practical implementation examples.

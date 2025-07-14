@@ -95,16 +95,13 @@ function setupAPIEndpoints(RED) {
                 const serverId = decodeURIComponent(req.params.serverId);
                 const connectionManager = require('../lib/manager/websocket-manager');
 
-                // Use the same method as TreeView - get all states
                 const states = await connectionManager.getStates(serverId);
                 const historyAdapters = [];
 
                 if (states && typeof states === 'object') {
                     const adapterConfigs = new Map();
 
-                    // Extract history adapter information from states
                     Object.keys(states).forEach(stateId => {
-                        // Look for alive states of history adapters
                         const aliveMatch = stateId.match(/^system\.adapter\.(history|sql|influxdb)\.(\d+)\.alive$/);
                         if (aliveMatch) {
                             const adapterType = aliveMatch[1];
@@ -119,7 +116,7 @@ function setupAPIEndpoints(RED) {
                                     name: adapterName,
                                     type: adapterType,
                                     instance: instance,
-                                    enabled: false, // Will be updated if enabled state found
+                                    enabled: false,
                                     alive: isAlive,
                                     title: adapterName
                                 });
@@ -128,7 +125,6 @@ function setupAPIEndpoints(RED) {
                             }
                         }
 
-                        // Look for enabled states of history adapters
                         const enabledMatch = stateId.match(/^system\.adapter\.(history|sql|influxdb)\.(\d+)\.enabled$/);
                         if (enabledMatch) {
                             const adapterType = enabledMatch[1];
@@ -144,7 +140,7 @@ function setupAPIEndpoints(RED) {
                                     type: adapterType,
                                     instance: instance,
                                     enabled: isEnabled,
-                                    alive: false, // Will be updated if alive state found
+                                    alive: false,
                                     title: adapterName
                                 });
                             } else {
@@ -153,13 +149,11 @@ function setupAPIEndpoints(RED) {
                         }
                     });
 
-                    // Convert map to array
                     for (const config of adapterConfigs.values()) {
                         historyAdapters.push(config);
                     }
                 }
 
-                // Sort by type and instance
                 historyAdapters.sort((a, b) => {
                     if (a.type !== b.type) return a.type.localeCompare(b.type);
                     return a.instance - b.instance;
@@ -197,8 +191,8 @@ module.exports = function (RED) {
         RED.nodes.createNode(this, n);
         this.iobhost = n.iobhost;
         this.iobport = n.iobport;
-        this.user = n.user;
-        this.password = n.password;
+        this.user = this.credentials.user;
+        this.password = this.credentials.password;
         this.usessl = n.usessl || false;
 
         const sslInfo = this.usessl ? ' (SSL enabled)' : '';
@@ -206,5 +200,10 @@ module.exports = function (RED) {
         RED.log.debug(`ioBroker config created: ${this.iobhost}:${this.iobport}${sslInfo}${authInfo}`);
     }
 
-    RED.nodes.registerType("iob-config", ioBConfig);
+    RED.nodes.registerType("iob-config", ioBConfig, {
+        credentials: {
+            user: { type: "text" },
+            password: { type: "password" }
+        }
+    });
 };
