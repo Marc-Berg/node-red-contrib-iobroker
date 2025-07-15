@@ -1,6 +1,6 @@
 # Changelog
 
-## [0.13.1] - 2025-xx-xx
+## [0.14.0] - 2025-07-15
 
 ### Added
 - **Current value display in node status indicators**
@@ -56,6 +56,7 @@
 
 ### Fixed
   - Enhance coordination between ConnectionManager, RecoveryManager and WebSocketManager during reconnections
+  - Improved error handling and recovery logic
 
 ## [0.13.0] - 2025-07-10
 
