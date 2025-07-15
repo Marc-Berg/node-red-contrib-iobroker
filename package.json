@@ -42,7 +42,7 @@
     "examples/*.json",
     "README.md",
     "README.de.md",
-    "CHANGELOG",
+    "CHANGELOG.md",
     "LICENSE"
   ],
   "node-red": {
