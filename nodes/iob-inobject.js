@@ -6,10 +6,10 @@ module.exports = function (RED) {
         RED.nodes.createNode(this, config);
         const node = this;
 
-        // Use helper to create status functions
+        
         const { setStatus, setError } = NodeHelpers.createStatusHelpers(node);
 
-        // Use helper to validate server config
+        
         const serverConfig = NodeHelpers.validateServerConfig(RED, config, setError);
         if (!serverConfig) return;
 
@@ -53,7 +53,7 @@ module.exports = function (RED) {
         function onObjectChange(objectId, objectData, operation) {
             try {
                 if (!objectData) {
-                    // Object was deleted
+                    
                     operation = 'delete';
                     objectData = { _id: objectId, deleted: true };
                 }
@@ -76,7 +76,7 @@ module.exports = function (RED) {
         function createCallback() {
             const callback = onObjectChange;
 
-            // Custom status texts for object subscription
+            
             const statusTexts = {
                 ready: isWildcardPattern
                     ? `Pattern ready: ${node.objectPattern}`
@@ -84,7 +84,7 @@ module.exports = function (RED) {
                 disconnected: "Disconnected"
             };
 
-            // Use helper for subscription event handling
+            
             const baseCallback = NodeHelpers.createSubscriptionEventCallback(
                 node,
                 setStatus,
@@ -94,17 +94,17 @@ module.exports = function (RED) {
                 statusTexts
             );
 
-            // Merge the callbacks
+            
             Object.assign(callback, baseCallback);
 
-            // Object subscriptions don't typically have initial values
+            
             callback.wantsInitialValue = false;
 
             return callback;
         }
 
         async function initialize() {
-            // Check if we're already subscribed and connection is ready
+            
             const status = connectionManager.getConnectionStatus(settings.serverId);
             if (node.isSubscribed && status.connected && status.ready) {
                 return;
@@ -113,12 +113,12 @@ module.exports = function (RED) {
             try {
                 setStatus("yellow", "ring", "Connecting...");
 
-                // Handle config changes using helper
+                
                 await NodeHelpers.handleConfigChange(node, config, RED, settings);
 
                 const callback = createCallback();
 
-                // Use the new subscribeObjects method
+                
                 await connectionManager.subscribeObjects(
                     settings.nodeId,
                     settings.serverId,
@@ -141,13 +141,13 @@ module.exports = function (RED) {
                 const errorMsg = error.message || 'Unknown error';
 
                 if (errorMsg.includes('auth_failed') || errorMsg.includes('Authentication failed')) {
-                    // Permanent authentication failure
+                    
                     setStatus("red", "ring", "Auth failed");
                 } else if (errorMsg.includes('not possible in state')) {
-                    // Connection is in a state where retry isn't possible 
+                    
                     setStatus("red", "ring", "Connection failed");
                 } else {
-                    // Other errors - manager will handle recovery
+                    
                     setStatus("yellow", "ring", "Retrying...");
                 }
 
@@ -182,7 +182,7 @@ module.exports = function (RED) {
 
         node.on("error", NodeHelpers.createErrorHandler(node, setError));
 
-        // Initialize the node
+        
         initialize();
     }
 

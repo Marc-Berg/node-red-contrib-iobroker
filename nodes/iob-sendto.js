@@ -6,10 +6,10 @@ module.exports = function(RED) {
         RED.nodes.createNode(this, config);
         const node = this;
 
-        // Use helper to create status functions
+        
         const { setStatus, setError } = NodeHelpers.createStatusHelpers(node);
         
-        // Use helper to validate server config
+        
         const serverConfig = NodeHelpers.validateServerConfig(RED, config, setError);
         if (!serverConfig) return;
 
@@ -48,7 +48,7 @@ module.exports = function(RED) {
 
         node.on('input', async function(msg, send, done) {
             try {
-                // Handle status requests using helper
+                
                 if (NodeHelpers.handleStatusRequest(msg, send, done, settings)) {
                     return;
                 }
