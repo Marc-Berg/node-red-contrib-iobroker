@@ -101,10 +101,10 @@ Falls du keine Admin Instanz verwenden möchtest:
 
 ## 📚 Zusätzliche Ressourcen
 
-- **📋 Release Notes**: [Changelog](CHANGELOG.md)
-- **🔍 Fehlerbehebung**: [Troubleshooting Guide](docs/troubleshooting.md)
-- **📊 Logging**: [Logging Guide](docs/logging.md) - Log-Nachrichten verstehen und Fehlerdiagnose
-- **🎯 Anwendungsfälle**: [Common Use Cases](docs/use-cases.md)
+- **📋 Release Notes**: [Changelog](https://github.com/Marc-Berg/node-red-contrib-iobroker/blob/main/CHANGELOG.md)
+- **🔍 Fehlerbehebung**: [Troubleshooting Guide](https://github.com/Marc-Berg/node-red-contrib-iobroker/blob/main/docs/troubleshooting.md)
+- **📊 Logging**: [Logging Guide](https://github.com/Marc-Berg/node-red-contrib-iobroker/blob/main/docs/logging.md) - Log-Nachrichten verstehen und Fehlerdiagnose
+- **🎯 Anwendungsfälle**: [Common Use Cases](https://github.com/Marc-Berg/node-red-contrib-iobroker/blob/main/docs/use-cases.md)
 - **📖 Vollständige Dokumentation**: [GitHub Repository](https://github.com/Marc-Berg/node-red-contrib-iobroker)
 - **🐛 Fehlerberichte**: [GitHub Issues](https://github.com/Marc-Berg/node-red-contrib-iobroker/issues)
 - **📘 ioBroker Forum**: [ioBroker.net](https://forum.iobroker.net)
