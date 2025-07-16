@@ -8,6 +8,18 @@ module.exports = function(RED) {
         node.server = RED.nodes.getNode(config.server);
         node.stateId = config.stateId;
         node.isSubscribed = false;
+        
+        // Configuration options
+        node.sendInitialValue = config.sendInitialValue || false;
+        node.ackFilter = config.ackFilter || "both";
+        
+        // Detect wildcard pattern
+        node.isWildcardPattern = node.stateId && node.stateId.includes('*');
+        
+        // Wildcard patterns don't support initial values
+        if (node.isWildcardPattern) {
+            node.sendInitialValue = false;
+        }
 
         if (!node.server || !node.stateId) {
             node.status({ fill: "red", shape: "dot", text: "Error: Server or State ID not configured" });
@@ -31,19 +43,86 @@ module.exports = function(RED) {
         };
 
         const onSubscriptionConfirmed = ({ serverId, stateId }) => {
-            if (serverId === node.server.id && stateId === node.stateId) {
-                node.status({ fill: "green", shape: "ring", text: `Subscribed to ${node.stateId}` });
-                node.isSubscribed = true; // Ensure subscription status is correct after re-subscription
+            if (serverId === node.server.id) {
+                // For wildcard patterns, any matching subscription confirms our pattern is active
+                if (node.isWildcardPattern) {
+                    if (matchesWildcardPattern(stateId, node.stateId)) {
+                        node.status({ fill: "green", shape: "ring", text: `Pattern active: ${node.stateId}` });
+                        node.isSubscribed = true;
+                    }
+                } else {
+                    // For single states, exact match
+                    if (stateId === node.stateId) {
+                        node.status({ fill: "green", shape: "ring", text: `Subscribed to ${node.stateId}` });
+                        node.isSubscribed = true;
+                    }
+                }
             }
         };
 
         const onStateChanged = ({ serverId, stateId, state }) => {
-            if (serverId === node.server.id && stateId === node.stateId) {
-                const statusText = `val: ${state.val} (ts: ${new Date(state.ts).toLocaleTimeString()})`;
+            if (serverId === node.server.id) {
+                // For wildcard patterns, check if the stateId matches the pattern
+                if (node.isWildcardPattern) {
+                    if (!matchesWildcardPattern(stateId, node.stateId)) {
+                        return; // State doesn't match our pattern
+                    }
+                } else {
+                    // For single states, exact match
+                    if (stateId !== node.stateId) {
+                        return;
+                    }
+                }
+                
+                // Apply ACK filter
+                if (!shouldSendMessage(state.ack, node.ackFilter)) {
+                    return;
+                }
+                
+                // Create output message
+                const message = {
+                    payload: state.val,
+                    topic: stateId,
+                    ts: state.ts,
+                    ack: state.ack,
+                    state: state
+                };
+                
+                // Add pattern info for wildcard matches
+                if (node.isWildcardPattern) {
+                    message.pattern = node.stateId;
+                }
+                
+                // Update status and send message
+                const statusText = node.isWildcardPattern 
+                    ? `${stateId}: ${state.val} (ts: ${new Date(state.ts).toLocaleTimeString()})`
+                    : `val: ${state.val} (ts: ${new Date(state.ts).toLocaleTimeString()})`;
+                    
                 node.status({ fill: "green", shape: "dot", text: statusText });
-                node.send({ payload: state.val, topic: stateId, ts: state.ts, ack: state.ack });
+                node.send(message);
             }
         };
+        
+        // Helper function to check ACK filter
+        function shouldSendMessage(ack, filter) {
+            switch (filter) {
+                case "ack": return ack === true;
+                case "noack": return ack === false;
+                default: return true; // "both"
+            }
+        }
+        
+        // Helper function to match wildcard patterns
+        function matchesWildcardPattern(stateId, pattern) {
+            // Convert wildcard pattern to regex
+            // Escape special regex characters except *
+            const regexPattern = pattern
+                .replace(/[.+?^${}()|[\]\\]/g, '\\$&') // Escape special chars
+                .replace(/\*/g, '.*'); // Replace * with .*
+            
+            const regex = new RegExp(`^${regexPattern}$`);
+            return regex.test(stateId);
+        }
 
         const onDisconnected = ({ serverId }) => {
             if (serverId === node.server.id) {
@@ -99,7 +178,10 @@ module.exports = function(RED) {
         });
 
         // Initial status on deploy
-        node.status({ fill: "grey", shape: "dot", text: "Waiting for server..." });
+        const initialStatusText = node.isWildcardPattern 
+            ? `Waiting for pattern: ${node.stateId}` 
+            : "Waiting for server...";
+        node.status({ fill: "grey", shape: "dot", text: initialStatusText });
     }
 
     RED.nodes.registerType("iob-in-evented", IoBrokerInEventedNode);

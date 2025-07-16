@@ -7,13 +7,69 @@
         defaults: {
             name: { value: "" },
             stateId: { value: "", required: true },
-            server: { value: "", type: "iob-config", required: true }
+            server: { value: "", type: "iob-config", required: true },
+            sendInitialValue: { value: false },
+            ackFilter: { value: "both" }
         },
         inputs: 0,
         outputs: 1,
-        icon: "ioBroker.svg",
+        icon: "iobroker.svg",
         label: function() {
-            return this.name || this.stateId || "iob-in-evented";
+            if (this.name) return this.name;
+            
+            // Check for wildcard pattern
+            if (this.stateId && this.stateId.includes('*')) {
+                return `${this.stateId} (wildcard)`;
+            }
+            
+            return this.stateId || "iob-in-evented";
+        },
+        oneditprepare: function() {
+            // Wildcard detection
+            function checkForWildcard() {
+                const stateValue = $('#node-input-stateId').val() || '';
+                const hasWildcardChars = stateValue.includes('*');
+                
+                if (hasWildcardChars) {
+                    // Disable initial values for wildcards
+                    $('#node-input-sendInitialValue').prop('checked', false).prop('disabled', true);
+                    $('#initial-value-container').addClass('wildcard-disabled');
+                    
+                    // Show wildcard info
+                    showWildcardInfo();
+                } else {
+                    // Re-enable initial values for single states
+                    $('#node-input-sendInitialValue').prop('disabled', false);
+                    $('#initial-value-container').removeClass('wildcard-disabled');
+                    
+                    // Hide wildcard info
+                    hideWildcardInfo();
+                }
+            }
+            
+            function showWildcardInfo() {
+                const warnings = [
+                    'This pattern will match multiple states',
+                    'Initial values are automatically disabled',
+                    'Each matching state will generate separate messages'
+                ];
+                
+                $('#wildcard-warnings').empty();
+                warnings.forEach(warning => {
+                    $('#wildcard-warnings').append(`<li>${warning}</li>`);
+                });
+                $('#wildcard-info').show();
+            }
+            
+            function hideWildcardInfo() {
+                $('#wildcard-info').hide();
+            }
+            
+            // Event handlers
+            $('#node-input-stateId').on('input', checkForWildcard);
+            
+            // Initial check
+            setTimeout(checkForWildcard, 100);
         }
     });
 </script>
@@ -29,21 +85,88 @@
     </div>
     <div class="form-row">
         <label for="node-input-stateId"><i class="fa fa-dot-circle-o"></i> State ID</label>
-        <input type="text" id="node-input-stateId" placeholder="e.g. 0_userdata.0.myState">
+        <input type="text" id="node-input-stateId" placeholder="e.g. 0_userdata.0.myState or system.adapter.*">
+    </div>
+    <div class="form-row">
+        <label for="node-input-ackFilter"><i class="fa fa-filter"></i> ACK Filter</label>
+        <select id="node-input-ackFilter">
+            <option value="both">All (acknowledged and unacknowledged)</option>
+            <option value="ack">Only acknowledged</option>
+            <option value="noack">Only unacknowledged</option>
+        </select>
+    </div>
+    <div class="form-row" id="initial-value-container">
+        <label for="node-input-sendInitialValue"></label>
+        <input type="checkbox" id="node-input-sendInitialValue" style="display: inline-block; width: auto; vertical-align: top;">
+        <label for="node-input-sendInitialValue" style="width: 70%;"> Send initial value on deploy</label>
+        <div class="form-tips" style="margin-top: 5px;">
+            <b>Note:</b> Initial values are not supported for wildcard patterns.
+        </div>
+    </div>
+    <div id="wildcard-info" style="display: none; margin-top: 10px;">
+        <div style="background: #fff3cd; border: 1px solid #ffeaa7; border-radius: 4px; padding: 8px; font-size: 12px;">
+            <strong>Wildcard Pattern Detected:</strong>
+            <ul id="wildcard-warnings" style="margin: 5px 0 0 15px; padding: 0;">
+            </ul>
+        </div>
     </div>
 </script>
 
 <script type="text/html" data-help-name="iob-in-evented">
     <p>Subscribes to ioBroker state changes using the new event-based architecture.</p>
-    <p>This node listens for changes to a single, specified State ID and outputs a message whenever the state is updated.</p>
+    <p>This node listens for changes to a specified State ID or wildcard pattern and outputs a message whenever a matching state is updated.</p>
+    
+    <h3>Configuration</h3>
+    <dl class="message-properties">
+        <dt>State ID</dt>
+        <dd>The State ID to monitor. Supports wildcard patterns using <code>*</code> (e.g., <code>system.adapter.*</code>)</dd>
+        <dt>ACK Filter</dt>
+        <dd>Filter messages based on the acknowledgment flag:
+            <ul>
+                <li><b>All:</b> Send all state changes (default)</li>
+                <li><b>Only acknowledged:</b> Only send changes where ack=true</li>
+                <li><b>Only unacknowledged:</b> Only send changes where ack=false</li>
+            </ul>
+        </dd>
+        <dt>Send initial value</dt>
+        <dd>Send the current value when the node is deployed (not available for wildcard patterns)</dd>
+    </dl>
+    
     <h3>Outputs</h3>
     <dl class="message-properties">
         <dt>payload</dt>
         <dd>The value of the state (<code>state.val</code>).</dd>
         <dt>topic</dt>
         <dd>The State ID that changed.</dd>
+        <dt>ts</dt>
+        <dd>The timestamp of the state change.</dd>
+        <dt>ack</dt>
+        <dd>The acknowledgment flag of the state.</dd>
         <dt>state</dt>
         <dd>The complete ioBroker state object.</dd>
+        <dt>pattern <span style="color: #999;">(wildcard only)</span></dt>
+        <dd>The original wildcard pattern that matched this state.</dd>
     </dl>
+    
+    <h3>Wildcard Patterns</h3>
+    <p>Wildcard patterns allow you to monitor multiple states with a single node:</p>
+    <ul>
+        <li><code>system.adapter.*</code> - All adapter states</li>
+        <li><code>0_userdata.0.*</code> - All user data states</li>
+        <li><code>hm-rpc.0.*.STATE</code> - All STATE channels from HomeMatic</li>
+    </ul>
+    <p><b>Note:</b> Initial values are not supported for wildcard patterns as they could generate many messages at once.</p>
+    
     <p><b>Note:</b> This is a new node for testing the next-generation architecture. It runs alongside the existing nodes.</p>
 </script>
+
+<style>
+    .wildcard-disabled {
+        opacity: 0.5;
+        pointer-events: none;
+    }
+    
+    .wildcard-disabled label {
+        color: #999 !important;
+    }
+</style>
