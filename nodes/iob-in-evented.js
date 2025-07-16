@@ -22,6 +22,12 @@ module.exports = function(RED) {
             }
         };
 
+        const onSubscriptionConfirmed = ({ serverId, stateId }) => {
+            if (serverId === node.server.id && stateId === node.stateId) {
+                node.status({ fill: "green", shape: "ring", text: `Subscribed to ${node.stateId}` });
+            }
+        };
+
         const onStateChanged = ({ serverId, stateId, state }) => {
             if (serverId === node.server.id && stateId === node.stateId) {
                 const statusText = `val: ${state.val} (ts: ${new Date(state.ts).toLocaleTimeString()})`;
@@ -63,6 +69,7 @@ module.exports = function(RED) {
 
         // Listen for events from the Orchestrator
         Orchestrator.on('server:ready', onServerReady);
+        Orchestrator.on('state:subscription_confirmed', onSubscriptionConfirmed);
         Orchestrator.on('state:changed', onStateChanged);
         Orchestrator.on('connection:disconnected', onDisconnected);
         Orchestrator.on('connection:retrying', onRetrying);
@@ -71,6 +78,7 @@ module.exports = function(RED) {
         node.on('close', (done) => {
             // Clean up all listeners to prevent memory leaks
             Orchestrator.removeListener('server:ready', onServerReady);
+            Orchestrator.removeListener('state:subscription_confirmed', onSubscriptionConfirmed);
             Orchestrator.removeListener('state:changed', onStateChanged);
             Orchestrator.removeListener('connection:disconnected', onDisconnected);
             Orchestrator.removeListener('connection:retrying', onRetrying);
