@@ -1,5 +1,10 @@
 # Changelog
 
+## [0.14.1] - 2025-07-16
+
+### Fixed
+- fix subscribe issue with multiplestate
+
 ## [0.14.0] - 2025-07-15
 
 ### Added
