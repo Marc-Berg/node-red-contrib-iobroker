@@ -12,6 +12,9 @@ function setupStaticResources(RED) {
 
     if (staticResourcesSetup) return true;
 
+    // Initialize the Orchestrator once when the config node is loaded
+    Orchestrator.init(RED);
+
     try {
         const sharedPath = path.join(__dirname, '..', 'shared');
 
