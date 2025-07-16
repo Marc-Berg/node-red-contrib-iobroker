@@ -1,72 +1,88 @@
-// nodes/iob-in-evented.js
 const Orchestrator = require('../lib/orchestrator');
 
 module.exports = function(RED) {
     function IoBrokerInEventedNode(config) {
         RED.nodes.createNode(this, config);
         const node = this;
-
-        // 1. Get the server configuration from the existing iob-config node
-        const server = RED.nodes.getNode(config.server);
-        if (!server) {
-            node.status({ fill: "red", shape: "ring", text: "No server configured" });
-            return;
-        }
-
-        const stateId = config.stateId;
-        if (!stateId) {
-            node.status({ fill: "red", shape: "ring", text: "No State ID configured" });
-            return;
-        }
         
-        // 2. Register this node with the new Orchestrator
-        // The 'server' object contains all credentials and connection details.
-        Orchestrator.registerNode(node.id, server);
+        node.server = RED.nodes.getNode(config.server);
+        node.stateId = config.stateId;
 
-        // 3. Define handlers for events from the Orchestrator
-        const onStateChanged = ({ stateId: changedId, state }) => {
-            if (changedId === stateId) {
-                node.send({
-                    topic: changedId,
-                    payload: state.val,
-                    state: state
+        if (!node.server || !node.stateId) {
+            node.status({ fill: "red", shape: "dot", text: "Error: Server or State ID not configured" });
+            return;
+        }
+
+        // --- Event Handler ---
+
+        const onServerReady = ({ serverId }) => {
+            if (serverId === node.server.id) {
+                node.status({ fill: "blue", shape: "dot", text: `Subscribing to ${node.stateId}...` });
+                Orchestrator.subscribe(node.id, node.stateId);
+            }
+        };
+
+        const onStateChanged = ({ serverId, stateId, state }) => {
+            if (serverId === node.server.id && stateId === node.stateId) {
+                const statusText = `val: ${state.val} (ts: ${new Date(state.ts).toLocaleTimeString()})`;
+                node.status({ fill: "green", shape: "dot", text: statusText });
+                node.send({ payload: state.val, topic: stateId, ts: state.ts, ack: state.ack });
+            }
+        };
+
+        const onDisconnected = ({ serverId }) => {
+            if (serverId === node.server.id) {
+                node.status({ fill: "red", shape: "ring", text: "Disconnected" });
+            }
+        };
+
+        const onRetrying = ({ serverId, attempt, delay }) => {
+            if (serverId === node.server.id) {
+                node.status({ 
+                    fill: "yellow", 
+                    shape: "ring", 
+                    text: `Retrying in ${delay / 1000}s (Attempt #${attempt})` 
                 });
             }
         };
 
-        const updateNodeStatus = () => {
-             // This logic can be expanded to show more detailed status
-            node.status({ fill: "green", shape: "dot", text: "connected" });
-        };
-       
-        const handleDisconnect = () => {
-            node.status({ fill: "red", shape: "ring", text: "disconnected" });
+        const onPermanentFailure = ({ serverId, error }) => {
+            if (serverId === node.server.id) {
+                node.status({ 
+                    fill: "red", 
+                    shape: "dot", 
+                    text: `Failed: ${error.message}` 
+                });
+            }
         };
 
-        // 4. Subscribe to Orchestrator events
-        Orchestrator.subscribe(node.id, stateId);
+        // --- Node Lifecycle ---
+
+        // Register the node with the Orchestrator. This triggers the initial connection request.
+        Orchestrator.registerNode(node.id, node.server);
+
+        // Listen for events from the Orchestrator
+        Orchestrator.on('server:ready', onServerReady);
         Orchestrator.on('state:changed', onStateChanged);
-        Orchestrator.on('auth:success', updateNodeStatus);
-        Orchestrator.on('connection:disconnected', handleDisconnect);
+        Orchestrator.on('connection:disconnected', onDisconnected);
+        Orchestrator.on('connection:retrying', onRetrying);
+        Orchestrator.on('connection:failed_permanently', onPermanentFailure);
 
-
-        // 5. Clean up when the node is closed or redeployed
         node.on('close', (done) => {
-            // Unregister this node's need for the connection
-            Orchestrator.unregisterNode(node.id, server.id);
+            // Clean up all listeners to prevent memory leaks
+            Orchestrator.removeListener('server:ready', onServerReady);
+            Orchestrator.removeListener('state:changed', onStateChanged);
+            Orchestrator.removeListener('connection:disconnected', onDisconnected);
+            Orchestrator.removeListener('connection:retrying', onRetrying);
+            Orchestrator.removeListener('connection:failed_permanently', onPermanentFailure);
             
-            // Unsubscribe from events to prevent memory leaks
-            Orchestrator.off('state:changed', onStateChanged);
-            Orchestrator.off('auth:success', updateNodeStatus);
-            Orchestrator.off('connection:disconnected', handleDisconnect);
-            
-            // Stop listening for this specific state
-            Orchestrator.unsubscribe(node.id, stateId);
-            
-            node.status({});
+            Orchestrator.unregisterNode(node.id, node.server.id);
             done();
         });
+
+        // Initial status on deploy
+        node.status({ fill: "grey", shape: "dot", text: "Waiting for server..." });
     }
 
     RED.nodes.registerType("iob-in-evented", IoBrokerInEventedNode);
-}
+};

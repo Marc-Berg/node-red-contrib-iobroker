@@ -2,12 +2,14 @@ const path = require('path');
 const express = require('express');
 const fs = require('fs');
 const { Logger } = require('../lib/utils/logger');
+const Orchestrator = require('../lib/orchestrator');
 
 let staticResourcesSetup = false;
 let apiEndpointsSetup = false;
 
 function setupStaticResources(RED) {
     Logger.setRED(RED);
+
     if (staticResourcesSetup) return true;
 
     try {
@@ -186,6 +188,8 @@ function setupAPIEndpoints(RED) {
 module.exports = function (RED) {
     const staticResult = setupStaticResources(RED);
     const apiResult = setupAPIEndpoints(RED);
+
+    Orchestrator.init(RED);
 
     function ioBConfig(n) {
         RED.nodes.createNode(this, n);
