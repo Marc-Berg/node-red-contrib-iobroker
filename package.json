@@ -49,6 +49,7 @@
     "version": ">=2.0.0",
     "nodes": {
       "iobin": "nodes/iob-in.js",
+      "iobin-evented": "nodes/iob-in-evented.js",
       "iobout": "nodes/iob-out.js",
       "iobinobject": "nodes/iob-inobject.js",
       "iobget": "nodes/iob-get.js",

@@ -1,0 +1,49 @@
+<!-- nodes/iob-in-evented.html -->
+
+<script type="text/javascript">
+    RED.nodes.registerType('iob-in-evented', {
+        category: 'ioBroker',
+        color: '#82b54b',
+        defaults: {
+            name: { value: "" },
+            stateId: { value: "", required: true },
+            server: { value: "", type: "iob-config", required: true }
+        },
+        inputs: 0,
+        outputs: 1,
+        icon: "ioBroker.svg",
+        label: function() {
+            return this.name || this.stateId || "iob-in-evented";
+        }
+    });
+</script>
+
+<script type="text/html" data-template-name="iob-in-evented">
+    <div class="form-row">
+        <label for="node-input-name"><i class="fa fa-tag"></i> Name</label>
+        <input type="text" id="node-input-name" placeholder="Name">
+    </div>
+    <div class="form-row">
+        <label for="node-input-server"><i class="fa fa-server"></i> Server</label>
+        <input type="text" id="node-input-server">
+    </div>
+    <div class="form-row">
+        <label for="node-input-stateId"><i class="fa fa-dot-circle-o"></i> State ID</label>
+        <input type="text" id="node-input-stateId" placeholder="e.g. 0_userdata.0.myState">
+    </div>
+</script>
+
+<script type="text/html" data-help-name="iob-in-evented">
+    <p>Subscribes to ioBroker state changes using the new event-based architecture.</p>
+    <p>This node listens for changes to a single, specified State ID and outputs a message whenever the state is updated.</p>
+    <h3>Outputs</h3>
+    <dl class="message-properties">
+        <dt>payload</dt>
+        <dd>The value of the state (<code>state.val</code>).</dd>
+        <dt>topic</dt>
+        <dd>The State ID that changed.</dd>
+        <dt>state</dt>
+        <dd>The complete ioBroker state object.</dd>
+    </dl>
+    <p><b>Note:</b> This is a new node for testing the next-generation architecture. It runs alongside the existing nodes.</p>
+</script>
