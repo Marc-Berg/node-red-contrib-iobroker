@@ -1,14 +1,8 @@
 # Changelog
 
-## [0.14.2] - 2025-07-16
+## [0.14.3] - 2025-07-16
 
-### Fixed
-- fix(iob-in): restore subscribedStates after connection recovery
-
-## [0.14.1] - 2025-07-16
-
-### Fixed
-- fix subscribe issue with multiplestate
+ - prevent duplicate messages with delayed subscription consolidation
 
 ## [0.14.0] - 2025-07-15
 
