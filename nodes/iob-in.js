@@ -103,18 +103,15 @@ module.exports = function (RED) {
                 let statusText;
 
                 if (isMultipleStates) {
-                    const currentCount = node.currentStateValues.size;
                     const subscribedCount = node.subscribedStates.size;
                     const filterLabel = (settings.filterMode === 'changes-only' || settings.filterMode === 'changes-smart') ? ' [Changes]' : '';
-                    
                     if (node.hasReceivedValue) {
-                        statusText = `${subscribedCount} states (${currentCount} current)${filterLabel} - Last: ${timestamp}`;
+                        statusText = `${subscribedCount} states${filterLabel} - Last: ${timestamp}`;
                     } else {
                         statusText = `${stateList.length} states (${settings.outputMode})${filterLabel}`;
                     }
                 } else if (isWildcardPattern) {
                     const filterLabel = (settings.filterMode === 'changes-only' || settings.filterMode === 'changes-smart') ? ' [Changes]' : '';
-                    
                     if (node.hasReceivedValue) {
                         statusText = `Pattern active${filterLabel} - Last: ${timestamp}`;
                     } else {
@@ -124,7 +121,6 @@ module.exports = function (RED) {
                     const filterLabel = (settings.filterMode === 'changes-only' || settings.filterMode === 'changes-smart') ? ' [Changes]' : '';
                     statusText = `Ready${filterLabel}`;
                 }
-
                 setStatus("green", "dot", statusText);
             }
         }
@@ -306,9 +302,8 @@ module.exports = function (RED) {
             node.initialGroupedMessageSent = true;
             node.hasReceivedValue = true;
             
-            const currentCount = node.currentStateValues.size;
             const expectedCount = node.expectedInitialValues;
-            node.debug(`Grouped initial message sent with ${currentCount}/${expectedCount} states`);
+            node.debug(`Grouped initial message sent with ${node.currentStateValues.size}/${expectedCount} states`);
             
             updateStatusWithValue(true);
         }
