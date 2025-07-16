@@ -6,7 +6,7 @@ module.exports = function (RED) {
         RED.nodes.createNode(this, config);
         const node = this;
         const { setStatus, setError } = NodeHelpers.createStatusHelpers(node);
-        
+
         const serverConfig = NodeHelpers.validateServerConfig(RED, config, setError);
         if (!serverConfig) return;
 
@@ -62,12 +62,12 @@ module.exports = function (RED) {
         node.fallbackTimeout = null;
         node.lastValue = undefined;
         node.hasReceivedValue = false;
-        
+
         node.previous = new Map();
 
         function formatValueForStatus(value) {
             let displayValue;
-            
+
             if (value === null) {
                 displayValue = "null";
             } else if (value === undefined) {
@@ -83,11 +83,11 @@ module.exports = function (RED) {
             } else {
                 displayValue = String(value);
             }
-            
+
             if (displayValue.length > 20) {
                 return "..." + displayValue.slice(-20);
             }
-            
+
             return displayValue;
         }
 
@@ -137,23 +137,23 @@ module.exports = function (RED) {
             if (isInitialValue) {
                 return true;
             }
-            
+
             if (filterMode !== 'changes-only' && filterMode !== 'changes-smart') {
                 return true;
             }
 
             const previousValue = node.previous.get(stateId);
-            
+
             if (filterMode === 'changes-only' && previousValue === undefined) {
                 return true;
             }
-            
+
             if (typeof newValue === 'object' && newValue !== null) {
                 const currentJSON = JSON.stringify(newValue);
                 const previousJSON = previousValue !== undefined ? JSON.stringify(previousValue) : undefined;
                 return currentJSON !== previousJSON;
             }
-            
+
             return newValue !== previousValue;
         }
 
@@ -301,10 +301,10 @@ module.exports = function (RED) {
             node.send(message);
             node.initialGroupedMessageSent = true;
             node.hasReceivedValue = true;
-            
+
             const expectedCount = node.expectedInitialValues;
             node.debug(`Grouped initial message sent with ${node.currentStateValues.size}/${expectedCount} states`);
-            
+
             updateStatusWithValue(true);
         }
 
@@ -380,6 +380,23 @@ module.exports = function (RED) {
             }
         }
 
+        // WICHTIG: Funktion um subscribedStates vom NodeRegistry zu synchronisieren
+        function syncSubscribedStatesFromRegistry() {
+            try {
+                // Diese Funktion würde die subscribedStates vom NodeRegistry holen
+                // Da wir keinen direkten Zugriff haben, müssen wir das anders lösen
+                if (isMultipleStates) {
+                    const registryInfo = connectionManager.getMultipleStateInfo?.(settings.nodeId);
+                    if (registryInfo && registryInfo.subscribedStates) {
+                        node.subscribedStates = new Set(registryInfo.subscribedStates);
+                        node.debug(`Synced ${node.subscribedStates.size} subscribed states from registry`);
+                    }
+                }
+            } catch (error) {
+                node.debug(`Could not sync subscribed states from registry: ${error.message}`);
+            }
+        }
+
         function createCallback() {
             const callback = onStateChange;
 
@@ -420,12 +437,12 @@ module.exports = function (RED) {
                         if (settings.filterMode !== 'changes-smart') {
                             updatePreviousValue(stateId, state.val);
                         }
-                        
+
                         if (isSingleState) {
                             node.lastValue = state.val;
                             node.hasReceivedValue = true;
                         }
-                        
+
                         const message = createMessage(stateId, state, true);
                         node.send(message);
                         updateStatusWithValue(true);
@@ -437,24 +454,49 @@ module.exports = function (RED) {
             };
 
             const statusTexts = {
-                ready: isMultipleStates 
+                ready: isMultipleStates
                     ? `${stateList.length} states (${settings.outputMode})${(settings.filterMode === 'changes-only' || settings.filterMode === 'changes-smart') ? ' [Changes]' : ''}`
-                    : isWildcardPattern 
-                        ? `Pattern: ${subscriptionPattern}${(settings.filterMode === 'changes-only' || settings.filterMode === 'changes-smart') ? ' [Changes]' : ''}` 
+                    : isWildcardPattern
+                        ? `Pattern: ${subscriptionPattern}${(settings.filterMode === 'changes-only' || settings.filterMode === 'changes-smart') ? ' [Changes]' : ''}`
                         : `Ready${(settings.filterMode === 'changes-only' || settings.filterMode === 'changes-smart') ? ' [Changes]' : ''}`,
                 disconnected: "Disconnected"
             };
 
             const baseCallback = NodeHelpers.createSubscriptionEventCallback(
-                node, 
+                node,
                 setStatus,
-                () => { 
-                    node.isSubscribed = true; 
+                () => {
+                    node.isSubscribed = true;
+                    // WICHTIG: Nach erfolgreicher Subscription subscribedStates synchronisieren
+                    if (isMultipleStates) {
+                        syncSubscribedStatesFromRegistry();
+                    }
                 },
                 statusTexts
             );
 
             Object.assign(callback, baseCallback);
+
+            // KORREKTUR: onSubscribed erweitern um die subscribedStates zu synchronisieren
+            const originalOnSubscribed = callback.onSubscribed;
+            callback.onSubscribed = function() {
+                if (originalOnSubscribed) {
+                    originalOnSubscribed();
+                }
+                
+                // WICHTIG: subscribedStates nach erfolgreicher Subscription synchronisieren
+                if (isMultipleStates) {
+                    // Da wir die erfolgreichen States von subscribeMultiple bekommen haben,
+                    // sollten sie bereits in node.subscribedStates sein
+                    // Aber zur Sicherheit nochmals die ursprünglichen States setzen
+                    if (node.subscribedStates.size === 0) {
+                        stateList.forEach(stateId => {
+                            node.subscribedStates.add(stateId);
+                        });
+                        node.debug(`Restored ${node.subscribedStates.size} subscribed states in onSubscribed`);
+                    }
+                }
+            };
 
             callback.onReconnect = function() {
                 node.isSubscribed = false;
@@ -467,7 +509,20 @@ module.exports = function (RED) {
                     clearTimeout(node.fallbackTimeout);
                     node.fallbackTimeout = null;
                 }
+                
+                // KORREKTUR: subscribedStates mit ursprünglichen States wiederherstellen
+                if (isMultipleStates) {
+                    node.subscribedStates.clear();
+                    node.currentStateValues.clear();
+                    stateList.forEach(stateId => {
+                        node.subscribedStates.add(stateId);
+                    });
+                    node.expectedInitialValues = stateList.length;
+                    node.debug(`Restored ${node.subscribedStates.size} subscribed states in onReconnect`);
+                }
+                
                 setStatus("yellow", "ring", "Resubscribing...");
+                updateStatusWithValue();
             };
 
             return callback;
@@ -488,11 +543,15 @@ module.exports = function (RED) {
                         callback,
                         globalConfig
                     );
-                    
+
+                    // WICHTIG: subscribedStates mit den tatsächlich erfolgreichen States setzen
+                    node.subscribedStates.clear();
                     successfulStates.forEach(stateId => {
                         node.subscribedStates.add(stateId);
                     });
                     
+                    node.debug(`Successfully subscribed to ${node.subscribedStates.size}/${stateList.length} states`);
+
                 } catch (error) {
                     node.error(`Failed to subscribe to multiple states: ${error.message}`);
                     throw error;
@@ -558,7 +617,7 @@ module.exports = function (RED) {
         node.on("close", async function (removed, done) {
             node.isInitialized = false;
             node.isSubscribed = false;
-            
+
             if (node.fallbackTimeout) {
                 clearTimeout(node.fallbackTimeout);
                 node.fallbackTimeout = null;
