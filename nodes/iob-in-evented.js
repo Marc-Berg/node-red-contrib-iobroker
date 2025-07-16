@@ -7,6 +7,7 @@ module.exports = function(RED) {
         
         node.server = RED.nodes.getNode(config.server);
         node.stateId = config.stateId;
+        node.isSubscribed = false;
 
         if (!node.server || !node.stateId) {
             node.status({ fill: "red", shape: "dot", text: "Error: Server or State ID not configured" });
@@ -17,14 +18,22 @@ module.exports = function(RED) {
 
         const onServerReady = ({ serverId }) => {
             if (serverId === node.server.id) {
-                node.status({ fill: "blue", shape: "dot", text: `Subscribing to ${node.stateId}...` });
-                Orchestrator.subscribe(node.id, node.stateId);
+                if (!node.isSubscribed) {
+                    node.status({ fill: "blue", shape: "dot", text: `Subscribing to ${node.stateId}...` });
+                    Orchestrator.subscribe(node.id, node.stateId);
+                    node.isSubscribed = true;
+                } else {
+                    // Server is ready again after reconnection, but we don't need to re-subscribe
+                    // The StateService will handle re-subscription automatically
+                    node.status({ fill: "yellow", shape: "ring", text: `Reconnected, waiting for subscription...` });
+                }
             }
         };
 
         const onSubscriptionConfirmed = ({ serverId, stateId }) => {
             if (serverId === node.server.id && stateId === node.stateId) {
                 node.status({ fill: "green", shape: "ring", text: `Subscribed to ${node.stateId}` });
+                node.isSubscribed = true; // Ensure subscription status is correct after re-subscription
             }
         };
 
@@ -39,6 +48,7 @@ module.exports = function(RED) {
         const onDisconnected = ({ serverId }) => {
             if (serverId === node.server.id) {
                 node.status({ fill: "red", shape: "ring", text: "Disconnected" });
+                node.isSubscribed = false; // Reset subscription status on disconnect
             }
         };
 
