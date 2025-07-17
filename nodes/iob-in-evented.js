@@ -1,4 +1,5 @@
 const Orchestrator = require('../lib/orchestrator');
+const { NodeHelpers } = require('../lib/utils/node-helpers');
 
 module.exports = function(RED) {
     function IoBrokerInEventedNode(config) {
@@ -12,6 +13,12 @@ module.exports = function(RED) {
         // Configuration options
         node.sendInitialValue = config.sendInitialValue || false;
         node.ackFilter = config.ackFilter || "both";
+        
+        // Track if the node has been registered with the orchestrator
+        node.isRegistered = false;
+        
+        // Setup message queue system for reliable message delivery
+        const { sendWhenReady, cleanup } = NodeHelpers.setupMessageQueue(RED, node);
         
         // Detect wildcard pattern
         node.isWildcardPattern = node.stateId && node.stateId.includes('*');
@@ -30,15 +37,11 @@ module.exports = function(RED) {
 
         const onServerReady = ({ serverId }) => {
             if (serverId === node.server.id) {
-                if (!node.isSubscribed) {
-                    node.status({ fill: "blue", shape: "dot", text: `Subscribing to ${node.stateId}...` });
-                    Orchestrator.subscribe(node.id, node.stateId);
-                    node.isSubscribed = true;
-                } else {
-                    // Server is ready again after reconnection, but we don't need to re-subscribe
-                    // The StateService will handle re-subscription automatically
-                    node.status({ fill: "yellow", shape: "ring", text: `Reconnected, waiting for subscription...` });
-                }
+                // Always subscribe when server is ready, regardless of previous state
+                // This ensures proper initial value handling for both deploy and restart
+                node.status({ fill: "blue", shape: "dot", text: `Subscribing to ${node.stateId}...` });
+                Orchestrator.subscribe(node.id, node.stateId);
+                node.isSubscribed = true;
             }
         };
 
@@ -55,6 +58,11 @@ module.exports = function(RED) {
                     if (stateId === node.stateId) {
                         node.status({ fill: "green", shape: "ring", text: `Subscribed to ${node.stateId}` });
                         node.isSubscribed = true;
+                        
+                        // Send initial value if requested (only for single states, not wildcards)
+                        if (node.sendInitialValue && !node.isWildcardPattern) {
+                            requestInitialValue();
+                        }
                     }
                 }
             }
@@ -81,11 +89,12 @@ module.exports = function(RED) {
                 
                 // Create output message
                 const message = {
-                    payload: state.val,
                     topic: stateId,
+                    payload: state.val,
                     ts: state.ts,
                     ack: state.ack,
-                    state: state
+                    state: state,
+                    timestamp: Date.now()
                 };
                 
                 // Add pattern info for wildcard matches
@@ -99,7 +108,46 @@ module.exports = function(RED) {
                     : `val: ${state.val} (ts: ${new Date(state.ts).toLocaleTimeString()})`;
                     
                 node.status({ fill: "green", shape: "dot", text: statusText });
+                
+                // Send state change message immediately (no queue needed for state changes)
                 node.send(message);
+            }
+        };
+        
+        // Function to request initial value for a single state
+        function requestInitialValue() {
+            if (node.isWildcardPattern) return; // Not supported for wildcards
+            
+            Orchestrator.getState(node.id, node.stateId);
+        }
+        
+        // Event handler for initial state value response
+        const onInitialStateValue = ({ serverId, stateId, state, nodeId }) => {
+            if (serverId === node.server.id && nodeId === node.id && stateId === node.stateId) {
+                if (state) {
+                    // Apply ACK filter
+                    if (!shouldSendMessage(state.ack, node.ackFilter)) {
+                        return;
+                    }
+                    
+                    // Create output message for initial value
+                    const message = {
+                        topic: stateId,
+                        payload: state.val,
+                        ts: state.ts,
+                        ack: state.ack,
+                        state: state,
+                        initial: true, // Mark as initial value
+                        timestamp: Date.now()
+                    };
+                    
+                    // Update status
+                    const statusText = `initial: ${message.payload} (ts: ${new Date(message.ts).toLocaleTimeString()})`;
+                    node.status({ fill: "green", shape: "dot", text: statusText });
+                    
+                    // Send when ready (uses queue system to ensure proper timing)
+                    sendWhenReady(message, "initial value");
+                }
             }
         };
         
@@ -153,13 +201,26 @@ module.exports = function(RED) {
 
         // --- Node Lifecycle ---
 
-        // Register the node with the Orchestrator. This triggers the initial connection request.
-        Orchestrator.registerNode(node.id, node.server);
+        // Function to register with orchestrator
+        const registerWithOrchestrator = () => {
+            if (!node.isRegistered) {
+                node.log(`Registering node with orchestrator after flows started`);
+                Orchestrator.registerNode(node.id, node.server);
+                node.isRegistered = true;
+            }
+        };
+
+        // Register with orchestrator when flows are ready
+        // Use timeout to ensure registration happens after flows are started
+        setTimeout(() => {
+            registerWithOrchestrator();
+        }, 300);
 
         // Listen for events from the Orchestrator
         Orchestrator.on('server:ready', onServerReady);
         Orchestrator.on('state:subscription_confirmed', onSubscriptionConfirmed);
         Orchestrator.on('state:changed', onStateChanged);
+        Orchestrator.on(`state:initial_value:${node.id}`, onInitialStateValue);
         Orchestrator.on('connection:disconnected', onDisconnected);
         Orchestrator.on('connection:retrying', onRetrying);
         Orchestrator.on('connection:failed_permanently', onPermanentFailure);
@@ -169,11 +230,18 @@ module.exports = function(RED) {
             Orchestrator.removeListener('server:ready', onServerReady);
             Orchestrator.removeListener('state:subscription_confirmed', onSubscriptionConfirmed);
             Orchestrator.removeListener('state:changed', onStateChanged);
+            Orchestrator.removeListener(`state:initial_value:${node.id}`, onInitialStateValue);
             Orchestrator.removeListener('connection:disconnected', onDisconnected);
             Orchestrator.removeListener('connection:retrying', onRetrying);
             Orchestrator.removeListener('connection:failed_permanently', onPermanentFailure);
             
-            Orchestrator.unregisterNode(node.id, node.server.id);
+            // Cleanup message queue system
+            cleanup();
+            
+            // Only unregister if we were actually registered
+            if (node.isRegistered) {
+                Orchestrator.unregisterNode(node.id, node.server.id);
+            }
             done();
         });
 
