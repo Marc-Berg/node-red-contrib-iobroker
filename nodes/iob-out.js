@@ -1,39 +1,43 @@
-const connectionManager = require('../lib/manager/websocket-manager');
-const { NodeHelpers } = require('../lib/utils/node-helpers');
+const Orchestrator = require('../lib/orchestrator');
+const { StatusHelpers } = require('../lib/utils/status-helpers');
 
 module.exports = function(RED) {
-    function iobout(config) {
+    function IoBrokerOutNode(config) {
         RED.nodes.createNode(this, config);
         const node = this;
-
-        const { setStatus, setError } = NodeHelpers.createStatusHelpers(node);
         
-        const serverConfig = NodeHelpers.validateServerConfig(RED, config, setError);
-        if (!serverConfig) return;
-
-        const { globalConfig, connectionDetails, serverId } = serverConfig;
-
-        const settings = {
-            inputProperty: config.inputProperty?.trim() || "payload",
-            setMode: config.setMode || "value",
-            autoCreate: config.autoCreate || false,
-            serverId,
-            nodeId: node.id,
-            stateName: config.stateName?.trim() || "",
-            stateRole: config.stateRole?.trim() || "",
-            payloadType: config.payloadType?.trim() || "",
-            stateReadonly: config.stateReadonly?.trim() || "",
-            stateUnit: config.stateUnit?.trim() || "",
-            stateMin: config.stateMin !== "" ? parseFloat(config.stateMin) : undefined,
-            stateMax: config.stateMax !== "" ? parseFloat(config.stateMax) : undefined
-        };
-
-        const configState = config.state?.trim();
-        node.currentConfig = connectionDetails;
-        node.isInitialized = false;
+        node.server = RED.nodes.getNode(config.server);
+        node.inputProperty = config.inputProperty?.trim() || "payload";
+        node.setMode = config.setMode || "value";
+        node.autoCreate = config.autoCreate || false;
+        node.configState = config.state?.trim();
+        
+        // Auto-create object settings
+        node.stateName = config.stateName?.trim() || "";
+        node.stateRole = config.stateRole?.trim() || "";
+        node.payloadType = config.payloadType?.trim() || "";
+        node.stateReadonly = config.stateReadonly?.trim() || "";
+        node.stateUnit = config.stateUnit?.trim() || "";
+        node.stateMin = config.stateMin !== "" ? parseFloat(config.stateMin) : undefined;
+        node.stateMax = config.stateMax !== "" ? parseFloat(config.stateMax) : undefined;
+        
+        // Track if the node has been registered with the orchestrator
+        node.isRegistered = false;
+        
+        // Store last set value for status display
         node.lastValue = undefined;
         node.hasSetValue = false;
+        
+        // Pending operations for async handling
+        node.pendingOperations = new Map(); // operationId -> { msg, done, operation }
+        node.operationCounter = 0;
 
+        if (!node.server) {
+            StatusHelpers.updateConnectionStatus(node, 'error', "Error: Server not configured");
+            return;
+        }
+
+        // Helper function to format values for status display
         function formatValueForStatus(value) {
             let displayValue;
             
@@ -60,26 +64,19 @@ module.exports = function(RED) {
             return displayValue;
         }
 
+        // Helper function to update status with current value
         function updateStatusWithValue() {
             if (node.hasSetValue && node.lastValue !== undefined) {
                 const formattedValue = formatValueForStatus(node.lastValue);
-                const autoCreateStatus = settings.autoCreate ? " (auto-create)" : "";
-                setStatus("green", "dot", formattedValue + autoCreateStatus);
+                const autoCreateStatus = node.autoCreate ? " (auto-create)" : "";
+                node.status({ fill: "green", shape: "dot", text: formattedValue + autoCreateStatus });
             } else {
-                const autoCreateStatus = settings.autoCreate ? " (auto-create)" : "";
-                setStatus("green", "dot", "Ready" + autoCreateStatus);
+                const autoCreateStatus = node.autoCreate ? " (auto-create)" : "";
+                node.status({ fill: "green", shape: "dot", text: "Ready" + autoCreateStatus });
             }
         }
 
-        const statusTexts = {
-            ready: settings.autoCreate ? "Ready (Auto-create enabled)" : "Ready",
-            reconnected: settings.autoCreate ? "Reconnected (Auto-create)" : "Reconnected"
-        };
-
-        NodeHelpers.initializeConnection(
-            node, config, RED, settings, globalConfig, setStatus, statusTexts
-        );
-
+        // Helper function to detect payload type
         function detectPayloadType(value) {
             if (value === null || value === undefined) return "mixed";
             if (typeof value === "boolean") return "boolean";
@@ -97,28 +94,30 @@ module.exports = function(RED) {
             return "mixed";
         }
 
+        // Helper function to get object properties
         function getObjectProperties(msg, stateId, value) {
             const props = {
-                name: msg.stateName || settings.stateName || stateId.split('.').pop(),
-                role: msg.stateRole || settings.stateRole || "state",
-                type: msg.payloadType || settings.payloadType || detectPayloadType(value),
-                unit: msg.stateUnit || settings.stateUnit || undefined,
-                min: msg.stateMin !== undefined ? msg.stateMin : settings.stateMin,
-                max: msg.stateMax !== undefined ? msg.stateMax : settings.stateMax
+                name: msg.stateName || node.stateName || stateId.split('.').pop(),
+                role: msg.stateRole || node.stateRole || "state",
+                type: msg.payloadType || node.payloadType || detectPayloadType(value),
+                unit: msg.stateUnit || node.stateUnit || undefined,
+                min: msg.stateMin !== undefined ? msg.stateMin : node.stateMin,
+                max: msg.stateMax !== undefined ? msg.stateMax : node.stateMax
             };
 
             let readonly = false;
             if (msg.stateReadonly !== undefined) {
                 readonly = msg.stateReadonly === true || msg.stateReadonly === "true";
-            } else if (settings.stateReadonly !== "") {
-                readonly = settings.stateReadonly === "true";
+            } else if (node.stateReadonly !== "") {
+                readonly = node.stateReadonly === "true";
             }
             props.readonly = readonly;
 
             return props;
         }
 
-        async function createObject(stateId, properties) {
+        // Helper function to create object definition
+        function createObjectDefinition(stateId, properties) {
             const objectDef = {
                 _id: stateId,
                 type: "state",
@@ -136,104 +135,291 @@ module.exports = function(RED) {
             if (properties.min !== undefined) objectDef.common.min = properties.min;
             if (properties.max !== undefined) objectDef.common.max = properties.max;
 
-            try {
-                await connectionManager.setObject(settings.serverId, stateId, objectDef);
-                return true;
-            } catch (error) {
-                node.error(`Failed to create object ${stateId}: ${error.message}`);
-                throw error;
-            }
+            return objectDef;
         }
 
-        async function ensureObjectExists(stateId, msg, value) {
-            if (!settings.autoCreate) {
-                return true;
-            }
+        // --- Event Handlers ---
 
-            try {
-                const existingObject = await connectionManager.getObject(settings.serverId, stateId);
-                
-                if (existingObject) {
-                    return true;
-                }
-                const objectProperties = getObjectProperties(msg, stateId, value);
-                await createObject(stateId, objectProperties);
-                
-                return true;
-            } catch (error) {
-                if (error.message && error.message.includes('not found')) {
-                    try {
-                        const objectProperties = getObjectProperties(msg, stateId, value);
-                        await createObject(stateId, objectProperties);
-                        return true;
-                    } catch (createError) {
-                        node.error(`Failed to create missing object ${stateId}: ${createError.message}`);
-                        throw createError;
-                    }
-                } else {
-                    node.error(`Error checking object existence for ${stateId}: ${error.message}`);
-                    throw error;
-                }
-            }
-        }
-
-        this.on('input', async function(msg, send, done) {
-            try {
-                if (NodeHelpers.handleStatusRequest(msg, send, done, settings)) {
-                    return;
-                }
-
-                const stateId = configState || (typeof msg.topic === "string" ? msg.topic.trim() : "");
-                if (!NodeHelpers.validateRequiredInput(stateId, "State ID", setStatus, done)) {
-                    return;
-                }
-
-                const value = msg[settings.inputProperty];
-                if (value === undefined) {
-                    node.error(`Input property "${settings.inputProperty}" not found in message`);
-                    setStatus("red", "ring", "Input missing");
-                    done && done();
-                    return;
-                }
-
-                if (settings.autoCreate) {
-                    setStatus("blue", "dot", "Checking object...");
-                }
-
-                try {
-                    await ensureObjectExists(stateId, msg, value);
-                } catch (error) {
-                    setStatus("red", "ring", "Object creation failed");
-                    node.error(`Object creation failed for ${stateId}: ${error.message}`);
-                    done && done(error);
-                    return;
-                }
-
-                const ack = settings.setMode === "value";
-                setStatus("blue", "dot", "Setting...");
-                
-                await connectionManager.setState(settings.serverId, stateId, value, ack);
-                
-                node.lastValue = value;
-                node.hasSetValue = true;
+        const onServerReady = ({ serverId }) => {
+            if (serverId === node.server.id) {
+                StatusHelpers.updateConnectionStatus(node, 'ready', 'Ready');
                 updateStatusWithValue();
+            }
+        };
+
+        const onStateSetResult = ({ serverId, stateId, nodeId, success, error }) => {
+            if (serverId === node.server.id && nodeId === node.id) {
+                // Find the pending operation
+                let operationId = null;
+                for (const [id, op] of node.pendingOperations) {
+                    if (op.operation === 'setState' && op.stateId === stateId) {
+                        operationId = id;
+                        break;
+                    }
+                }
                 
-                done && done();
+                if (operationId) {
+                    const operation = node.pendingOperations.get(operationId);
+                    node.pendingOperations.delete(operationId);
+                    
+                    if (success) {
+                        node.log(`Successfully set state ${stateId} to ${operation.value}`);
+                        node.lastValue = operation.value;
+                        node.hasSetValue = true;
+                        updateStatusWithValue();
+                        
+                        if (operation.done) {
+                            operation.done();
+                        }
+                    } else {
+                        StatusHelpers.updateConnectionStatus(node, 'error', 'Set failed');
+                        node.error(`Failed to set state ${stateId}: ${error}`);
+                        if (operation.done) {
+                            operation.done(new Error(`Failed to set state: ${error}`));
+                        }
+                    }
+                }
+            }
+        };
+
+        const onObjectGetResult = ({ serverId, objectId, nodeId, success, object, error }) => {
+            if (serverId === node.server.id && nodeId === node.id) {
+                // Find the pending operation
+                let operationId = null;
+                for (const [id, op] of node.pendingOperations) {
+                    if (op.operation === 'getObject' && op.objectId === objectId) {
+                        operationId = id;
+                        break;
+                    }
+                }
+                
+                if (operationId) {
+                    const operation = node.pendingOperations.get(operationId);
+                    node.pendingOperations.delete(operationId);
+                    
+                    if (success && object) {
+                        // Object exists, proceed with setState
+                        node.log(`Object ${objectId} exists, setting state`);
+                        operation.callback(true);
+                    } else {
+                        // Object doesn't exist, need to create it
+                        node.log(`Object ${objectId} doesn't exist, creating it`);
+                        operation.callback(false);
+                    }
+                }
+            }
+        };
+
+        const onObjectSetResult = ({ serverId, objectId, nodeId, success, error }) => {
+            if (serverId === node.server.id && nodeId === node.id) {
+                // Find the pending operation
+                let operationId = null;
+                for (const [id, op] of node.pendingOperations) {
+                    if (op.operation === 'setObject' && op.objectId === objectId) {
+                        operationId = id;
+                        break;
+                    }
+                }
+                
+                if (operationId) {
+                    const operation = node.pendingOperations.get(operationId);
+                    node.pendingOperations.delete(operationId);
+                    
+                    if (success) {
+                        node.log(`Successfully created object ${objectId}`);
+                        operation.callback(true);
+                    } else {
+                        StatusHelpers.updateConnectionStatus(node, 'error', 'Object creation failed');
+                        node.error(`Failed to create object ${objectId}: ${error}`);
+                        operation.callback(false, error);
+                    }
+                }
+            }
+        };
+
+        const onDisconnected = ({ serverId }) => {
+            if (serverId === node.server.id) {
+                StatusHelpers.updateConnectionStatus(node, 'disconnected', 'Disconnected');
+            }
+        };
+
+        const onRetrying = ({ serverId, attempt, delay }) => {
+            if (serverId === node.server.id) {
+                StatusHelpers.updateConnectionStatus(node, 'retrying', `Retrying in ${delay / 1000}s (Attempt #${attempt})`);
+            }
+        };
+
+        const onPermanentFailure = ({ serverId, error }) => {
+            if (serverId === node.server.id) {
+                StatusHelpers.updateConnectionStatus(node, 'error', `Failed: ${error.message}`);
+            }
+        };
+
+        // --- Helper Functions ---
+
+        // Async function to ensure object exists if auto-create is enabled
+        async function ensureObjectExists(stateId, msg, value) {
+            return new Promise((resolve, reject) => {
+                if (!node.autoCreate) {
+                    resolve(true);
+                    return;
+                }
+
+                const operationId = ++node.operationCounter;
+                
+                // First check if object exists
+                node.pendingOperations.set(operationId, {
+                    operation: 'getObject',
+                    objectId: stateId,
+                    callback: (exists, error) => {
+                        if (error) {
+                            reject(new Error(`Failed to check object existence: ${error}`));
+                            return;
+                        }
+                        
+                        if (exists) {
+                            resolve(true);
+                            return;
+                        }
+                        
+                        // Object doesn't exist, create it
+                        const objectProperties = getObjectProperties(msg, stateId, value);
+                        const objectDef = createObjectDefinition(stateId, objectProperties);
+                        
+                        const createOperationId = ++node.operationCounter;
+                        node.pendingOperations.set(createOperationId, {
+                            operation: 'setObject',
+                            objectId: stateId,
+                            callback: (success, createError) => {
+                                if (success) {
+                                    resolve(true);
+                                } else {
+                                    reject(new Error(`Failed to create object: ${createError}`));
+                                }
+                            }
+                        });
+                        
+                        Orchestrator.setObject(node.id, stateId, objectDef);
+                    }
+                });
+                
+                Orchestrator.getObject(node.id, stateId);
+            });
+        }
+
+        // --- Node Input Handler ---
+
+        node.on('input', async function(msg, send, done) {
+            try {
+                // Check if orchestrator is ready
+                if (!node.isRegistered) {
+                    StatusHelpers.updateConnectionStatus(node, 'error', 'Node not registered');
+                    if (done) done(new Error('Node not registered with orchestrator'));
+                    return;
+                }
+
+                // Get state ID from config or message topic
+                const stateId = node.configState || (typeof msg.topic === "string" ? msg.topic.trim() : "");
+                
+                if (!stateId) {
+                    StatusHelpers.updateConnectionStatus(node, 'error', 'Missing state ID');
+                    if (done) done(new Error('State ID is required'));
+                    return;
+                }
+
+                // Get value from message
+                const value = msg[node.inputProperty];
+                if (value === undefined) {
+                    StatusHelpers.updateConnectionStatus(node, 'error', 'Input missing');
+                    node.error(`Input property "${node.inputProperty}" not found in message`);
+                    if (done) done(new Error(`Input property "${node.inputProperty}" not found in message`));
+                    return;
+                }
+
+                // Check/create object if auto-create is enabled
+                if (node.autoCreate) {
+                    StatusHelpers.updateConnectionStatus(node, 'checking', 'Checking object...');
+                    try {
+                        await ensureObjectExists(stateId, msg, value);
+                    } catch (error) {
+                        StatusHelpers.updateConnectionStatus(node, 'error', 'Object creation failed');
+                        node.error(`Object creation failed for ${stateId}: ${error.message}`);
+                        if (done) done(error);
+                        return;
+                    }
+                }
+
+                // Set the state
+                const ack = node.setMode === "value";
+                StatusHelpers.updateConnectionStatus(node, 'setting', 'Setting...');
+                
+                const operationId = ++node.operationCounter;
+                node.pendingOperations.set(operationId, {
+                    operation: 'setState',
+                    stateId: stateId,
+                    value: value,
+                    done: done
+                });
+                
+                Orchestrator.setState(node.id, stateId, value, ack);
                 
             } catch (error) {
-                setStatus("red", "ring", "Error");
-                node.error(`Failed to set value: ${error.message}`);
-                done && done(error);
+                StatusHelpers.updateConnectionStatus(node, 'error', 'Error');
+                node.error(`Failed to process input: ${error.message}`);
+                if (done) done(error);
             }
         });
 
-        node.on("close", async function(done) {
-            await NodeHelpers.handleNodeClose(node, settings, "Output");
+        // --- Node Lifecycle ---
+
+        // Function to register with orchestrator
+        const registerWithOrchestrator = () => {
+            if (!node.isRegistered) {
+                node.log(`Registering node with orchestrator after flows started`);
+                Orchestrator.registerNode(node.id, node.server);
+                node.isRegistered = true;
+            }
+        };
+
+        // Register with orchestrator when flows are ready
+        // Use timeout to ensure registration happens after flows are started
+        setTimeout(() => {
+            registerWithOrchestrator();
+        }, 300);
+
+        // Listen for events from the Orchestrator
+        Orchestrator.on('server:ready', onServerReady);
+        Orchestrator.on(`state:set_result:${node.id}`, onStateSetResult);
+        Orchestrator.on(`object:get_result:${node.id}`, onObjectGetResult);
+        Orchestrator.on(`object:set_result:${node.id}`, onObjectSetResult);
+        Orchestrator.on('connection:disconnected', onDisconnected);
+        Orchestrator.on('connection:retrying', onRetrying);
+        Orchestrator.on('connection:failed_permanently', onPermanentFailure);
+
+        node.on('close', function(done) {
+            // Clean up any pending operations
+            node.pendingOperations.clear();
+            
+            // Clean up all listeners to prevent memory leaks
+            Orchestrator.removeListener('server:ready', onServerReady);
+            Orchestrator.removeListener(`state:set_result:${node.id}`, onStateSetResult);
+            Orchestrator.removeListener(`object:get_result:${node.id}`, onObjectGetResult);
+            Orchestrator.removeListener(`object:set_result:${node.id}`, onObjectSetResult);
+            Orchestrator.removeListener('connection:disconnected', onDisconnected);
+            Orchestrator.removeListener('connection:retrying', onRetrying);
+            Orchestrator.removeListener('connection:failed_permanently', onPermanentFailure);
+            
+            // Only unregister if we were actually registered
+            if (node.isRegistered) {
+                Orchestrator.unregisterNode(node.id, node.server.id);
+            }
             done();
         });
 
-        node.on("error", NodeHelpers.createErrorHandler(node, setError));
+        // Initial status
+        const initialStatusText = node.autoCreate ? "Waiting for server... (auto-create)" : "Waiting for server...";
+        StatusHelpers.updateConnectionStatus(node, 'waiting', initialStatusText);
     }
 
-    RED.nodes.registerType("iobout", iobout);
+    RED.nodes.registerType("iobout", IoBrokerOutNode);
 };
