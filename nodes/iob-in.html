@@ -34,32 +34,15 @@ RED.nodes.registerType('iobin', {
     color: '#a6bbcf',
     defaults: {
         name: { value: "" },
-        state: { 
-            value: "",
-            validate: function(v) {
-                // Allow empty for multiple mode, or require value for single mode
-                if (this.inputMode === 'single') {
-                    return v && v.trim().length > 0;
-                }
-                return true; // Valid for multiple mode even if empty
-            }
-        },
-        multipleStates: { 
-            value: "",
-            validate: function(v) {
-                if (this.inputMode === 'multiple') {
-                    return v && v.trim().length > 0;
-                }
-                return true;
-            }
-        },
+        state: { value: "" },
+        multipleStates: { value: "" },
         outputProperty: { value: "payload" },
         ackFilter: { value: "both" },
         sendInitialValue: { value: false },
         useWildcard: { value: false },
-        inputMode: { value: "single" }, // "single" or "multiple"
-        outputMode: { value: "individual" }, // "individual", "grouped"
-        filterMode: { value: "all" }, // "all", "changes-only", "changes-smart"
+        inputMode: { value: "single" },
+        outputMode: { value: "individual" },
+        filterMode: { value: "all" },
         server: { value: "", type: "iob-config", required: true }
     },
     inputs: 0,
@@ -87,7 +70,6 @@ RED.nodes.registerType('iobin', {
     },
     oneditprepare: function() {
         const node = this;
-        const nodeType = 'iobin';
         
         // Auto-select server configuration if only one exists
         const serverInput = $('#node-input-server');
@@ -118,18 +100,12 @@ RED.nodes.registerType('iobin', {
             const hasWildcardChars = stateValue.includes('*');
             
             if (hasWildcardChars) {
-                // Disable initial values for wildcards
                 $('#node-input-sendInitialValue').prop('checked', false).prop('disabled', true);
                 $('#initial-value-container').addClass('wildcard-disabled');
-                
-                // Show wildcard info
                 showWildcardInfo();
             } else {
-                // Re-enable initial values for single states
                 $('#node-input-sendInitialValue').prop('disabled', false);
                 $('#initial-value-container').removeClass('wildcard-disabled');
-                
-                // Hide wildcard info
                 hideWildcardInfo();
             }
         }
@@ -160,19 +136,14 @@ RED.nodes.registerType('iobin', {
                 $('#single-state-row').show();
                 $('#multiple-states-row').hide();
                 $('#output-mode-row').hide();
-                
-                // Re-enable wildcard detection and initial values for single mode
                 checkForWildcard();
             } else if (inputMode === 'multiple') {
                 $('#single-state-row').hide();
                 $('#multiple-states-row').show();
                 $('#output-mode-row').show();
-                
-                // Disable initial values for wildcards but enable for multiple states
                 $('#node-input-sendInitialValue').prop('disabled', false);
                 $('#initial-value-container').removeClass('wildcard-disabled');
                 hideWildcardInfo();
-                
                 updateMultipleStatesCount();
                 updateOutputModeDisplay();
             }
@@ -251,15 +222,12 @@ RED.nodes.registerType('iobin', {
                 enableWildcardDetection: true,
                 wildcardInputId: 'node-input-sendInitialValue',
                 onStateSelected: function(stateId) {
-                    // Update the input field
                     $('#node-input-state').val(stateId).trigger('input');
                     checkForWildcard();
                 }
             });
-            
         }).catch(error => {
             console.error('Failed to load TreeView component:', error);
-            
             const fallbackMessage = $(`
                 <div style="margin-top: 5px; padding: 8px; background-color: #fff3cd; border: 1px solid #ffeaa7; border-radius: 4px; font-size: 12px; color: #856404;">
                     <i class="fa fa-exclamation-triangle"></i> TreeView component not available. Manual input with basic wildcard detection.
@@ -267,7 +235,248 @@ RED.nodes.registerType('iobin', {
             `);
             $('#node-input-state').closest('.form-row').after(fallbackMessage);
         });
+    },
+    
+    oneditsave: function() {
+        const inputMode = $('#node-input-inputMode').val();
+        
+        if (inputMode === 'single') {
+            const stateValue = $('#node-input-state').val();
+            this.useWildcard = stateValue && stateValue.includes('*');
+            
+            if (this.useWildcard) {
+                this.sendInitialValue = false;
+            }
+        } else if (inputMode === 'multiple') {
+            this.useWildcard = false;
+            
+            const states = $('#node-input-multipleStates').val()
+                .split('\n')
+                .map(s => s.trim())
+                .filter(s => s.length > 0);
+            this.multipleStates = states.join('\n');
+        }
+        
+        if (this.treeController) {
+            this.treeController.cleanup();
+        }
+    },
+    
+    oneditresize: function() {
+        // Handle responsive design
     }
+});
+</script>
+
+<script type="text/html" data-template-name="iobin">
+    <div class="form-row">
+        <label for="node-input-name"><i class="icon-tag"></i> Name</label>
+        <input type="text" id="node-input-name" placeholder="Node name (optional)">
+    </div>
+    
+    <div class="form-row">
+        <label for="node-input-inputMode"><i class="icon-tag"></i> Input Mode</label>
+        <select id="node-input-inputMode" style="width:100%">
+            <option value="single">Single State / Wildcard Pattern</option>
+            <option value="multiple">Multiple States</option>
+        </select>
+    </div>
+    
+    <div class="form-row input-mode-row" id="single-state-row">
+        <label for="node-input-state"><i class="icon-tag"></i> State ID / Pattern</label>
+        <input type="text" id="node-input-state" placeholder="e.g. 0_userdata.0.test or system.adapter.*.alive">
+    </div>
+    
+    <div class="form-row input-mode-row" id="multiple-states-row" style="display:none;">
+        <label for="node-input-multipleStates"><i class="icon-tag"></i> Multiple States</label>
+        <textarea id="node-input-multipleStates" rows="6" style="width:100%; font-family: monospace;" placeholder="Enter one state ID per line:&#10;0_userdata.0.state1&#10;0_userdata.0.state2&#10;system.adapter.history.0.alive"></textarea>
+        <div style="margin-top: 5px; font-size: 12px; color: #666;">
+            <span id="multiple-states-count">0 state(s) configured</span>
+        </div>
+    </div>
+    
+    <div class="form-row input-mode-row" id="output-mode-row" style="display:none;">
+        <label for="node-input-outputMode"><i class="icon-tag"></i> Output Mode</label>
+        <select id="node-input-outputMode" style="width:100%">
+            <option value="individual">Individual Messages</option>
+            <option value="grouped">Grouped Object</option>
+        </select>
+        <div style="margin-top: 5px; font-size: 12px; color: #666;" id="output-mode-description"></div>
+    </div>
+      
+    <div class="form-row">
+        <label for="node-input-outputProperty"><i class="icon-tag"></i> Output Property</label>
+        <input type="text" id="node-input-outputProperty" placeholder="payload">
+    </div>
+    
+    <div class="form-row">
+        <label for="node-input-ackFilter"><i class="icon-tag"></i> Trigger on</label>
+        <select id="node-input-ackFilter" style="width:100%">
+            <option value="both">Both (ack and no-ack)</option>
+            <option value="ack">Acknowledged only (ack=true)</option>
+            <option value="noack">Unacknowledged only (ack=false)</option>
+        </select>
+    </div>
+    
+    <div class="form-row">
+        <label for="node-input-filterMode"><i class="icon-tag"></i> Filter Mode</label>
+        <select id="node-input-filterMode" style="width:100%">
+            <option value="all">Send all events</option>
+            <option value="changes-only">Send only value changes</option>
+            <option value="changes-smart">Send only value changes (with baseline)</option>
+        </select>
+        <div style="margin-top: 5px; font-size: 12px; color: #666;" id="filter-mode-description"></div>
+    </div>
+    
+    <div class="form-row" id="initial-value-container">
+        <label for="node-input-sendInitialValue" style="width: auto;">
+            <input type="checkbox" id="node-input-sendInitialValue" style="width: auto; margin-right: 5px;">
+            <i class="icon-tag"></i> Send initial value on startup
+        </label>
+        <div style="margin-top: 5px; font-size: 12px; color: #666;">
+            Automatically disabled for wildcards. For multiple states: sends all current values at startup. 
+            <strong>Note:</strong> Initial values always bypass change filtering.
+        </div>
+    </div>
+    
+    <div class="form-row">
+        <label for="node-input-server"><i class="icon-tag"></i> Server</label>
+        <input type="text" id="node-input-server" required>
+    </div>
+    
+    <div id="wildcard-info" style="display: none; margin-top: 10px;">
+        <div style="background: #fff3cd; border: 1px solid #ffeaa7; border-radius: 4px; padding: 8px; font-size: 12px;">
+            <strong>Wildcard Pattern Detected:</strong>
+            <ul id="wildcard-warnings" style="margin: 5px 0 0 15px; padding: 0;"></ul>
+        </div>
+    </div>
+</script>
+
+<script type="text/html" data-help-name="iobin">
+    <p>ioBroker state subscription via WebSocket with support for single states, wildcard patterns, and multiple predefined states.</p>
+    
+    <h3>Input Modes</h3>
+    <ul>
+        <li><b>Single State / Wildcard Pattern:</b> One state ID or wildcard pattern (auto-detected when * is present)</li>
+        <li><b>Multiple States:</b> Predefined list of states</li>
+    </ul>
+    
+    <h3>Output Modes (Multiple States)</h3>
+    <ul>
+        <li><b>Individual Messages:</b> Each state change creates a separate message (like single state mode)</li>
+        <li><b>Grouped Object:</b> All current values of subscribed states in one message object</li>
+    </ul>
+    
+    <h3>Filter Modes</h3>
+    <ul>
+        <li><b>Send all events:</b> Every state change triggers a message - no filtering</li>
+        <li><b>Send only value changes:</b> Only send when value actually changes - first change is always sent</li>
+        <li><b>Send only value changes (with baseline):</b> Pre-loads current value as baseline, then only sends actual changes - first change may be blocked if same as current</li>
+    </ul>
+    
+    <h3>Wildcard Patterns (Single Mode)</h3>
+    <ul>
+        <li><code>*</code> matches any number of characters (auto-detected)</li>
+        <li><code>?</code> is <strong>not supported</strong> by ioBroker</li>
+        <li>Examples:
+            <ul>
+                <li><code>system.adapter.*.alive</code> - all adapter alive states</li>
+                <li><code>0_userdata.0.*</code> - all states under 0_userdata.0</li>
+                <li><code>*.temperature</code> - all temperature states</li>
+            </ul>
+        </li>
+        <li><strong>Note:</strong> Initial values are automatically disabled when * is detected</li>
+    </ul>
+    
+    <h3>Multiple States Configuration</h3>
+    <ul>
+        <li>Enter one state ID per line in the textarea</li>
+        <li>Empty lines are ignored</li>
+        <li>No wildcards supported in multiple states mode</li>
+    </ul>
+    
+    <h3>Output Examples</h3>
+    
+    <h4>Individual Messages (default)</h4>
+    <pre>
+msg = {
+  topic: "0_userdata.0.state1",
+  payload: 42,
+  state: { val: 42, ack: true, ts: 1234567890 },
+  timestamp: 1234567890
+}
+    </pre>
+    
+    <h4>Grouped Object (Multiple States)</h4>
+    <pre>
+// When any of the subscribed states changes, ALL current values are sent:
+msg = {
+  topic: "grouped_states",
+  payload: {
+    "0_userdata.0.state1": 42,      // All subscribed states
+    "0_userdata.0.state2": "hello", // with their current values
+    "0_userdata.0.state3": true
+  },
+  states: {
+    "0_userdata.0.state1": { val: 42, ack: true, ts: 1234567890 },
+    "0_userdata.0.state2": { val: "hello", ack: true, ts: 1234567891 },
+    "0_userdata.0.state3": { val: true, ack: true, ts: 1234567892 }
+  },
+  timestamp: 1234567890,
+  changedState: "0_userdata.0.state1"  // Which state triggered this message
+}
+    </pre>
+    
+    <h3>Value Change Filtering</h3>
+    <ul>
+        <li><b>Send only value changes:</b> First state change is always sent, subsequent changes only if value differs</li>
+        <li><b>Send only value changes (with baseline):</b> Current value is pre-loaded as baseline, then only actual changes are sent</li>
+        <li><b>Initial Values:</b> Always bypass change filtering (when "Send initial value on startup" is enabled)</li>
+        <li>Identical consecutive values are blocked</li>
+        <li>Works with all data types (numbers, strings, booleans, objects)</li>
+        <li>Useful for reducing message volume and avoiding unnecessary processing</li>
+    </ul>
+    
+    <h4>Filter Mode Comparison (without "Send initial value")</h4>
+    <pre>
+Current state value: 25
+
+Send only value changes:
+1. First change: 25 → SENT (no baseline yet)
+2. Second change: 25 → BLOCKED (same value)  
+3. Third change: 26 → SENT (value changed)
+
+Send only value changes (with baseline):
+1. Startup: Load baseline 25 (stored, not sent)
+2. First change: 25 → BLOCKED (same as baseline)
+3. Second change: 26 → SENT (value changed)
+    </pre>
+    
+    <h4>With "Send initial value" enabled</h4>
+    <pre>
+Both modes behave identically because initial values bypass change filtering.
+    </pre>
+    
+    <h3>Performance Notes</h3>
+    <ul>
+        <li>Avoid overly broad patterns like <code>*</code> or <code>*.*</code></li>
+        <li>Initial values are automatically disabled for wildcards only</li>
+        <li>Grouped mode always sends ALL current values when any subscribed state changes</li>
+        <li>Initial values for multiple states: all current values sent at startup</li>
+        <li>Change filtering reduces message volume but requires storing previous values</li>
+    </ul>
+</script>
+
+<style>
+    .wildcard-disabled {
+        opacity: 0.5;
+        pointer-events: none;
+    }
+    
+    .wildcard-disabled label {
+        color: #999 !important;
+    }
+</style>
 });
             const filterMode = $('#node-input-filterMode').val();
             let description = '';

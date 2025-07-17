@@ -1,28 +1,25 @@
-const connectionManager = require('../lib/manager/websocket-manager');
-const { NodeHelpers } = require('../lib/utils/node-helpers');
+const Orchestrator = require('../lib/orchestrator');
+const { StatusHelpers } = require('../lib/utils/status-helpers');
 
-module.exports = function (RED) {
-    function ioblog(config) {
+module.exports = function(RED) {
+    function IoBrokerLogNode(config) {
         RED.nodes.createNode(this, config);
         const node = this;
-        const { setStatus, setError } = NodeHelpers.createStatusHelpers(node);
-        const serverConfig = NodeHelpers.validateServerConfig(RED, config, setError);
-        if (!serverConfig) return;
-
-        const { globalConfig, connectionDetails, serverId } = serverConfig;
-
-        const settings = {
-            outputProperty: config.outputProperty?.trim() || "payload",
-            logLevel: config.logLevel || "info",
-            includeTimestamp: config.includeTimestamp !== false,
-            includeSource: config.includeSource !== false,
-            serverId,
-            nodeId: node.id
-        };
-
-        node.currentConfig = connectionDetails;
-        node.isInitialized = false;
+        
+        node.server = RED.nodes.getNode(config.server);
+        node.outputProperty = config.outputProperty?.trim() || "payload";
+        node.logLevel = config.logLevel || "info";
+        node.includeTimestamp = config.includeTimestamp !== false;
+        node.includeSource = config.includeSource !== false;
+        
+        // Track if the node has been registered with the orchestrator
+        node.isRegistered = false;
         node.isSubscribed = false;
+
+        if (!node.server) {
+            StatusHelpers.updateConnectionStatus(node, 'error', "Error: Server not configured");
+            return;
+        }
 
         const LOG_LEVELS = {
             silly: 0,
@@ -32,13 +29,15 @@ module.exports = function (RED) {
             error: 4
         };
 
-        const minimumLevel = LOG_LEVELS[settings.logLevel] || LOG_LEVELS.info;
+        const minimumLevel = LOG_LEVELS[node.logLevel] || LOG_LEVELS.info;
 
+        // Helper function to check if log message should be processed
         function shouldProcessLogMessage(logLevel) {
             const messageLevel = LOG_LEVELS[logLevel];
             return messageLevel >= minimumLevel;
         }
 
+        // Helper function to format timestamp
         function formatTimestamp(ts) {
             try {
                 const date = new Date(ts);
@@ -48,6 +47,7 @@ module.exports = function (RED) {
             }
         }
 
+        // Helper function to create log message
         function createLogMessage(logData) {
             try {
                 let severity = null;
@@ -80,7 +80,7 @@ module.exports = function (RED) {
                     raw: logData
                 };
 
-                outputMessage[settings.outputProperty] = message;
+                outputMessage[node.outputProperty] = message;
                 outputMessage.log = {
                     severity: severity,
                     message: message,
@@ -89,11 +89,11 @@ module.exports = function (RED) {
                     level: LOG_LEVELS[severity] || LOG_LEVELS.info
                 };
 
-                if (settings.includeSource && source) {
+                if (node.includeSource && source) {
                     outputMessage.source = source;
                 }
 
-                if (settings.includeTimestamp) {
+                if (node.includeTimestamp) {
                     outputMessage.timestamp = formatTimestamp(timestamp);
                 }
 
@@ -105,121 +105,123 @@ module.exports = function (RED) {
             }
         }
 
-        function onLogMessage(logData) {
-            try {
-                const message = createLogMessage(logData);
-                if (message) {
-                    node.send(message);
-                    const now = new Date().toLocaleTimeString(undefined, { hour12: false });
-                    const levelColor = {
-                        error: "red",
-                        warn: "yellow",
-                        info: "blue",
-                        debug: "grey",
-                        silly: "grey"
-                    }[message.level] || "blue";
+        // Helper function to update status with log info
+        function updateStatusWithLogLevel(level) {
+            const now = new Date().toLocaleTimeString(undefined, { hour12: false });
+            const levelColor = {
+                error: "red",
+                warn: "yellow", 
+                info: "blue",
+                debug: "grey",
+                silly: "grey"
+            }[level] || "blue";
+            
+            node.status({ fill: levelColor, shape: "dot", text: `${level} - ${now}` });
+        }
 
-                    setStatus(levelColor, "dot", `${message.level} - ${now}`);
+        // --- Event Handlers ---
+
+        const onServerReady = ({ serverId }) => {
+            if (serverId === node.server.id) {
+                if (!node.isSubscribed) {
+                    StatusHelpers.updateConnectionStatus(node, 'subscribing', 'Subscribing to logs...');
+                    Orchestrator.subscribeToLogs(node.id, node.logLevel);
                 }
-            } catch (error) {
-                node.error(`Log processing error: ${error.message}`);
-                setError(`Processing error: ${error.message}`, "Process error");
             }
-        }
+        };
 
-        function createCallback() {
-            const callback = onLogMessage;
-            const statusTexts = {
-                ready: `Monitoring (${settings.logLevel}+)`,
-                disconnected: "Disconnected"
-            };
-
-            const baseCallback = NodeHelpers.createSubscriptionEventCallback(
-                node,
-                setStatus,
-                () => {
-                    node.isSubscribed = true;
-                },
-                statusTexts
-            );
-
-            Object.assign(callback, baseCallback);
-
-            return callback;
-        }
-
-        async function initialize() {
-            const status = connectionManager.getConnectionStatus(settings.serverId);
-            if (node.isSubscribed && status.connected && status.ready) {
-                return;
-            }
-
-            try {
-                setStatus("yellow", "ring", "Connecting...");
-                await NodeHelpers.handleConfigChange(node, config, RED, settings);
-                const callback = createCallback();
-                await connectionManager.subscribeToLiveLogs(
-                    settings.nodeId,
-                    settings.serverId,
-                    callback,
-                    globalConfig,
-                    settings.logLevel
-                );
-
+        const onLogSubscriptionConfirmed = ({ serverId, nodeId }) => {
+            if (serverId === node.server.id && nodeId === node.id) {
+                node.log(`Log subscription confirmed for level ${node.logLevel}`);
                 node.isSubscribed = true;
+                node.status({ fill: "green", shape: "dot", text: `Monitoring (${node.logLevel}+)` });
+            }
+        };
 
-                setStatus("green", "dot", `Monitoring (${settings.logLevel}+)`);
-                node.isInitialized = true;
-
-            } catch (error) {
-                const errorMsg = error.message || 'Unknown error';
-
-                if (errorMsg.includes('auth_failed') || errorMsg.includes('Authentication failed')) {
-                    setStatus("red", "ring", "Auth failed");
-                } else if (errorMsg.includes('not possible in state')) {
-                    setStatus("red", "ring", "Connection failed");
-                } else {
-                    setStatus("yellow", "ring", "Retrying...");
+        const onLogMessage = ({ serverId, nodeId, logData }) => {
+            if (serverId === node.server.id && nodeId === node.id) {
+                try {
+                    const message = createLogMessage(logData);
+                    if (message) {
+                        node.send(message);
+                        updateStatusWithLogLevel(message.level);
+                    }
+                } catch (error) {
+                    node.error(`Log processing error: ${error.message}`);
+                    StatusHelpers.updateConnectionStatus(node, 'error', `Processing error: ${error.message}`);
                 }
+            }
+        };
 
+        const onDisconnected = ({ serverId }) => {
+            if (serverId === node.server.id) {
+                StatusHelpers.updateConnectionStatus(node, 'disconnected', 'Disconnected');
                 node.isSubscribed = false;
             }
-        }
+        };
 
-        node.on("close", async function (removed, done) {
-            node.isInitialized = false;
-            node.isSubscribed = false;
-
-            try {
-                const connectionStatus = connectionManager.getConnectionStatus ?
-                    connectionManager.getConnectionStatus(settings.serverId) : null;
-
-                if (connectionStatus && connectionStatus.ready && !connectionManager.destroyed) {
-                    await connectionManager.unsubscribeFromLiveLogs(
-                        settings.nodeId,
-                        settings.serverId
-                    );
-                } else {
-                    node.debug(`Skipping log unsubscribe for ${settings.nodeId} - connection not ready or manager destroyed`);
-                }
-
-                node.status({});
-
-            } catch (error) {
-                if (error.message && error.message.includes('timeout')) {
-                    node.debug(`Log unsubscribe timeout during shutdown, ignoring: ${error.message}`);
-                } else {
-                    node.warn(`Cleanup error: ${error.message}`);
-                }
-            } finally {
-                done();
+        const onRetrying = ({ serverId, attempt, delay }) => {
+            if (serverId === node.server.id) {
+                StatusHelpers.updateConnectionStatus(node, 'retrying', `Retrying in ${delay / 1000}s (Attempt #${attempt})`);
             }
+        };
+
+        const onPermanentFailure = ({ serverId, error }) => {
+            if (serverId === node.server.id) {
+                StatusHelpers.updateConnectionStatus(node, 'error', `Failed: ${error.message}`);
+            }
+        };
+
+        // --- Node Lifecycle ---
+
+        // Function to register with orchestrator
+        const registerWithOrchestrator = () => {
+            if (!node.isRegistered) {
+                node.log(`Registering node with orchestrator after flows started`);
+                Orchestrator.registerNode(node.id, node.server);
+                node.isRegistered = true;
+            }
+        };
+
+        // Register with orchestrator when flows are ready
+        // Use timeout to ensure registration happens after flows are started
+        setTimeout(() => {
+            registerWithOrchestrator();
+        }, 300);
+
+        // Listen for events from the Orchestrator
+        Orchestrator.on('server:ready', onServerReady);
+        Orchestrator.on(`log:subscription_confirmed:${node.id}`, onLogSubscriptionConfirmed);
+        Orchestrator.on(`log:message:${node.id}`, onLogMessage);
+        Orchestrator.on('connection:disconnected', onDisconnected);
+        Orchestrator.on('connection:retrying', onRetrying);
+        Orchestrator.on('connection:failed_permanently', onPermanentFailure);
+
+        node.on('close', function(done) {
+            // Unsubscribe from logs if subscribed
+            if (node.isSubscribed) {
+                Orchestrator.unsubscribeFromLogs(node.id);
+            }
+            
+            // Clean up all listeners to prevent memory leaks
+            Orchestrator.removeListener('server:ready', onServerReady);
+            Orchestrator.removeListener(`log:subscription_confirmed:${node.id}`, onLogSubscriptionConfirmed);
+            Orchestrator.removeListener(`log:message:${node.id}`, onLogMessage);
+            Orchestrator.removeListener('connection:disconnected', onDisconnected);
+            Orchestrator.removeListener('connection:retrying', onRetrying);
+            Orchestrator.removeListener('connection:failed_permanently', onPermanentFailure);
+            
+            // Only unregister if we were actually registered
+            if (node.isRegistered) {
+                Orchestrator.unregisterNode(node.id, node.server.id);
+            }
+            
+            done();
         });
 
-        node.on("error", NodeHelpers.createErrorHandler(node, setError));
-
-        initialize();
+        // Initial status
+        StatusHelpers.updateConnectionStatus(node, 'waiting', 'Waiting for server...');
     }
 
-    RED.nodes.registerType("ioblog", ioblog);
+    RED.nodes.registerType("ioblog", IoBrokerLogNode);
 };
