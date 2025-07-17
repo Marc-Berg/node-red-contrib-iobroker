@@ -3,6 +3,7 @@ const express = require('express');
 const fs = require('fs');
 const { Logger } = require('../lib/utils/logger');
 const Orchestrator = require('../lib/orchestrator');
+const eventBus = require('../lib/events/event-bus');
 
 let staticResourcesSetup = false;
 let apiEndpointsSetup = false;
@@ -57,13 +58,13 @@ function setupAPIEndpoints(RED) {
     if (apiEndpointsSetup) return true;
 
     try {
-        const connectionManager = require('../lib/manager/websocket-manager');
-
+        // API endpoint that uses the Event-based architecture for states
         RED.httpAdmin.get('/iobroker/ws/states/:serverId', async (req, res) => {
             try {
                 const serverId = decodeURIComponent(req.params.serverId);
-                const states = await connectionManager.getStates(serverId);
-
+                
+                // Get states via the new Event-based architecture
+                const states = await getStatesViaEventArchitecture(serverId);
                 res.setHeader('Cache-Control', 'public, max-age=300');
                 res.json(states);
 
@@ -75,6 +76,51 @@ function setupAPIEndpoints(RED) {
                 });
             }
         });
+        
+        // Helper function to get states via Event-based architecture
+        async function getStatesViaEventArchitecture(serverId) {
+            return new Promise((resolve, reject) => {
+                // Check if the server is connected via our new architecture
+                if (!Orchestrator.servers || !Orchestrator.servers.has(serverId)) {
+                    reject(new Error(`Server ${serverId} not found in Event-based architecture. Available servers: ${Array.from(Orchestrator.servers.keys()).join(', ')}`));
+                    return;
+                }
+                
+                const server = Orchestrator.servers.get(serverId);
+                if (!server || !server.ready) {
+                    reject(new Error('Server not ready in Event-based architecture'));
+                    return;
+                }
+                
+                // Send a request for all states via the WebSocket connection
+                const requestId = `states_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
+                const timeout = setTimeout(() => {
+                    reject(new Error('Timeout waiting for states response'));
+                }, 10000);
+                
+                // Listen for the response
+                const responseHandler = ({ serverId: responseServerId, requestId: responseRequestId, states, error }) => {
+                    if (responseServerId === serverId && responseRequestId === requestId) {
+                        clearTimeout(timeout);
+                        eventBus.removeListener('api:states_response', responseHandler);
+                        
+                        if (error) {
+                            reject(new Error(error));
+                        } else {
+                            resolve(states);
+                        }
+                    }
+                };
+                
+                eventBus.on('api:states_response', responseHandler);
+                
+                // Send the request via WebSocket
+                eventBus.emit('websocket:send', { 
+                    serverId, 
+                    payload: [3, requestId, "getStates", []] 
+                });
+            });
+        }
 
         RED.httpAdmin.get('/iobroker/ws/status/:serverId', (req, res) => {
             try {

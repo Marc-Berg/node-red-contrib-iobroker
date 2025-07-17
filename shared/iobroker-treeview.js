@@ -19,8 +19,10 @@
         const style = document.createElement('style');
         style.id = 'iob-shared-styles-v2';
         style.textContent = `
-            .iob-container { height: 320px; overflow-y: auto; border: 1px solid #ccc; border-radius: 4px; background: #fafafa; display: none; position: relative; }
+            .iob-wrapper { margin-top: 8px; }
+            .iob-container { height: 320px; overflow-y: auto; border: 1px solid #ccc; border-radius: 4px; background: #fafafa; display: none; position: relative; margin-top: 8px; }
             .iob-content { padding: 4px; }
+            .iob-search-container { margin-top: 8px; }
             .iob-item { height: ${CONFIG.ITEM_HEIGHT}px; display: flex; align-items: center; padding: 0 8px; cursor: pointer; white-space: nowrap; border-radius: 3px; transition: background-color 0.15s ease; user-select: none; font-family: Monaco, monospace; font-size: 13px; margin-bottom: 1px; }
             .iob-item:hover { background-color: #e8f4f8; }
             .iob-item.selected { background-color: #d4edda; border-left: 3px solid #28a745; }
@@ -31,17 +33,17 @@
             .iob-icon { display: inline-flex; width: 18px; height: 18px; align-items: center; justify-content: center; margin-right: 6px; font-size: 12px; flex-shrink: 0; }
             .iob-label { flex: 1; overflow: hidden; text-overflow: ellipsis; min-width: 0; }
             .iob-label mark { background-color: #ffeb3b; padding: 1px 3px; border-radius: 2px; font-weight: bold; color: #333; }
-            .iob-search { width: 100%; padding: 8px 12px; border: 1px solid #ddd; border-radius: 4px; font-size: 14px; margin-bottom: 8px; }
+            .iob-search { width: 100%; padding: 8px 12px; border: 1px solid #ddd; border-radius: 4px; font-size: 14px; box-sizing: border-box; }
             .iob-search:focus { outline: none; border-color: #4CAF50; box-shadow: 0 0 0 2px rgba(76, 175, 80, 0.2); }
             .iob-info { display: inline-block; margin-left: 8px; padding: 2px 8px; background-color: #d1ecf1; border: 1px solid #bee5eb; border-radius: 3px; font-size: 12px; color: #0c5460; font-family: Monaco, monospace; max-width: 300px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; vertical-align: middle; }
             .iob-info.folder { background-color: #fff3cd; border-color: #ffeaa7; color: #856404; }
             .iob-actions { display: flex; gap: 8px; margin-top: 8px; padding-top: 8px; border-top: 1px solid #dee2e6; justify-content: flex-end; }
-            .iob-status { padding: 6px 10px; border-radius: 3px; font-size: 12px; font-weight: 500; margin-top: 5px; display: inline-block; }
+            .iob-status { padding: 6px 10px; border-radius: 3px; font-size: 12px; font-weight: 500; margin-top: 8px; display: none; }
             .iob-status.success { background-color: #d4edda; color: #155724; border: 1px solid #c3e6cb; }
             .iob-status.info { background-color: #d1ecf1; color: #0c5460; border: 1px solid #bee5eb; }
             .iob-status.error { background-color: #f8d7da; color: #721c24; border: 1px solid #f5c6cb; }
-            .iob-buttons { display: flex; gap: 8px; margin-top: 5px; }
-            .iob-btn { padding: 6px 12px; border: 1px solid #ddd; border-radius: 4px; background: white; cursor: pointer; font-size: 12px; transition: all 0.2s ease; }
+            .iob-buttons { display: flex; gap: 8px; align-items: center; flex-wrap: wrap; }
+            .iob-btn { padding: 6px 12px; border: 1px solid #ddd; border-radius: 4px; background: white; cursor: pointer; font-size: 12px; transition: all 0.2s ease; white-space: nowrap; }
             .iob-btn:hover { background: #f8f9fa; border-color: #adb5bd; }
             .iob-btn.primary { background: #007bff; color: white; border-color: #007bff; }
             .iob-btn.primary:hover { background: #0056b3; }
@@ -404,18 +406,27 @@
         
         if (!stateInput.length || !serverInput.length) throw new Error('Required inputs not found');
         
-        // Create UI elements
+        // Create UI elements with better structure
         const elements = {
+            wrapper: $('<div class="iob-wrapper"></div>'),
             container: $('<div class="iob-container"></div>'),
-            searchContainer: $(`<div style="display:none;"><input type="text" class="iob-search" placeholder="${searchPlaceholder}"></div>`),
+            searchContainer: $(`<div class="iob-search-container" style="display:none;"><input type="text" class="iob-search" placeholder="${searchPlaceholder}"></div>`),
             actions: $(`<div class="iob-actions" style="display:none;"><button type="button" class="iob-btn success" disabled><i class="fa fa-check"></i> Use</button><button type="button" class="iob-btn"><i class="fa fa-times"></i> Cancel</button></div>`),
             buttons: $(`<div class="iob-buttons"><button type="button" class="iob-btn primary">Tree View</button><button type="button" class="iob-btn refresh-btn"><i class="fa fa-refresh"></i> Refresh</button><button type="button" class="iob-btn clear-btn"><i class="fa fa-times"></i> Clear</button></div>`),
             status: $('<div class="iob-status"></div>'),
             stats: $('<div class="iob-stats"></div>')
         };
         
-        // Insert elements
-        stateInput.after(elements.stats).after(elements.status).after(elements.actions).after(elements.container).after(elements.searchContainer).after(elements.buttons);
+        // Build the structure properly
+        elements.wrapper.append(elements.buttons);
+        elements.wrapper.append(elements.searchContainer);
+        elements.wrapper.append(elements.container);
+        elements.wrapper.append(elements.actions);
+        elements.wrapper.append(elements.status);
+        elements.wrapper.append(elements.stats);
+        
+        // Insert the wrapper after the input
+        stateInput.after(elements.wrapper);
         
         // Get references
         const toggleBtn = elements.buttons.find('.primary');
@@ -515,7 +526,8 @@
             const serverNode = RED.nodes.node(serverInput.val());
             if (!serverNode) return showStatus('error', 'No server selected');
             
-            const serverId = `${serverNode.iobhost}:${serverNode.iobport}`;
+            // Use the Node-RED server ID directly instead of constructing host:port
+            const serverId = serverNode.id;
             currentServerId = serverId;
             
             if (!forceRefresh) {
@@ -567,7 +579,8 @@
         
         function showStatus(type, msg) {
             const icons = { success: 'fa-check-circle', info: 'fa-info-circle', error: 'fa-exclamation-triangle' };
-            elements.status.html(`<span class="iob-status ${type}"><i class="fa ${icons[type]}"></i> ${msg}</span>`).show();
+            elements.status.removeClass('success info error').addClass(type);
+            elements.status.html(`<i class="fa ${icons[type]}"></i> ${msg}`).show();
         }
         
         function toggleMode() {

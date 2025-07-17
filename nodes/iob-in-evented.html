@@ -1,6 +1,33 @@
 <!-- nodes/iob-in-evented.html -->
 
 <script type="text/javascript">
+// Shared TreeView loader with robust error handling
+function loadSharedTreeView() {
+    return new Promise((resolve, reject) => {
+        if (window.ioBrokerSharedTreeView && window.ioBrokerSharedTreeView.initialized) {
+            resolve();
+            return;
+        }
+
+        const script = document.createElement('script');
+        script.src = 'iobroker/shared/iobroker-treeview.js?v=1.0.0';
+        script.onload = () => {
+            setTimeout(() => {
+                if (window.ioBrokerSharedTreeView && window.ioBrokerSharedTreeView.initialized) {
+                    console.log('TreeView component loaded successfully');
+                    resolve();
+                } else {
+                    reject(new Error('TreeView component failed to initialize'));
+                }
+            }, 100);
+        };
+        script.onerror = () => {
+            console.error('TreeView component script not found');
+            reject(new Error('TreeView component script not found'));
+        };
+        document.head.appendChild(script);
+    });
+}
     RED.nodes.registerType('iob-in-evented', {
         category: 'ioBroker',
         color: '#82b54b',
@@ -25,6 +52,32 @@
             return this.stateId || "iob-in-evented";
         },
         oneditprepare: function() {
+            const node = this;
+            const nodeType = 'iob-in-evented';
+            
+            // Auto-select server configuration if only one exists
+            const serverInput = $('#node-input-server');
+            if (!this.server || this.server === '') {
+                const configNodes = [];
+                RED.nodes.eachConfig(function(config) {
+                    if (config.type === 'iob-config') {
+                        configNodes.push(config);
+                    }
+                });
+                
+                if (configNodes.length === 1) {
+                    this.server = configNodes[0].id;
+                    serverInput.val(this.server);
+                    
+                    setTimeout(() => {
+                        RED.notify(`Auto-selected server: ${configNodes[0].name || configNodes[0].iobhost}`, {
+                            type: "info",
+                            timeout: 1500
+                        });
+                    }, 500);
+                }
+            }
+            
             // Wildcard detection
             function checkForWildcard() {
                 const stateValue = $('#node-input-stateId').val() || '';
@@ -70,6 +123,35 @@
             
             // Initial check
             setTimeout(checkForWildcard, 100);
+            
+            // Load and initialize TreeView component
+            loadSharedTreeView().then(() => {
+                this.treeController = window.ioBrokerSharedTreeView.setup({
+                    nodeType: 'iob-in-evented',
+                    inputId: 'node-input-stateId',
+                    serverInputId: 'node-input-server',
+                    searchPlaceholder: 'Search states (supports wildcards)...',
+                    itemType: 'states',
+                    dataEndpoint: '/iobroker/ws/states',
+                    enableWildcardDetection: true,
+                    wildcardInputId: 'node-input-sendInitialValue',
+                    onStateSelected: function(stateId) {
+                        // Update the input field
+                        $('#node-input-stateId').val(stateId).trigger('input');
+                        checkForWildcard();
+                    }
+                });
+                
+            }).catch(error => {
+                console.error('Failed to load TreeView component:', error);
+                
+                const fallbackMessage = $(`
+                    <div style="margin-top: 5px; padding: 8px; background-color: #fff3cd; border: 1px solid #ffeaa7; border-radius: 4px; font-size: 12px; color: #856404;">
+                        <i class="fa fa-exclamation-triangle"></i> TreeView component not available. Manual input with basic wildcard detection.
+                    </div>
+                `);
+                $('#node-input-stateId').closest('.form-row').after(fallbackMessage);
+            });
         }
     });
 </script>
@@ -168,5 +250,24 @@
     
     .wildcard-disabled label {
         color: #999 !important;
+    }
+    
+    #btn-browse-states {
+        transition: all 0.2s ease;
+        font-size: 12px;
+        white-space: nowrap;
+    }
+    
+    #btn-browse-states:hover:not(:disabled) {
+        background: #f8f9fa;
+        border-color: #adb5bd;
+    }
+    
+    #btn-browse-states:disabled {
+        background: #e9ecef;
+        border-color: #ced4da;
+        color: #6c757d;
+        cursor: not-allowed;
+        opacity: 0.6;
     }
 </style>
