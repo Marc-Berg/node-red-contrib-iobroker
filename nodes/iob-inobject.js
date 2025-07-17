@@ -1,39 +1,35 @@
-const connectionManager = require('../lib/manager/websocket-manager');
-const { NodeHelpers } = require('../lib/utils/node-helpers');
+const Orchestrator = require('../lib/orchestrator');
+const { StatusHelpers } = require('../lib/utils/status-helpers');
 
 module.exports = function (RED) {
     function iobinobject(config) {
         RED.nodes.createNode(this, config);
         const node = this;
 
-        
-        const { setStatus, setError } = NodeHelpers.createStatusHelpers(node);
+        // Get the server configuration
+        node.server = RED.nodes.getNode(config.server);
+        if (!node.server) {
+            StatusHelpers.updateConnectionStatus(node, 'error', "Error: Server not configured");
+            return;
+        }
 
-        
-        const serverConfig = NodeHelpers.validateServerConfig(RED, config, setError);
-        if (!serverConfig) return;
-
-        const { globalConfig, connectionDetails, serverId } = serverConfig;
-
+        // Configuration
         const objectPattern = config.objectPattern?.trim();
         if (!objectPattern) {
-            return setError("Object Pattern missing", "Pattern missing");
+            StatusHelpers.updateConnectionStatus(node, 'error', "Error: Object Pattern missing");
+            return;
         }
 
         const isWildcardPattern = objectPattern.includes('*');
-
-        const settings = {
-            outputProperty: config.outputProperty?.trim() || "payload",
-            serverId,
-            nodeId: node.id,
-            useWildcard: isWildcardPattern
-        };
-
-        node.currentConfig = connectionDetails;
-        node.isInitialized = false;
-        node.isSubscribed = false;
+        node.outputProperty = config.outputProperty?.trim() || "payload";
         node.objectPattern = objectPattern;
+        node.isWildcardPattern = isWildcardPattern;
 
+        // Track if the node has been registered with the orchestrator
+        node.isRegistered = false;
+        node.isSubscribed = false;
+
+        // Helper function to create output message
         function createMessage(objectId, objectData, operation = 'update') {
             const message = {
                 topic: objectId,
@@ -46,144 +42,153 @@ module.exports = function (RED) {
                 message.pattern = node.objectPattern;
             }
 
-            message[settings.outputProperty] = objectData;
+            message[node.outputProperty] = objectData;
             return message;
         }
 
-        function onObjectChange(objectId, objectData, operation) {
-            try {
-                if (!objectData) {
-                    
-                    operation = 'delete';
-                    objectData = { _id: objectId, deleted: true };
-                }
-
-                const message = createMessage(objectId, objectData, operation);
-                node.send(message);
-
-                const timestamp = new Date().toLocaleTimeString(undefined, { hour12: false });
-                const statusText = isWildcardPattern
-                    ? `Pattern active - Last: ${timestamp}`
-                    : `Last: ${timestamp}`;
-                setStatus("green", "dot", statusText);
-
-            } catch (error) {
-                node.error(`Object change processing error: ${error.message}`);
-                setError(`Processing error: ${error.message}`, "Process error");
-            }
+        // Helper function to update status with object info
+        function updateStatusWithObjectInfo(objectId, operation) {
+            const now = new Date().toLocaleTimeString(undefined, { hour12: false });
+            const statusText = isWildcardPattern
+                ? `Pattern active - Last: ${now}`
+                : `Last: ${now}`;
+            node.status({ fill: "green", shape: "dot", text: statusText });
         }
 
-        function createCallback() {
-            const callback = onObjectChange;
+        // --- Event Handlers ---
 
-            
-            const statusTexts = {
-                ready: isWildcardPattern
-                    ? `Pattern ready: ${node.objectPattern}`
-                    : "Ready",
-                disconnected: "Disconnected"
-            };
-
-            
-            const baseCallback = NodeHelpers.createSubscriptionEventCallback(
-                node,
-                setStatus,
-                () => {
-                    node.isSubscribed = true;
-                },
-                statusTexts
-            );
-
-            
-            Object.assign(callback, baseCallback);
-
-            
-            callback.wantsInitialValue = false;
-
-            return callback;
-        }
-
-        async function initialize() {
-            
-            const status = connectionManager.getConnectionStatus(settings.serverId);
-            if (node.isSubscribed && status.connected && status.ready) {
-                return;
-            }
-
-            try {
-                setStatus("yellow", "ring", "Connecting...");
-
-                
-                await NodeHelpers.handleConfigChange(node, config, RED, settings);
-
-                const callback = createCallback();
-
-                
-                await connectionManager.subscribeObjects(
-                    settings.nodeId,
-                    settings.serverId,
-                    objectPattern,
-                    callback,
-                    globalConfig
-                );
-
-                node.isSubscribed = true;
-
-                const patternInfo = isWildcardPattern
-                    ? `wildcard pattern: ${objectPattern}`
-                    : `single object: ${objectPattern}`;
-
-
-                setStatus("green", "dot", isWildcardPattern ? `Pattern: ${objectPattern}` : "Ready");
-                node.isInitialized = true;
-
-            } catch (error) {
-                const errorMsg = error.message || 'Unknown error';
-
-                if (errorMsg.includes('auth_failed') || errorMsg.includes('Authentication failed')) {
-                    
-                    setStatus("red", "ring", "Auth failed");
-                } else if (errorMsg.includes('not possible in state')) {
-                    
-                    setStatus("red", "ring", "Connection failed");
+        const onServerReady = ({ serverId }) => {
+            if (serverId === node.server.id) {
+                if (!node.isSubscribed) {
+                    node.log(`Server ready for ${serverId}, subscribing to object pattern: ${node.objectPattern}`);
+                    StatusHelpers.updateConnectionStatus(node, 'subscribing', 'Subscribing to objects...');
+                    Orchestrator.subscribeToObjects(node.id, node.objectPattern);
                 } else {
-                    
-                    setStatus("yellow", "ring", "Retrying...");
+                    node.log(`Server ready for ${serverId}, but already subscribed to objects`);
                 }
+            }
+        };
 
+        const onObjectSubscriptionConfirmed = ({ serverId, objectId }) => {
+            if (serverId === node.server.id) {
+                if (node.isWildcardPattern) {
+                    // For wildcard patterns, any matching subscription confirms our pattern is active
+                    if (objectId.includes('*') || objectId === node.objectPattern) {
+                        node.status({ fill: "green", shape: "ring", text: `Pattern: ${node.objectPattern}` });
+                        node.isSubscribed = true;
+                    }
+                } else {
+                    // For single objects, exact match
+                    if (objectId === node.objectPattern) {
+                        node.status({ fill: "green", shape: "ring", text: `Subscribed to ${node.objectPattern}` });
+                        node.isSubscribed = true;
+                    }
+                }
+            }
+        };
+
+        const onObjectChanged = ({ serverId, objectId, objectData, operation }) => {
+            if (serverId === node.server.id) {
+                try {
+                    // Check if this object change is relevant for our pattern
+                    let isRelevant = false;
+                    
+                    if (node.isWildcardPattern) {
+                        // For wildcard patterns, check if objectId matches the pattern
+                        const patternRegex = new RegExp(node.objectPattern.replace(/\*/g, '.*'));
+                        isRelevant = patternRegex.test(objectId);
+                    } else {
+                        // For single objects, exact match
+                        isRelevant = objectId === node.objectPattern;
+                    }
+                    
+                    if (isRelevant) {
+                        // Handle deletion case
+                        if (!objectData) {
+                            operation = 'delete';
+                            objectData = { _id: objectId, deleted: true };
+                        }
+
+                        const message = createMessage(objectId, objectData, operation);
+                        node.send(message);
+                        updateStatusWithObjectInfo(objectId, operation);
+                    }
+                } catch (error) {
+                    node.error(`Object change processing error: ${error.message}`);
+                    StatusHelpers.updateConnectionStatus(node, 'error', `Processing error: ${error.message}`);
+                }
+            }
+        };
+
+        const onDisconnected = ({ serverId }) => {
+            if (serverId === node.server.id) {
+                StatusHelpers.updateConnectionStatus(node, 'disconnected', 'Disconnected');
                 node.isSubscribed = false;
             }
-        }
+        };
 
-        node.on("close", async function (removed, done) {
-            node.isInitialized = false;
-            node.isSubscribed = false;
-
-            try {
-                await connectionManager.unsubscribeObjects(
-                    settings.nodeId,
-                    settings.serverId,
-                    objectPattern
-                );
-
-                node.status({});
-
-                const patternInfo = isWildcardPattern
-                    ? `wildcard pattern ${objectPattern}`
-                    : `single object ${objectPattern}`;
-
-
-            } catch (error) {
-                node.warn(`Cleanup error: ${error.message}`);
-            } finally {
-                done();
+        const onRetrying = ({ serverId, attempt, delay }) => {
+            if (serverId === node.server.id) {
+                StatusHelpers.updateConnectionStatus(node, 'retrying', `Retrying in ${delay / 1000}s (Attempt #${attempt})`);
             }
+        };
+
+        const onPermanentFailure = ({ serverId, error }) => {
+            if (serverId === node.server.id) {
+                StatusHelpers.updateConnectionStatus(node, 'error', `Connection failed: ${error}`);
+                node.isSubscribed = false;
+            }
+        };
+
+        // --- Node Lifecycle ---
+
+        // Function to register with orchestrator
+        const registerWithOrchestrator = () => {
+            if (!node.isRegistered) {
+                node.log(`Registering node with orchestrator after flows started`);
+                Orchestrator.registerNode(node.id, node.server);
+                node.isRegistered = true;
+            }
+        };
+
+        // Register with orchestrator when flows are ready
+        // Use timeout to ensure registration happens after flows are started
+        setTimeout(() => {
+            registerWithOrchestrator();
+        }, 300);
+
+        // Listen for events from the Orchestrator
+        Orchestrator.on('server:ready', onServerReady);
+        Orchestrator.on('object:subscription_confirmed', onObjectSubscriptionConfirmed);
+        Orchestrator.on('object:changed', onObjectChanged);
+        Orchestrator.on('connection:disconnected', onDisconnected);
+        Orchestrator.on('connection:retrying', onRetrying);
+        Orchestrator.on('connection:failed_permanently', onPermanentFailure);
+
+        node.on('close', function(done) {
+            // Unsubscribe from objects if subscribed
+            if (node.isSubscribed) {
+                Orchestrator.unsubscribeFromObjects(node.id, node.objectPattern);
+            }
+            
+            // Clean up all listeners to prevent memory leaks
+            Orchestrator.removeListener('server:ready', onServerReady);
+            Orchestrator.removeListener('object:subscription_confirmed', onObjectSubscriptionConfirmed);
+            Orchestrator.removeListener('object:changed', onObjectChanged);
+            Orchestrator.removeListener('connection:disconnected', onDisconnected);
+            Orchestrator.removeListener('connection:retrying', onRetrying);
+            Orchestrator.removeListener('connection:failed_permanently', onPermanentFailure);
+            
+            // Only unregister if we were actually registered
+            if (node.isRegistered) {
+                Orchestrator.unregisterNode(node.id, node.server.id);
+            }
+            
+            done();
         });
 
-        node.on("error", NodeHelpers.createErrorHandler(node, setError));
-
-        
-        initialize();
+        // Initial status
+        StatusHelpers.updateConnectionStatus(node, 'waiting', 'Waiting for server...');
     }
 
     RED.nodes.registerType("iobinobject", iobinobject);
