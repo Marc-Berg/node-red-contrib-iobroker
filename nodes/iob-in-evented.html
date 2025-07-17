@@ -33,10 +33,13 @@ function loadSharedTreeView() {
         color: '#82b54b',
         defaults: {
             name: { value: "" },
-            stateId: { value: "", required: true },
+            stateId: { value: "", required: false },
             server: { value: "", type: "iob-config", required: true },
             sendInitialValue: { value: false },
-            ackFilter: { value: "both" }
+            ackFilter: { value: "both" },
+            inputMode: { value: "single" },
+            multipleStates: { value: "" },
+            outputMode: { value: "individual" }
         },
         inputs: 0,
         outputs: 1,
@@ -44,7 +47,13 @@ function loadSharedTreeView() {
         label: function() {
             if (this.name) return this.name;
             
-            // Check for wildcard pattern
+            // Multiple states mode
+            if (this.inputMode === 'multiple') {
+                const stateCount = this.multipleStates ? this.multipleStates.split('\n').filter(s => s.trim()).length : 0;
+                return stateCount > 0 ? `Multiple (${stateCount})` : "Multiple States";
+            }
+            
+            // Single state / wildcard mode  
             if (this.stateId && this.stateId.includes('*')) {
                 return `${this.stateId} (wildcard)`;
             }
@@ -118,11 +127,68 @@ function loadSharedTreeView() {
                 $('#wildcard-info').hide();
             }
             
+            // Input mode switching
+            function updateInputModeDisplay() {
+                const inputMode = $('#node-input-inputMode').val();
+                
+                if (inputMode === 'single') {
+                    $('#single-state-container').show();
+                    $('#multiple-states-container').hide();
+                    $('#output-mode-container').hide();
+                    
+                    // Re-enable wildcard detection and initial values for single mode
+                    checkForWildcard();
+                } else if (inputMode === 'multiple') {
+                    $('#single-state-container').hide();
+                    $('#multiple-states-container').show();
+                    $('#output-mode-container').show();
+                    
+                    // Disable initial values for wildcards but enable for multiple states
+                    $('#node-input-sendInitialValue').prop('disabled', false);
+                    $('#initial-value-container').removeClass('wildcard-disabled');
+                    hideWildcardInfo();
+                    
+                    updateOutputModeDisplay();
+                    updateMultipleStatesCount();
+                }
+            }
+            
+            // Setup output mode display
+            function updateOutputModeDisplay() {
+                const outputMode = $('#node-input-outputMode').val();
+                let description = '';
+                
+                switch(outputMode) {
+                    case 'individual':
+                        description = 'Each state change creates a separate message';
+                        break;
+                    case 'grouped':
+                        description = 'All current values of subscribed states in one message object';
+                        break;
+                    default:
+                        description = 'Each state change creates a separate message';
+                }
+                
+                $('#output-mode-description').text(description);
+            }
+            
+            // Multiple states count helper
+            function updateMultipleStatesCount() {
+                const states = $('#node-input-multipleStates').val().split('\n').filter(s => s.trim()).length;
+                $('#multiple-states-count').text(`${states} state(s) configured`);
+            }
+            
             // Event handlers
             $('#node-input-stateId').on('input', checkForWildcard);
+            $('#node-input-inputMode').on('change', updateInputModeDisplay);
+            $('#node-input-outputMode').on('change', updateOutputModeDisplay);
+            $('#node-input-multipleStates').on('input', updateMultipleStatesCount);
             
-            // Initial check
-            setTimeout(checkForWildcard, 100);
+            // Initial setup
+            setTimeout(() => {
+                updateInputModeDisplay();
+                checkForWildcard();
+            }, 100);
             
             // Load and initialize TreeView component
             loadSharedTreeView().then(() => {
@@ -166,8 +232,32 @@ function loadSharedTreeView() {
         <input type="text" id="node-input-server">
     </div>
     <div class="form-row">
+        <label for="node-input-inputMode"><i class="fa fa-list"></i> Input Mode</label>
+        <select id="node-input-inputMode">
+            <option value="single">Single State / Wildcard Pattern</option>
+            <option value="multiple">Multiple States</option>
+        </select>
+    </div>
+    <div class="form-row" id="single-state-container">
         <label for="node-input-stateId"><i class="fa fa-dot-circle-o"></i> State ID</label>
         <input type="text" id="node-input-stateId" placeholder="e.g. 0_userdata.0.myState or system.adapter.*">
+    </div>
+    <div class="form-row" id="multiple-states-container" style="display: none;">
+        <label for="node-input-multipleStates"><i class="fa fa-list"></i> Multiple States</label>
+        <textarea id="node-input-multipleStates" rows="6" placeholder="Enter one state ID per line:&#10;0_userdata.0.temperature&#10;0_userdata.0.humidity&#10;lights.living.state"></textarea>
+        <div class="form-tips" style="margin-top: 5px;">
+            <span id="multiple-states-count">0 state(s) configured</span>
+        </div>
+    </div>
+    <div class="form-row" id="output-mode-container" style="display: none;">
+        <label for="node-input-outputMode"><i class="fa fa-share"></i> Output Mode</label>
+        <select id="node-input-outputMode">
+            <option value="individual">Individual Messages</option>
+            <option value="grouped">Grouped Object</option>
+        </select>
+        <div class="form-tips" style="margin-top: 5px;">
+            <span id="output-mode-description">Each state change creates a separate message</span>
+        </div>
     </div>
     <div class="form-row">
         <label for="node-input-ackFilter"><i class="fa fa-filter"></i> ACK Filter</label>
