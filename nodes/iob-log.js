@@ -124,13 +124,17 @@ module.exports = function(RED) {
         const onServerReady = ({ serverId }) => {
             if (serverId === node.server.id) {
                 if (!node.isSubscribed) {
+                    node.log(`Server ready for ${serverId}, subscribing to logs with level ${node.logLevel}`);
                     StatusHelpers.updateConnectionStatus(node, 'subscribing', 'Subscribing to logs...');
                     Orchestrator.subscribeToLogs(node.id, node.logLevel);
+                } else {
+                    node.log(`Server ready for ${serverId}, but already subscribed`);
                 }
             }
         };
 
         const onLogSubscriptionConfirmed = ({ serverId, nodeId }) => {
+            node.log(`Log subscription confirmed event received: serverId=${serverId}, nodeId=${nodeId}, myServerId=${node.server.id}, myNodeId=${node.id}`);
             if (serverId === node.server.id && nodeId === node.id) {
                 node.log(`Log subscription confirmed for level ${node.logLevel}`);
                 node.isSubscribed = true;
@@ -143,8 +147,8 @@ module.exports = function(RED) {
                 try {
                     const message = createLogMessage(logData);
                     if (message) {
-                        node.send(message);
                         updateStatusWithLogLevel(message.level);
+                        node.send(message);
                     }
                 } catch (error) {
                     node.error(`Log processing error: ${error.message}`);
@@ -191,8 +195,8 @@ module.exports = function(RED) {
 
         // Listen for events from the Orchestrator
         Orchestrator.on('server:ready', onServerReady);
-        Orchestrator.on(`log:subscription_confirmed:${node.id}`, onLogSubscriptionConfirmed);
-        Orchestrator.on(`log:message:${node.id}`, onLogMessage);
+        Orchestrator.on('log:subscription_confirmed', onLogSubscriptionConfirmed);
+        Orchestrator.on('log:message', onLogMessage);
         Orchestrator.on('connection:disconnected', onDisconnected);
         Orchestrator.on('connection:retrying', onRetrying);
         Orchestrator.on('connection:failed_permanently', onPermanentFailure);
@@ -205,8 +209,8 @@ module.exports = function(RED) {
             
             // Clean up all listeners to prevent memory leaks
             Orchestrator.removeListener('server:ready', onServerReady);
-            Orchestrator.removeListener(`log:subscription_confirmed:${node.id}`, onLogSubscriptionConfirmed);
-            Orchestrator.removeListener(`log:message:${node.id}`, onLogMessage);
+            Orchestrator.removeListener('log:subscription_confirmed', onLogSubscriptionConfirmed);
+            Orchestrator.removeListener('log:message', onLogMessage);
             Orchestrator.removeListener('connection:disconnected', onDisconnected);
             Orchestrator.removeListener('connection:retrying', onRetrying);
             Orchestrator.removeListener('connection:failed_permanently', onPermanentFailure);
