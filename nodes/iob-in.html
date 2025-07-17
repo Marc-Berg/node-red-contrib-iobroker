@@ -58,9 +58,9 @@ RED.nodes.registerType('iobin', {
         sendInitialValue: { value: false },
         useWildcard: { value: false },
         inputMode: { value: "single" }, // "single" or "multiple"
-        outputMode: { value: "individual" }, // "individual", "grouped", "array"
+        outputMode: { value: "individual" }, // "individual", "grouped"
         filterMode: { value: "all" }, // "all", "changes-only", "changes-smart"
-        server: { value: "", type: "iob-config" }
+        server: { value: "", type: "iob-config", required: true }
     },
     inputs: 0,
     outputs: 1,
@@ -85,13 +85,12 @@ RED.nodes.registerType('iobin', {
         const filter = (this.filterMode === 'changes-only' || this.filterMode === 'changes-smart') ? ' [Changes]' : '';
         return (this.state || "iob-in") + filter;
     },
-    
     oneditprepare: function() {
         const node = this;
-        const nodeType = 'iobin'; // Define nodeType for wildcard functions
-        const serverInput = $('#node-input-server');
+        const nodeType = 'iobin';
         
-        // Auto-select server configuration
+        // Auto-select server configuration if only one exists
+        const serverInput = $('#node-input-server');
         if (!this.server || this.server === '') {
             const configNodes = [];
             RED.nodes.eachConfig(function(config) {
@@ -113,41 +112,163 @@ RED.nodes.registerType('iobin', {
             }
         }
         
-        // Initialize defaults for missing properties
-        if (!this.inputMode) {
-            this.inputMode = 'single';
-        }
-        
-        if (!this.filterMode) {
-            this.filterMode = 'all';
-        }
-        
-        // Set values in dropdowns
-        $('#node-input-inputMode').val(this.inputMode);
-        $('#node-input-filterMode').val(this.filterMode);
-        
-        // Setup input mode switching
-        function updateInputModeDisplay() {
-            const mode = $('#node-input-inputMode').val();
+        // Wildcard detection
+        function checkForWildcard() {
+            const stateValue = $('#node-input-state').val() || '';
+            const hasWildcardChars = stateValue.includes('*');
             
-            $('.input-mode-row').hide();
-            
-            if (mode === 'single') {
-                $('#single-state-row').show();
-                $('#initial-value-container').show();
+            if (hasWildcardChars) {
+                // Disable initial values for wildcards
+                $('#node-input-sendInitialValue').prop('checked', false).prop('disabled', true);
+                $('#initial-value-container').addClass('wildcard-disabled');
+                
+                // Show wildcard info
+                showWildcardInfo();
+            } else {
+                // Re-enable initial values for single states
                 $('#node-input-sendInitialValue').prop('disabled', false);
                 $('#initial-value-container').removeClass('wildcard-disabled');
-            } else if (mode === 'multiple') {
+                
+                // Hide wildcard info
+                hideWildcardInfo();
+            }
+        }
+        
+        function showWildcardInfo() {
+            const warnings = [
+                'This pattern will match multiple states',
+                'Initial values are automatically disabled',
+                'Each matching state will generate separate messages'
+            ];
+            
+            $('#wildcard-warnings').empty();
+            warnings.forEach(warning => {
+                $('#wildcard-warnings').append(`<li>${warning}</li>`);
+            });
+            $('#wildcard-info').show();
+        }
+        
+        function hideWildcardInfo() {
+            $('#wildcard-info').hide();
+        }
+        
+        // Input mode switching
+        function updateInputModeDisplay() {
+            const inputMode = $('#node-input-inputMode').val();
+            
+            if (inputMode === 'single') {
+                $('#single-state-row').show();
+                $('#multiple-states-row').hide();
+                $('#output-mode-row').hide();
+                
+                // Re-enable wildcard detection and initial values for single mode
+                checkForWildcard();
+            } else if (inputMode === 'multiple') {
+                $('#single-state-row').hide();
                 $('#multiple-states-row').show();
                 $('#output-mode-row').show();
-                $('#initial-value-container').show();
+                
+                // Disable initial values for wildcards but enable for multiple states
                 $('#node-input-sendInitialValue').prop('disabled', false);
                 $('#initial-value-container').removeClass('wildcard-disabled');
+                hideWildcardInfo();
+                
+                updateMultipleStatesCount();
+                updateOutputModeDisplay();
             }
+        }
+        
+        // Setup output mode display
+        function updateOutputModeDisplay() {
+            const outputMode = $('#node-input-outputMode').val();
+            let description = '';
+            
+            switch(outputMode) {
+                case 'individual':
+                    description = 'Each state change creates a separate message';
+                    break;
+                case 'grouped':
+                    description = 'All current values of subscribed states in one message object';
+                    break;
+                default:
+                    description = 'Each state change creates a separate message';
+            }
+            
+            $('#output-mode-description').text(description);
         }
         
         // Setup filter mode display
         function updateFilterModeDisplay() {
+            const filterMode = $('#node-input-filterMode').val();
+            let description = '';
+            
+            switch(filterMode) {
+                case 'all':
+                    description = 'Sends every state update including duplicates (no filtering)';
+                    break;
+                case 'changes-only':
+                    description = 'Sends first value after restart, then only when value actually changes';
+                    break;
+                case 'changes-smart':
+                    description = 'Pre-loads baseline values at startup, then only sends changes';
+                    break;
+                default:
+                    description = 'Sends every state update including duplicates (no filtering)';
+            }
+            
+            $('#filter-mode-description').text(description);
+        }
+        
+        // Multiple states count helper
+        function updateMultipleStatesCount() {
+            const states = $('#node-input-multipleStates').val().split('\n').filter(s => s.trim()).length;
+            $('#multiple-states-count').text(`${states} state(s) configured`);
+        }
+        
+        // Event handlers
+        $('#node-input-state').on('input', checkForWildcard);
+        $('#node-input-inputMode').on('change', updateInputModeDisplay);
+        $('#node-input-outputMode').on('change', updateOutputModeDisplay);
+        $('#node-input-filterMode').on('change', updateFilterModeDisplay);
+        $('#node-input-multipleStates').on('input', updateMultipleStatesCount);
+        
+        // Initial setup
+        setTimeout(() => {
+            updateInputModeDisplay();
+            updateFilterModeDisplay();
+            checkForWildcard();
+        }, 100);
+
+        // Load and initialize TreeView component
+        loadSharedTreeView().then(() => {
+            this.treeController = window.ioBrokerSharedTreeView.setup({
+                nodeType: 'iobin',
+                inputId: 'node-input-state',
+                serverInputId: 'node-input-server',
+                searchPlaceholder: 'Search states (supports wildcards)...',
+                itemType: 'states',
+                dataEndpoint: '/iobroker/ws/states',
+                enableWildcardDetection: true,
+                wildcardInputId: 'node-input-sendInitialValue',
+                onStateSelected: function(stateId) {
+                    // Update the input field
+                    $('#node-input-state').val(stateId).trigger('input');
+                    checkForWildcard();
+                }
+            });
+            
+        }).catch(error => {
+            console.error('Failed to load TreeView component:', error);
+            
+            const fallbackMessage = $(`
+                <div style="margin-top: 5px; padding: 8px; background-color: #fff3cd; border: 1px solid #ffeaa7; border-radius: 4px; font-size: 12px; color: #856404;">
+                    <i class="fa fa-exclamation-triangle"></i> TreeView component not available. Manual input with basic wildcard detection.
+                </div>
+            `);
+            $('#node-input-state').closest('.form-row').after(fallbackMessage);
+        });
+    }
+});
             const filterMode = $('#node-input-filterMode').val();
             let description = '';
             
@@ -400,9 +521,6 @@ RED.nodes.registerType('iobin', {
         <textarea id="node-input-multipleStates" rows="6" style="width:100%; font-family: monospace;" placeholder="Enter one state ID per line:&#10;0_userdata.0.state1&#10;0_userdata.0.state2&#10;system.adapter.history.0.alive"></textarea>
         <div style="margin-top: 5px; font-size: 12px; color: #666;">
             <span id="multiple-states-count">0 state(s) configured</span>
-            <button type="button" id="add-current-state" class="editor-button editor-button-small" style="margin-left: 10px;">
-                <i class="fa fa-plus"></i> Add current single state
-            </button>
         </div>
     </div>
     
@@ -427,6 +545,40 @@ RED.nodes.registerType('iobin', {
             <option value="ack">Acknowledged only (ack=true)</option>
             <option value="noack">Unacknowledged only (ack=false)</option>
         </select>
+    </div>
+    
+    <div class="form-row">
+        <label for="node-input-filterMode"><i class="icon-tag"></i> Filter Mode</label>
+        <select id="node-input-filterMode" style="width:100%">
+            <option value="all">Send all events</option>
+            <option value="changes-only">Send only value changes</option>
+            <option value="changes-smart">Send only value changes (with baseline)</option>
+        </select>
+        <div style="margin-top: 5px; font-size: 12px; color: #666;" id="filter-mode-description"></div>
+    </div>
+    
+    <div class="form-row" id="initial-value-container">
+        <label for="node-input-sendInitialValue" style="width: auto;">
+            <input type="checkbox" id="node-input-sendInitialValue" style="width: auto; margin-right: 5px;">
+            <i class="icon-tag"></i> Send initial value on startup
+        </label>
+        <div style="margin-top: 5px; font-size: 12px; color: #666;">
+            Automatically disabled for wildcards. For multiple states: sends all current values at startup. 
+            <strong>Note:</strong> Initial values always bypass change filtering.
+        </div>
+    </div>
+    
+    <div class="form-row">
+        <label for="node-input-server"><i class="icon-tag"></i> Server</label>
+        <input type="text" id="node-input-server" required>
+    </div>
+    <div id="wildcard-info" style="display: none; margin-top: 10px;">
+        <div style="background: #fff3cd; border: 1px solid #ffeaa7; border-radius: 4px; padding: 8px; font-size: 12px;">
+            <strong>Wildcard Pattern Detected:</strong>
+            <ul id="wildcard-warnings" style="margin: 5px 0 0 15px; padding: 0;">
+            </ul>
+        </div>
+    </div>
     </div>
     
     <div class="form-row">
@@ -570,3 +722,33 @@ Both modes behave identically because initial values bypass change filtering.
         <li>Change filtering reduces message volume but requires storing previous values</li>
     </ul>
 </script>
+
+<style>
+    .wildcard-disabled {
+        opacity: 0.5;
+        pointer-events: none;
+    }
+    
+    .wildcard-disabled label {
+        color: #999 !important;
+    }
+    
+    #btn-browse-states {
+        transition: all 0.2s ease;
+        font-size: 12px;
+        white-space: nowrap;
+    }
+    
+    #btn-browse-states:hover:not(:disabled) {
+        background: #f8f9fa;
+        border-color: #adb5bd;
+    }
+    
+    #btn-browse-states:disabled {
+        background: #e9ecef;
+        border-color: #ced4da;
+        color: #6c757d;
+        cursor: not-allowed;
+        opacity: 0.6;
+    }
+</style>

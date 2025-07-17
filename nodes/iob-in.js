@@ -1,656 +1,795 @@
-const connectionManager = require('../lib/manager/websocket-manager');
+const Orchestrator = require('../lib/orchestrator');
 const { NodeHelpers } = require('../lib/utils/node-helpers');
 
-module.exports = function (RED) {
-    function iobin(config) {
+module.exports = function(RED) {
+    function IoBrokerInNode(config) {
         RED.nodes.createNode(this, config);
         const node = this;
-        const { setStatus, setError } = NodeHelpers.createStatusHelpers(node);
-
-        const serverConfig = NodeHelpers.validateServerConfig(RED, config, setError);
-        if (!serverConfig) return;
-
-        const { globalConfig, connectionDetails, serverId } = serverConfig;
-
-        const inputMode = config.inputMode || 'single';
-        let stateList = [];
-        let subscriptionPattern = '';
-
-        if (inputMode === 'multiple') {
-            const multipleStatesRaw = config.multipleStates || '';
-            stateList = multipleStatesRaw
-                .split('\n')
+        
+        node.server = RED.nodes.getNode(config.server);
+        node.stateId = config.state; // Updated from config.stateId to config.state
+        node.isSubscribed = false;
+        
+        // Configuration options
+        node.sendInitialValue = config.sendInitialValue || false;
+        node.outputProperty = config.outputProperty || "payload"; // New field
+        node.filterMode = config.filterMode || "all"; // New field
+        node.ackFilter = config.ackFilter || "both"; // ACK filter
+        node.inputMode = config.inputMode || "single";
+        node.multipleStates = config.multipleStates || "";
+        node.outputMode = config.outputMode || "individual";
+        
+        // Debug configuration
+        node.log(`Node configuration: inputMode=${node.inputMode}, sendInitialValue=${node.sendInitialValue}, outputMode=${node.outputMode}, outputProperty=${node.outputProperty}, filterMode=${node.filterMode}, ackFilter=${node.ackFilter}, multipleStates="${node.multipleStates}"`);
+        
+        // Parse multiple states if in multiple mode
+        node.statesList = [];
+        node.groupedStateValues = {};  // For grouped output mode
+        node.subscribedStates = new Set(); // Track which states are subscribed
+        node.initialValuesRequested = new Set(); // Track initial value requests
+        node.initialValueTimeout = null; // Timeout for grouped initial values
+        
+        // Variables for grouped mode getState requests
+        node.pendingGroupedStates = null; // Set of states we're waiting for in grouped mode
+        node.groupedUpdateTriggeredBy = null; // Which state triggered the grouped update
+        node.groupedTimeout = null; // Timeout for grouped getState requests
+        
+        if (node.inputMode === 'multiple' && node.multipleStates) {
+            node.statesList = node.multipleStates.split('\n')
                 .map(s => s.trim())
                 .filter(s => s.length > 0);
-
-            if (stateList.length === 0) {
-                return setError("No states configured for multiple states mode", "No states");
-            }
-        } else {
-            subscriptionPattern = config.state ? config.state.trim() : '';
-            if (!subscriptionPattern) {
-                return setError("State ID or pattern missing", "Config missing");
+            
+            node.log(`Parsed ${node.statesList.length} states: [${node.statesList.join(', ')}]`);
+        }
+        
+        // Track if the node has been registered with the orchestrator
+        node.isRegistered = false;
+        
+        // Track baseline requests for changes-smart mode
+        node._pendingBaselineRequests = new Set();
+        
+        // Setup message queue system for reliable message delivery
+        const { sendWhenReady, cleanup } = NodeHelpers.setupMessageQueue(RED, node);
+        
+        // Previous state values for change detection
+        node.previousValues = new Map();
+        
+        // Helper function to update node status with current value
+        function updateNodeStatus(stateId, value, isInitial = false) {
+            if (node.inputMode === 'single') {
+                // For single state mode, show the current value
+                const filterLabel = (node.filterMode === 'changes-only' || node.filterMode === 'changes-smart') ? ' [Changes]' : '';
+                const initialLabel = isInitial ? ' (initial)' : '';
+                const timestamp = new Date().toLocaleTimeString(undefined, { hour12: false });
+                
+                let displayValue = value;
+                if (typeof value === 'object') {
+                    displayValue = JSON.stringify(value);
+                } else if (value === null) {
+                    displayValue = 'null';
+                } else if (value === undefined) {
+                    displayValue = 'undefined';
+                }
+                
+                // Truncate long values
+                if (String(displayValue).length > 30) {
+                    displayValue = String(displayValue).substring(0, 27) + '...';
+                }
+                
+                const statusText = `${displayValue}${filterLabel}${initialLabel}`;
+                node.status({ fill: "green", shape: "dot", text: statusText });
+            } else if (node.inputMode === 'multiple') {
+                // For multiple states mode, show count and mode
+                const filterLabel = (node.filterMode === 'changes-only' || node.filterMode === 'changes-smart') ? ' [Changes]' : '';
+                const timestamp = new Date().toLocaleTimeString(undefined, { hour12: false });
+                const statusText = `${node.statesList.length} states (${node.outputMode})${filterLabel}`;
+                node.status({ fill: "green", shape: "dot", text: statusText });
             }
         }
+        
+        // Helper function to create messages with the correct output property
+        function createMessage(state, stateId) {
+            const message = {
+                topic: stateId,
+                ts: state.ts,
+                lc: state.lc,
+                ack: state.ack,
+                from: state.from,
+                quality: state.q
+            };
+            
+            // Use the configured output property (default: "payload")
+            message[node.outputProperty] = state.val;
+            
+            return message;
+        }
+        
+        // Helper function to check if a value should be filtered
+        function shouldFilterValue(stateId, currentValue, isInitial = false) {
+            // Initial values ALWAYS bypass filtering - they are always sent
+            if (isInitial) {
+                node.log(`Filter: Initial value for ${stateId} - ALWAYS allowed (bypasses filtering)`);
+                return false;
+            }
+            
+            if (node.filterMode === 'all') {
+                return false; // Don't filter anything
+            }
+            
+            if (node.filterMode === 'changes-only') {
+                const previousValue = node.previousValues.get(stateId);
+                if (previousValue === undefined) {
+                    // First time we see this state after restart - ALLOW in changes-only mode
+                    node.log(`Filter: changes-only mode - first occurrence of ${stateId} after restart, allowing`);
+                    return false;
+                }
+                
+                const shouldFilter = previousValue === currentValue;
+                if (shouldFilter) {
+                    node.log(`Filter: changes-only mode - value unchanged for ${stateId}, filtering`);
+                }
+                return shouldFilter;
+            }
+            
+            if (node.filterMode === 'changes-smart') {
+                const previousValue = node.previousValues.get(stateId);
+                if (previousValue === undefined) {
+                    // First time we see this state after restart - this should not happen in smart mode
+                    // because we pre-load baseline values, but if it does, allow it
+                    node.log(`Filter: changes-smart mode - unexpected first occurrence of ${stateId}, allowing`);
+                    return false;
+                }
+                
+                const shouldFilter = previousValue === currentValue;
+                if (shouldFilter) {
+                    node.log(`Filter: changes-smart mode - value unchanged for ${stateId}, filtering`);
+                }
+                return shouldFilter;
+            }
+            
+            return false;
+        }
+        
+        // Helper function to create grouped messages
+        function createGroupedMessage(topic, isInitial = false, triggeredBy = null, partial = false) {
+            const message = {
+                topic: topic,
+                states: Object.assign({}, node.groupedStateValues),
+                timestamp: Date.now(),
+                multipleStatesMode: true,
+                outputMode: 'grouped'
+            };
+            
+            // Use the configured output property (default: "payload")
+            message[node.outputProperty] = Object.keys(node.groupedStateValues).reduce((acc, key) => {
+                acc[key] = node.groupedStateValues[key].value;
+                return acc;
+            }, {});
+            
+            if (isInitial) {
+                message.initial = true;
+            }
+            
+            if (triggeredBy) {
+                message.triggeredBy = triggeredBy;
+            }
+            
+            if (partial) {
+                message.partial = true;
+            }
+            
+            return message;
+        }
+        
+        // Detect wildcard pattern (only for single mode)
+        node.isWildcardPattern = node.inputMode === 'single' && node.stateId && node.stateId.includes('*');
+        
+        // Wildcard patterns don't support initial values
+        if (node.isWildcardPattern) {
+            node.sendInitialValue = false;
+        }
 
-        const isWildcardPattern = inputMode === 'single' && subscriptionPattern.includes('*');
-        const isMultipleStates = inputMode === 'multiple';
-        const isSingleState = inputMode === 'single' && !isWildcardPattern;
+        // Validation
+        if (!node.server) {
+            node.status({ fill: "red", shape: "dot", text: "Error: Server not configured" });
+            return;
+        }
+        
+        if (node.inputMode === 'single' && !node.stateId) {
+            node.status({ fill: "red", shape: "dot", text: "Error: State ID not configured" });
+            return;
+        }
+        
+        if (node.inputMode === 'multiple' && node.statesList.length === 0) {
+            node.status({ fill: "red", shape: "dot", text: "Error: No states configured" });
+            return;
+        }
 
-        const settings = {
-            outputProperty: config.outputProperty?.trim() || "payload",
-            ackFilter: config.ackFilter || "both",
-            sendInitialValue: config.sendInitialValue && !isWildcardPattern,
-            outputMode: config.outputMode || "individual",
-            filterMode: config.filterMode || "all",
-            serverId,
-            nodeId: node.id,
-            useWildcard: isWildcardPattern,
-            inputMode: inputMode
+        // --- Event Handler ---
+
+        const onServerReady = ({ serverId }) => {
+            if (serverId === node.server.id) {
+                // Subscribe based on input mode
+                if (node.inputMode === 'single') {
+                    node.status({ fill: "blue", shape: "dot", text: `Subscribing to ${node.stateId}...` });
+                    Orchestrator.subscribe(node.id, node.stateId);
+                } else if (node.inputMode === 'multiple') {
+                    node.status({ fill: "blue", shape: "dot", text: `Subscribing to ${node.statesList.length} states...` });
+                    
+                    // Subscribe to each state individually
+                    node.statesList.forEach(stateId => {
+                        Orchestrator.subscribe(node.id, stateId);
+                    });
+                }
+                node.isSubscribed = true;
+            }
         };
 
-        node.currentConfig = connectionDetails;
-        node.isInitialized = false;
-        node.isSubscribed = false;
-        node.subscriptionPattern = subscriptionPattern;
-        node.stateList = stateList;
-        node.currentStateValues = new Map();
-        node.subscribedStates = new Set();
-        node.initialValueCount = 0;
-        node.expectedInitialValues = 0;
-        node.initialGroupedMessageSent = false;
-        node.fallbackTimeout = null;
-        node.lastValue = undefined;
-        node.hasReceivedValue = false;
-
-        node.previous = new Map();
-
-        function formatValueForStatus(value) {
-            let displayValue;
-
-            if (value === null) {
-                displayValue = "null";
-            } else if (value === undefined) {
-                displayValue = "undefined";
-            } else if (typeof value === 'boolean') {
-                displayValue = value ? "true" : "false";
-            } else if (typeof value === 'object') {
-                try {
-                    displayValue = JSON.stringify(value);
-                } catch (e) {
-                    displayValue = "[Object]";
-                }
-            } else {
-                displayValue = String(value);
-            }
-
-            if (displayValue.length > 20) {
-                return "..." + displayValue.slice(-20);
-            }
-
-            return displayValue;
-        }
-
-        function updateStatusWithValue(isInitialValue = false) {
-            if (isSingleState && node.hasReceivedValue && node.lastValue !== undefined) {
-                const formattedValue = formatValueForStatus(node.lastValue);
-                const filterLabel = (settings.filterMode === 'changes-only' || settings.filterMode === 'changes-smart') ? ' [Changes]' : '';
-                const timestamp = new Date().toLocaleTimeString(undefined, { hour12: false });
-                const initialLabel = isInitialValue ? ' (initial)' : '';
-                setStatus("green", "dot", `${formattedValue}${filterLabel}${initialLabel}`);
-            } else {
-                const timestamp = new Date().toLocaleTimeString(undefined, { hour12: false });
-                let statusText;
-
-                if (isMultipleStates) {
-                    const subscribedCount = node.subscribedStates.size;
-                    const filterLabel = (settings.filterMode === 'changes-only' || settings.filterMode === 'changes-smart') ? ' [Changes]' : '';
-                    if (node.hasReceivedValue) {
-                        statusText = `${subscribedCount} states${filterLabel} - Last: ${timestamp}`;
+        const onSubscriptionConfirmed = ({ serverId, stateId }) => {
+            if (serverId === node.server.id) {
+                if (node.inputMode === 'single') {
+                    // For wildcard patterns, any matching subscription confirms our pattern is active
+                    if (node.isWildcardPattern) {
+                        if (matchesWildcardPattern(stateId, node.stateId)) {
+                            node.status({ fill: "green", shape: "ring", text: `Pattern active: ${node.stateId}` });
+                            node.isSubscribed = true;
+                        }
                     } else {
-                        statusText = `${stateList.length} states (${settings.outputMode})${filterLabel}`;
+                        // For single states, exact match
+                        if (stateId === node.stateId) {
+                            node.status({ fill: "green", shape: "ring", text: `Subscribed to ${node.stateId}` });
+                            node.isSubscribed = true;
+                            
+                            // Send initial value if requested (only for single states, not wildcards)
+                            if (node.sendInitialValue && !node.isWildcardPattern) {
+                                requestInitialValue();
+                            }
+                            
+                            // For changes-smart mode, always request current value to establish baseline
+                            // (even if sendInitialValue is false)
+                            if (node.filterMode === 'changes-smart' && !node.sendInitialValue && !node.isWildcardPattern) {
+                                node.log(`Changes-smart mode: requesting baseline value for ${node.stateId}`);
+                                requestBaselineValue();
+                            }
+                        }
                     }
-                } else if (isWildcardPattern) {
-                    const filterLabel = (settings.filterMode === 'changes-only' || settings.filterMode === 'changes-smart') ? ' [Changes]' : '';
-                    if (node.hasReceivedValue) {
-                        statusText = `Pattern active${filterLabel} - Last: ${timestamp}`;
-                    } else {
-                        statusText = `Pattern: ${subscriptionPattern}${filterLabel}`;
+                } else if (node.inputMode === 'multiple') {
+                    // For multiple states, check if this state is in our list
+                    if (node.statesList.includes(stateId)) {
+                        node.subscribedStates.add(stateId);
+                        
+                        node.log(`Multiple states: Subscription confirmed for ${stateId} (${node.subscribedStates.size}/${node.statesList.length})`);
+                        
+                        node.status({ 
+                            fill: "green", 
+                            shape: "ring", 
+                            text: `Subscribed: ${node.subscribedStates.size}/${node.statesList.length} states` 
+                        });
+                        
+                        // If all states are subscribed and we want initial values, request them all at once
+                        node.log(`Checking for initial values: subscribedStates=${node.subscribedStates.size}, totalStates=${node.statesList.length}, sendInitialValue=${node.sendInitialValue}`);
+                        
+                        if (node.subscribedStates.size === node.statesList.length && node.sendInitialValue) {
+                            node.log(`All states subscribed. Requesting initial values for ${node.statesList.length} states.`);
+                            
+                            // Small delay to ensure all subscriptions are properly established
+                            setTimeout(() => {
+                                // Set timeout for grouped initial values (10 seconds)
+                                if (node.outputMode === 'grouped') {
+                                    node.initialValueTimeout = setTimeout(() => {
+                                        node.log(`Initial value timeout reached. Sending partial data.`);
+                                        // Send grouped message with whatever values we have
+                                        if (Object.keys(node.groupedStateValues).length > 0) {
+                                            const partialGroupedMessage = {
+                                                topic: 'grouped_states_initial',
+                                                payload: Object.keys(node.groupedStateValues).reduce((acc, key) => {
+                                                    acc[key] = node.groupedStateValues[key].value;
+                                                    return acc;
+                                                }, {}),
+                                                states: Object.assign({}, node.groupedStateValues),
+                                                initial: true,
+                                                partial: true, // Indicate this is a partial result
+                                                timestamp: Date.now(),
+                                                multipleStatesMode: true,
+                                                outputMode: 'grouped'
+                                            };
+                                            
+                                            sendWhenReady(partialGroupedMessage, "grouped initial values (partial)");
+                                        }
+                                        node.status({ fill: "orange", shape: "dot", text: "Partial initial values (timeout)" });
+                                    }, 10000);
+                                }
+                                
+                                // Request initial values for all states
+                                node.statesList.forEach(state => {
+                                    if (!node.initialValuesRequested.has(state)) {
+                                        node.log(`Requesting initial value for: ${state}`);
+                                        node.initialValuesRequested.add(state);
+                                        requestInitialValue(state);
+                                    }
+                                });
+                            }, 100);
+                        }
+                        
+                        // For changes-smart mode, always request baseline values (even if sendInitialValue is false)
+                        // Note: changes-only mode does NOT get baseline values - it waits for the first real change
+                        if (node.subscribedStates.size === node.statesList.length && 
+                            node.filterMode === 'changes-smart' && !node.sendInitialValue) {
+                            node.log(`Changes-smart mode: requesting baseline values for ${node.statesList.length} states.`);
+                            
+                            setTimeout(() => {
+                                node.statesList.forEach(state => {
+                                    if (!node.initialValuesRequested.has(state)) {
+                                        node.log(`Requesting baseline value for: ${state}`);
+                                        node.initialValuesRequested.add(state);
+                                        requestBaselineValue(state);
+                                    }
+                                });
+                            }, 100);
+                        }
                     }
-                } else {
-                    const filterLabel = (settings.filterMode === 'changes-only' || settings.filterMode === 'changes-smart') ? ' [Changes]' : '';
-                    statusText = `Ready${filterLabel}`;
                 }
-                setStatus("green", "dot", statusText);
             }
-        }
+        };
 
+        const onStateChanged = ({ serverId, stateId, state }) => {
+            if (serverId === node.server.id) {
+                // Apply ACK filter
+                if (!shouldSendMessage(state.ack, node.ackFilter)) {
+                    return;
+                }
+                
+                if (node.inputMode === 'single') {
+                    // For wildcard patterns, check if the stateId matches the pattern
+                    if (node.isWildcardPattern) {
+                        if (!matchesWildcardPattern(stateId, node.stateId)) {
+                            return; // State doesn't match our pattern
+                        }
+                    } else {
+                        // For single states, exact match
+                        if (stateId !== node.stateId) {
+                            return;
+                        }
+                    }
+                    
+                    // Apply filter logic
+                    if (shouldFilterValue(stateId, state.val)) {
+                        node.previousValues.set(stateId, state.val); // Update previous value even if filtered
+                        return;
+                    }
+                    
+                    // Create output message for single mode
+                    const message = createMessage(state, stateId);
+                    message.state = state;
+                    message.timestamp = Date.now();
+                    
+                    // Add pattern info for wildcard matches
+                    if (node.isWildcardPattern) {
+                        message.pattern = node.stateId;
+                    }
+                    
+                    // Update previous value
+                    node.previousValues.set(stateId, state.val);
+                    
+                    // Update node status
+                    updateNodeStatus(stateId, state.val, false);
+                    
+                    // Send the message through the queue system
+                    sendWhenReady(message);
+                    
+                } else if (node.inputMode === 'multiple') {
+                    // For multiple states, check if this state is in our list
+                    if (!node.statesList.includes(stateId)) {
+                        return;
+                    }
+                    
+                    if (node.outputMode === 'individual') {
+                        // Apply filter logic
+                        if (shouldFilterValue(stateId, state.val)) {
+                            node.previousValues.set(stateId, state.val); // Update previous value even if filtered
+                            return;
+                        }
+                        
+                        // Individual mode: send separate message for each state change
+                        const message = createMessage(state, stateId);
+                        message.state = state;
+                        message.timestamp = Date.now();
+                        message.multipleStatesMode = true;
+                        
+                        // Update previous value
+                        node.previousValues.set(stateId, state.val);
+                        
+                        // Update node status for multiple states
+                        updateNodeStatus(stateId, state.val, false);
+                        
+                        sendWhenReady(message);
+                        
+                    } else if (node.outputMode === 'grouped') {
+                        // Grouped mode: update the changed state value
+                        node.groupedStateValues[stateId] = {
+                            value: state.val,
+                            ts: state.ts,
+                            ack: state.ack,
+                            state: state
+                        };
+                        
+                        // For grouped mode, we need current values of ALL states
+                        // Request current values for all states that we don't have yet
+                        const missingStates = node.statesList.filter(s => !node.groupedStateValues.hasOwnProperty(s));
+                        
+                        if (missingStates.length > 0) {
+                            node.log(`Grouped mode: Missing ${missingStates.length} states, requesting current values: [${missingStates.join(', ')}]`);
+                            
+                            // Track which states we're requesting for this grouped update
+                            node.pendingGroupedStates = new Set(missingStates);
+                            node.groupedUpdateTriggeredBy = stateId;
+                            
+                            // Request current values for missing states using the normal node ID
+                            missingStates.forEach(missingStateId => {
+                                Orchestrator.getState(node.id, missingStateId);
+                            });
+                            
+                            // Set timeout to send partial data if some states don't respond
+                            node.groupedTimeout = setTimeout(() => {
+                                if (Object.keys(node.groupedStateValues).length > 0) {
+                                    node.log(`Grouped mode: Timeout reached, sending partial grouped message`);
+                                    const partialGroupedMessage = {
+                                        topic: 'grouped_states',
+                                        payload: Object.keys(node.groupedStateValues).reduce((acc, key) => {
+                                            acc[key] = node.groupedStateValues[key].value;
+                                            return acc;
+                                        }, {}),
+                                        states: Object.assign({}, node.groupedStateValues),
+                                        triggeredBy: node.groupedUpdateTriggeredBy,
+                                        timestamp: Date.now(),
+                                        multipleStatesMode: true,
+                                        outputMode: 'grouped',
+                                        partial: true
+                                    };
+                                    
+                                    sendWhenReady(partialGroupedMessage);
+                                }
+                                // Clean up
+                                node.pendingGroupedStates = null;
+                                node.groupedUpdateTriggeredBy = null;
+                                node.groupedTimeout = null;
+                            }, 2000); // 2 second timeout
+                            
+                        } else {
+                            // We already have all states, send grouped message immediately
+                            node.log(`Grouped mode: All states available, sending grouped message immediately`);
+                            const groupedMessage = {
+                                topic: 'grouped_states',
+                                payload: Object.keys(node.groupedStateValues).reduce((acc, key) => {
+                                    acc[key] = node.groupedStateValues[key].value;
+                                    return acc;
+                                }, {}),
+                                states: Object.assign({}, node.groupedStateValues),
+                                triggeredBy: stateId,
+                                timestamp: Date.now(),
+                                multipleStatesMode: true,
+                                outputMode: 'grouped'
+                            };
+                            
+                            sendWhenReady(groupedMessage);
+                        }
+                    }
+                }
+            }
+        };
+        
+        // Function to request initial value for a single state
+        function requestInitialValue(targetStateId) {
+            const stateToRequest = targetStateId || node.stateId;
+            
+            if (node.inputMode === 'single' && node.isWildcardPattern) {
+                return; // Not supported for wildcards
+            }
+            
+            node.log(`Requesting initial value for state: ${stateToRequest}`);
+            Orchestrator.getState(node.id, stateToRequest);
+        }
+        
+        // Function to request baseline value (for changes-smart mode without sending initial message)
+        function requestBaselineValue(targetStateId) {
+            const stateToRequest = targetStateId || node.stateId;
+            
+            if (node.inputMode === 'single' && node.isWildcardPattern) {
+                return; // Not supported for wildcards
+            }
+            
+            node.log(`Requesting baseline value for changes-smart mode: ${stateToRequest}`);
+            // Use the normal node ID but mark this as a baseline request internally
+            node._pendingBaselineRequests = node._pendingBaselineRequests || new Set();
+            node._pendingBaselineRequests.add(stateToRequest);
+            Orchestrator.getState(node.id, stateToRequest);
+        }
+        
+        // Event handler for initial state value response
+        const onInitialStateValue = ({ serverId, stateId, state, nodeId }) => {
+            node.log(`Initial value response: serverId=${serverId}, stateId=${stateId}, nodeId=${nodeId}, state=${state ? 'present' : 'null'}`);
+            
+            // Check if this is a baseline request (for changes-smart mode)
+            const isBaselineRequest = node._pendingBaselineRequests && node._pendingBaselineRequests.has(stateId);
+            
+            if (serverId === node.server.id && nodeId === node.id) {
+                // Check if this is a state we're interested in
+                const isRelevantState = (node.inputMode === 'single' && stateId === node.stateId) ||
+                                      (node.inputMode === 'multiple' && node.statesList.includes(stateId));
+                
+                if (isRelevantState && state) {
+                    if (isBaselineRequest) {
+                        // This is a baseline value request - just store the value, don't send message
+                        node.log(`Setting baseline value for changes-smart mode: ${stateId} = ${state.val}`);
+                        node.previousValues.set(stateId, state.val);
+                        // Remove from pending baseline requests
+                        node._pendingBaselineRequests.delete(stateId);
+                        return;
+                    }
+                    
+                    node.log(`Processing initial value for ${stateId}: ${state.val}`);
+                    
+                    // Apply ACK filter
+                    if (!shouldSendMessage(state.ack, node.ackFilter)) {
+                        node.log(`Initial value filtered by ACK filter for ${stateId}`);
+                        return;
+                    }
+                    
+                    if (node.inputMode === 'single') {
+                        // Apply filter logic for initial values
+                        if (shouldFilterValue(stateId, state.val, true)) {
+                            node.previousValues.set(stateId, state.val); // Update previous value even if filtered
+                            return;
+                        }
+                        
+                        // Single state mode
+                        const message = createMessage(state, stateId);
+                        message.state = state;
+                        message.initial = true;
+                        message.timestamp = Date.now();
+                        
+                        // Update previous value
+                        node.previousValues.set(stateId, state.val);
+                        
+                        // Update status
+                        updateNodeStatus(stateId, state.val, true);
+                        
+                        sendWhenReady(message, "initial value");
+                        
+                    } else if (node.inputMode === 'multiple') {
+                        if (node.outputMode === 'individual') {
+                            // Apply filter logic for initial values
+                            if (shouldFilterValue(stateId, state.val, true)) {
+                                node.previousValues.set(stateId, state.val); // Update previous value even if filtered
+                                return;
+                            }
+                            
+                            // Individual mode: send separate message for each initial value
+                            const message = createMessage(state, stateId);
+                            message.state = state;
+                            message.initial = true;
+                            message.timestamp = Date.now();
+                            message.multipleStatesMode = true;
+                            
+                            // Update previous value
+                            node.previousValues.set(stateId, state.val);
+                            
+                            sendWhenReady(message, "initial value");
+                            
+                        } else if (node.outputMode === 'grouped') {
+                            // Check if this is a response for a pending grouped update
+                            if (node.pendingGroupedStates && node.pendingGroupedStates.has(stateId)) {
+                                node.log(`Grouped mode: Received missing state for grouped update: ${stateId}: ${state.val}`);
+                                
+                                // Store the state value
+                                node.groupedStateValues[stateId] = {
+                                    value: state.val,
+                                    ts: state.ts,
+                                    ack: state.ack,
+                                    state: state
+                                };
+                                
+                                // Remove from pending set
+                                node.pendingGroupedStates.delete(stateId);
+                                
+                                // Check if we have all pending states
+                                if (node.pendingGroupedStates.size === 0) {
+                                    node.log(`Grouped mode: All missing states received, sending complete grouped message`);
+                                    
+                                    // Clear timeout
+                                    if (node.groupedTimeout) {
+                                        clearTimeout(node.groupedTimeout);
+                                        node.groupedTimeout = null;
+                                    }
+                                    
+                                    // Send complete grouped message
+                                    const completeGroupedMessage = {
+                                        topic: 'grouped_states',
+                                        payload: Object.keys(node.groupedStateValues).reduce((acc, key) => {
+                                            acc[key] = node.groupedStateValues[key].value;
+                                            return acc;
+                                        }, {}),
+                                        states: Object.assign({}, node.groupedStateValues),
+                                        triggeredBy: node.groupedUpdateTriggeredBy,
+                                        timestamp: Date.now(),
+                                        multipleStatesMode: true,
+                                        outputMode: 'grouped'
+                                    };
+                                    
+                                    sendWhenReady(completeGroupedMessage);
+                                    
+                                    // Clean up
+                                    node.pendingGroupedStates = null;
+                                    node.groupedUpdateTriggeredBy = null;
+                                }
+                                
+                                return; // Don't process as regular initial value
+                            }
+                            
+                            // Regular initial value processing (not for grouped update)
+                            // Grouped mode: Store initial value and check if we have all values
+                            node.groupedStateValues[stateId] = {
+                                value: state.val,
+                                ts: state.ts,
+                                ack: state.ack,
+                                state: state
+                            };
+                            
+                            node.log(`Grouped mode: Stored initial value for ${stateId}. Now have ${Object.keys(node.groupedStateValues).length}/${node.statesList.length} values`);
+                            
+                            // Check if we have all initial values before sending grouped message
+                            const hasAllInitialValues = node.statesList.every(s => 
+                                node.groupedStateValues.hasOwnProperty(s)
+                            );
+                            
+                            node.log(`Grouped mode: hasAllInitialValues = ${hasAllInitialValues}`);
+                            
+                            if (hasAllInitialValues) {
+                                node.log(`Grouped mode: All initial values received. Sending grouped message.`);
+                                // Clear the timeout since we have all values
+                                if (node.initialValueTimeout) {
+                                    clearTimeout(node.initialValueTimeout);
+                                    node.initialValueTimeout = null;
+                                }
+                                
+                                // Send grouped message only when we have all initial values
+                                const groupedMessage = {
+                                    topic: 'grouped_states_initial',
+                                    payload: Object.keys(node.groupedStateValues).reduce((acc, key) => {
+                                        acc[key] = node.groupedStateValues[key].value;
+                                        return acc;
+                                    }, {}),
+                                    states: Object.assign({}, node.groupedStateValues),
+                                    initial: true,
+                                    timestamp: Date.now(),
+                                    multipleStatesMode: true,
+                                    outputMode: 'grouped'
+                                };
+                                
+                                sendWhenReady(groupedMessage, "grouped initial values");
+                            }
+                        }
+                        
+                        // Update status for multiple states
+                        const receivedCount = Object.keys(node.groupedStateValues).length;
+                        const totalCount = node.statesList.length;
+                        const statusText = `Initial values: ${receivedCount}/${totalCount}`;
+                        node.status({ fill: receivedCount === totalCount ? "green" : "yellow", shape: "dot", text: statusText });
+                    }
+                }
+            }
+        };
+        
+        // Helper function to check ACK filter
         function shouldSendMessage(ack, filter) {
             switch (filter) {
                 case "ack": return ack === true;
                 case "noack": return ack === false;
-                default: return true;
+                default: return true; // "both"
             }
         }
-
-        function shouldSendByValue(stateId, newValue, filterMode, isInitialValue = false) {
-            if (isInitialValue) {
-                return true;
-            }
-
-            if (filterMode !== 'changes-only' && filterMode !== 'changes-smart') {
-                return true;
-            }
-
-            const previousValue = node.previous.get(stateId);
-
-            if (filterMode === 'changes-only' && previousValue === undefined) {
-                return true;
-            }
-
-            if (typeof newValue === 'object' && newValue !== null) {
-                const currentJSON = JSON.stringify(newValue);
-                const previousJSON = previousValue !== undefined ? JSON.stringify(previousValue) : undefined;
-                return currentJSON !== previousJSON;
-            }
-
-            return newValue !== previousValue;
+        
+        // Helper function to match wildcard patterns
+        function matchesWildcardPattern(stateId, pattern) {
+            // Convert wildcard pattern to regex
+            // Escape special regex characters except *
+            const regexPattern = pattern
+                .replace(/[.+?^${}()|[\]\\]/g, '\\$&') // Escape special chars
+                .replace(/\*/g, '.*'); // Replace * with .*
+            
+            const regex = new RegExp(`^${regexPattern}$`);
+            return regex.test(stateId);
         }
 
-        function updatePreviousValue(stateId, value) {
-            if (settings.filterMode === 'changes-only' || settings.filterMode === 'changes-smart') {
-                if (typeof value === 'object' && value !== null) {
-                    try {
-                        node.previous.set(stateId, JSON.parse(JSON.stringify(value)));
-                    } catch (e) {
-                        node.previous.set(stateId, value);
-                    }
-                } else {
-                    node.previous.set(stateId, value);
-                }
+        const onDisconnected = ({ serverId }) => {
+            if (serverId === node.server.id) {
+                node.status({ fill: "red", shape: "ring", text: "Disconnected" });
+                node.isSubscribed = false; // Reset subscription status on disconnect
             }
-        }
+        };
 
-        async function initializeSmartChangeFilter() {
-            if (settings.filterMode !== 'changes-smart') {
-                return;
+        const onRetrying = ({ serverId, attempt, delay }) => {
+            if (serverId === node.server.id) {
+                node.status({ 
+                    fill: "yellow", 
+                    shape: "ring", 
+                    text: `Retrying in ${delay / 1000}s (Attempt #${attempt})` 
+                });
             }
+        };
 
-            try {
-                if (isMultipleStates) {
-                    for (const stateId of stateList) {
-                        try {
-                            const state = await connectionManager.getState(settings.serverId, stateId);
-                            if (state && state.val !== undefined) {
-                                updatePreviousValue(stateId, state.val);
-                                node.debug(`Smart filter: Pre-loaded ${stateId} = ${state.val}`);
-                            }
-                        } catch (error) {
-                            node.debug(`Smart filter: Could not load ${stateId}: ${error.message}`);
-                        }
-                    }
-                } else if (!isWildcardPattern) {
-                    try {
-                        const state = await connectionManager.getState(settings.serverId, subscriptionPattern);
-                        if (state && state.val !== undefined) {
-                            updatePreviousValue(subscriptionPattern, state.val);
-                            node.debug(`Smart filter: Pre-loaded ${subscriptionPattern} = ${state.val}`);
-                        }
-                    } catch (error) {
-                        node.debug(`Smart filter: Could not load ${subscriptionPattern}: ${error.message}`);
-                    }
-                }
-            } catch (error) {
-                node.warn(`Smart change filter initialization failed: ${error.message}`);
+        const onPermanentFailure = ({ serverId, error }) => {
+            if (serverId === node.server.id) {
+                node.status({ 
+                    fill: "red", 
+                    shape: "dot", 
+                    text: `Failed: ${error.message}` 
+                });
             }
-        }
+        };
 
-        function createMessage(stateId, state, isInitialValue = false) {
-            const message = {
-                topic: stateId,
-                state: state,
-                timestamp: Date.now()
-            };
+        // --- Node Lifecycle ---
 
-            if (isWildcardPattern) {
-                message.pattern = node.subscriptionPattern;
+        // Function to register with orchestrator
+        const registerWithOrchestrator = () => {
+            if (!node.isRegistered) {
+                node.log(`Registering node with orchestrator after flows started`);
+                Orchestrator.registerNode(node.id, node.server);
+                node.isRegistered = true;
             }
+        };
 
-            if (isInitialValue) {
-                message.initial = true;
+        // Register with orchestrator when flows are ready
+        // Use timeout to ensure registration happens after flows are started
+        setTimeout(() => {
+            registerWithOrchestrator();
+        }, 300);
+
+        // Listen for events from the Orchestrator
+        Orchestrator.on('server:ready', onServerReady);
+        Orchestrator.on('state:subscription_confirmed', onSubscriptionConfirmed);
+        Orchestrator.on('state:changed', onStateChanged);
+        Orchestrator.on(`state:initial_value:${node.id}`, onInitialStateValue);
+        Orchestrator.on('connection:disconnected', onDisconnected);
+        Orchestrator.on('connection:retrying', onRetrying);
+        Orchestrator.on('connection:failed_permanently', onPermanentFailure);
+
+        node.on('close', (done) => {
+            // Clean up timeouts if they exist
+            if (node.initialValueTimeout) {
+                clearTimeout(node.initialValueTimeout);
+                node.initialValueTimeout = null;
             }
-
-            message[settings.outputProperty] = state.val;
-            return message;
-        }
-
-        async function ensureAllStatesLoaded() {
-            if (!isMultipleStates || settings.outputMode !== 'grouped') {
-                return true;
+            if (node.groupedTimeout) {
+                clearTimeout(node.groupedTimeout);
+                node.groupedTimeout = null;
             }
-
-            const subscribedStateArray = Array.from(node.subscribedStates);
-            const missingStates = subscribedStateArray.filter(stateId => !node.currentStateValues.has(stateId));
-
-            if (missingStates.length === 0) {
-                return true;
+            
+            // Clean up all listeners to prevent memory leaks
+            Orchestrator.removeListener('server:ready', onServerReady);
+            Orchestrator.removeListener('state:subscription_confirmed', onSubscriptionConfirmed);
+            Orchestrator.removeListener('state:changed', onStateChanged);
+            Orchestrator.removeListener(`state:initial_value:${node.id}`, onInitialStateValue);
+            Orchestrator.removeListener('connection:disconnected', onDisconnected);
+            Orchestrator.removeListener('connection:retrying', onRetrying);
+            Orchestrator.removeListener('connection:failed_permanently', onPermanentFailure);
+            
+            // Cleanup message queue system
+            cleanup();
+            
+            // Only unregister if we were actually registered
+            if (node.isRegistered) {
+                Orchestrator.unregisterNode(node.id, node.server.id);
             }
-
-            try {
-                for (const stateId of missingStates) {
-                    try {
-                        const state = await connectionManager.getState(settings.serverId, stateId);
-                        if (state && state.val !== undefined) {
-                            node.currentStateValues.set(stateId, state);
-                        }
-                    } catch (getError) {
-                        node.warn(`Could not get value for ${stateId}: ${getError.message}`);
-                    }
-                }
-                return true;
-            } catch (error) {
-                node.warn(`Error loading missing states: ${error.message}`);
-                return false;
-            }
-        }
-
-        function createGroupedMessage(changedStateId, changedState, isInitialMessage = false) {
-            const values = {};
-            const states = {};
-
-            for (const [stateId, stateData] of node.currentStateValues.entries()) {
-                if (stateData && stateData.val !== undefined) {
-                    values[stateId] = stateData.val;
-                    states[stateId] = stateData;
-                }
-            }
-
-            const message = {
-                topic: "grouped_states",
-                [settings.outputProperty]: values,
-                states: states,
-                timestamp: Date.now()
-            };
-
-            if (isInitialMessage) {
-                message.initial = true;
-            }
-
-            if (changedStateId) {
-                message.changedState = changedStateId;
-            }
-
-            if (changedState) {
-                message.changedValue = changedState.val;
-            }
-
-            return message;
-        }
-
-        function sendGroupedInitialMessage() {
-            if (node.initialGroupedMessageSent) {
-                return;
-            }
-
-            if (node.fallbackTimeout) {
-                clearTimeout(node.fallbackTimeout);
-                node.fallbackTimeout = null;
-            }
-
-            const message = createGroupedMessage(null, null, true);
-            node.send(message);
-            node.initialGroupedMessageSent = true;
-            node.hasReceivedValue = true;
-
-            const expectedCount = node.expectedInitialValues;
-            node.debug(`Grouped initial message sent with ${node.currentStateValues.size}/${expectedCount} states`);
-
-            updateStatusWithValue(true);
-        }
-
-        function onStateChange(stateId, state, isInitialValue = false) {
-            try {
-                if (!state || state.val === undefined) {
-                    node.warn(`Invalid state data received for ${stateId}`);
-                    return;
-                }
-
-                if (!shouldSendMessage(state.ack, settings.ackFilter)) {
-                    return;
-                }
-
-                if (isMultipleStates && !node.subscribedStates.has(stateId)) {
-                    return;
-                }
-
-                if (!shouldSendByValue(stateId, state.val, settings.filterMode, isInitialValue)) {
-                    node.debug(`Change filter blocked duplicate value for ${stateId}: ${state.val}`);
-                    return;
-                }
-
-                if (!(isInitialValue && settings.filterMode === 'changes-smart')) {
-                    updatePreviousValue(stateId, state.val);
-                }
-
-                if (isMultipleStates) {
-                    node.currentStateValues.set(stateId, state);
-                }
-
-                if (isSingleState) {
-                    node.lastValue = state.val;
-                    node.hasReceivedValue = true;
-                }
-
-                if (isMultipleStates) {
-                    if (settings.outputMode === 'grouped') {
-                        if (node.currentStateValues.size < node.subscribedStates.size) {
-                            ensureAllStatesLoaded().then(() => {
-                                const message = createGroupedMessage(stateId, state);
-                                node.send(message);
-                                node.hasReceivedValue = true;
-                                updateStatusWithValue();
-                            }).catch(error => {
-                                node.warn(`Error loading all states: ${error.message}, sending available states`);
-                                const message = createGroupedMessage(stateId, state);
-                                node.send(message);
-                                node.hasReceivedValue = true;
-                                updateStatusWithValue();
-                            });
-                        } else {
-                            const message = createGroupedMessage(stateId, state);
-                            node.send(message);
-                            node.hasReceivedValue = true;
-                            updateStatusWithValue();
-                        }
-                    } else {
-                        const message = createMessage(stateId, state, isInitialValue);
-                        node.send(message);
-                        node.hasReceivedValue = true;
-                        updateStatusWithValue();
-                    }
-                } else {
-                    const message = createMessage(stateId, state, isInitialValue);
-                    node.send(message);
-                    updateStatusWithValue(isInitialValue);
-                }
-
-            } catch (error) {
-                node.error(`State change processing error: ${error.message}`);
-                setError(`Processing error: ${error.message}`, "Process error");
-            }
-        }
-
-        // WICHTIG: Funktion um subscribedStates vom NodeRegistry zu synchronisieren
-        function syncSubscribedStatesFromRegistry() {
-            try {
-                // Diese Funktion würde die subscribedStates vom NodeRegistry holen
-                // Da wir keinen direkten Zugriff haben, müssen wir das anders lösen
-                if (isMultipleStates) {
-                    const registryInfo = connectionManager.getMultipleStateInfo?.(settings.nodeId);
-                    if (registryInfo && registryInfo.subscribedStates) {
-                        node.subscribedStates = new Set(registryInfo.subscribedStates);
-                        node.debug(`Synced ${node.subscribedStates.size} subscribed states from registry`);
-                    }
-                }
-            } catch (error) {
-                node.debug(`Could not sync subscribed states from registry: ${error.message}`);
-            }
-        }
-
-        function createCallback() {
-            const callback = onStateChange;
-
-            callback.wantsInitialValue = settings.sendInitialValue;
-
-            callback.onInitialValue = function (stateId, state) {
-                try {
-                    if (!shouldSendMessage(state.ack, settings.ackFilter)) {
-                        return;
-                    }
-
-                    if (isMultipleStates) {
-                        node.currentStateValues.set(stateId, state);
-                        node.initialValueCount++;
-
-                        if (settings.filterMode !== 'changes-smart') {
-                            updatePreviousValue(stateId, state.val);
-                        }
-
-                        if (settings.outputMode === 'grouped') {
-                            if (node.initialValueCount >= node.expectedInitialValues) {
-                                sendGroupedInitialMessage();
-                            } else {
-                                if (!node.fallbackTimeout) {
-                                    node.fallbackTimeout = setTimeout(() => {
-                                        node.warn(`Fallback timeout: sending grouped message with ${node.currentStateValues.size}/${node.expectedInitialValues} states`);
-                                        sendGroupedInitialMessage();
-                                    }, 2000);
-                                }
-                            }
-                        } else {
-                            const message = createMessage(stateId, state, true);
-                            node.send(message);
-                            node.hasReceivedValue = true;
-                            updateStatusWithValue(true);
-                        }
-                    } else {
-                        if (settings.filterMode !== 'changes-smart') {
-                            updatePreviousValue(stateId, state.val);
-                        }
-
-                        if (isSingleState) {
-                            node.lastValue = state.val;
-                            node.hasReceivedValue = true;
-                        }
-
-                        const message = createMessage(stateId, state, true);
-                        node.send(message);
-                        updateStatusWithValue(true);
-                    }
-
-                } catch (error) {
-                    node.error(`Initial value processing error: ${error.message}`);
-                }
-            };
-
-            const statusTexts = {
-                ready: isMultipleStates
-                    ? `${stateList.length} states (${settings.outputMode})${(settings.filterMode === 'changes-only' || settings.filterMode === 'changes-smart') ? ' [Changes]' : ''}`
-                    : isWildcardPattern
-                        ? `Pattern: ${subscriptionPattern}${(settings.filterMode === 'changes-only' || settings.filterMode === 'changes-smart') ? ' [Changes]' : ''}`
-                        : `Ready${(settings.filterMode === 'changes-only' || settings.filterMode === 'changes-smart') ? ' [Changes]' : ''}`,
-                disconnected: "Disconnected"
-            };
-
-            const baseCallback = NodeHelpers.createSubscriptionEventCallback(
-                node,
-                setStatus,
-                () => {
-                    node.isSubscribed = true;
-                    // WICHTIG: Nach erfolgreicher Subscription subscribedStates synchronisieren
-                    if (isMultipleStates) {
-                        syncSubscribedStatesFromRegistry();
-                    }
-                },
-                statusTexts
-            );
-
-            Object.assign(callback, baseCallback);
-
-            // KORREKTUR: onSubscribed erweitern um die subscribedStates zu synchronisieren
-            const originalOnSubscribed = callback.onSubscribed;
-            callback.onSubscribed = function() {
-                if (originalOnSubscribed) {
-                    originalOnSubscribed();
-                }
-                
-                // WICHTIG: subscribedStates nach erfolgreicher Subscription synchronisieren
-                if (isMultipleStates) {
-                    // Da wir die erfolgreichen States von subscribeMultiple bekommen haben,
-                    // sollten sie bereits in node.subscribedStates sein
-                    // Aber zur Sicherheit nochmals die ursprünglichen States setzen
-                    if (node.subscribedStates.size === 0) {
-                        stateList.forEach(stateId => {
-                            node.subscribedStates.add(stateId);
-                        });
-                        node.debug(`Restored ${node.subscribedStates.size} subscribed states in onSubscribed`);
-                    }
-                }
-            };
-
-            callback.onReconnect = function() {
-                node.isSubscribed = false;
-                node.initialValueCount = 0;
-                node.initialGroupedMessageSent = false;
-                node.hasReceivedValue = false;
-                node.lastValue = undefined;
-                node.previous.clear();
-                if (node.fallbackTimeout) {
-                    clearTimeout(node.fallbackTimeout);
-                    node.fallbackTimeout = null;
-                }
-                
-                // KORREKTUR: subscribedStates mit ursprünglichen States wiederherstellen
-                if (isMultipleStates) {
-                    node.subscribedStates.clear();
-                    node.currentStateValues.clear();
-                    stateList.forEach(stateId => {
-                        node.subscribedStates.add(stateId);
-                    });
-                    node.expectedInitialValues = stateList.length;
-                    node.debug(`Restored ${node.subscribedStates.size} subscribed states in onReconnect`);
-                }
-                
-                setStatus("yellow", "ring", "Resubscribing...");
-                updateStatusWithValue();
-            };
-
-            return callback;
-        }
-
-        async function subscribeToStates() {
-            const callback = createCallback();
-
-            if (isMultipleStates) {
-                node.expectedInitialValues = stateList.length;
-                node.initialValueCount = 0;
-
-                try {
-                    const successfulStates = await connectionManager.subscribeMultiple(
-                        settings.nodeId,
-                        settings.serverId,
-                        stateList,
-                        callback,
-                        globalConfig
-                    );
-
-                    // WICHTIG: subscribedStates mit den tatsächlich erfolgreichen States setzen
-                    node.subscribedStates.clear();
-                    successfulStates.forEach(stateId => {
-                        node.subscribedStates.add(stateId);
-                    });
-                    
-                    node.debug(`Successfully subscribed to ${node.subscribedStates.size}/${stateList.length} states`);
-
-                } catch (error) {
-                    node.error(`Failed to subscribe to multiple states: ${error.message}`);
-                    throw error;
-                }
-            } else {
-                await connectionManager.subscribe(
-                    settings.nodeId,
-                    settings.serverId,
-                    subscriptionPattern,
-                    callback,
-                    globalConfig
-                );
-            }
-        }
-
-        async function initialize() {
-            const status = connectionManager.getConnectionStatus(settings.serverId);
-            if (node.isSubscribed && status.connected && status.ready) {
-                return;
-            }
-
-            try {
-                setStatus("yellow", "ring", "Connecting...");
-
-                node.currentStateValues.clear();
-                node.subscribedStates.clear();
-                node.initialValueCount = 0;
-                node.initialGroupedMessageSent = false;
-                node.hasReceivedValue = false;
-                node.lastValue = undefined;
-                node.previous.clear();
-                if (node.fallbackTimeout) {
-                    clearTimeout(node.fallbackTimeout);
-                    node.fallbackTimeout = null;
-                }
-
-                await NodeHelpers.handleConfigChange(node, config, RED, settings);
-
-                await subscribeToStates();
-
-                await initializeSmartChangeFilter();
-
-                node.isSubscribed = true;
-
-                updateStatusWithValue();
-                node.isInitialized = true;
-
-            } catch (error) {
-                const errorMsg = error.message || 'Unknown error';
-
-                if (errorMsg.includes('auth_failed') || errorMsg.includes('Authentication failed')) {
-                    setStatus("red", "ring", "Auth failed");
-                } else if (errorMsg.includes('not possible in state')) {
-                    setStatus("red", "ring", "Connection failed");
-                } else {
-                    setStatus("yellow", "ring", "Retrying...");
-                }
-
-                node.isSubscribed = false;
-            }
-        }
-
-        node.on("close", async function (removed, done) {
-            node.isInitialized = false;
-            node.isSubscribed = false;
-
-            if (node.fallbackTimeout) {
-                clearTimeout(node.fallbackTimeout);
-                node.fallbackTimeout = null;
-            }
-
-            try {
-                if (isMultipleStates) {
-                    await connectionManager.unsubscribeMultiple(
-                        settings.nodeId,
-                        settings.serverId,
-                        Array.from(node.subscribedStates)
-                    );
-                } else {
-                    await connectionManager.unsubscribe(
-                        settings.nodeId,
-                        settings.serverId,
-                        subscriptionPattern
-                    );
-                }
-
-                node.status({});
-
-            } catch (error) {
-                node.warn(`Cleanup error: ${error.message}`);
-            } finally {
-                done();
-            }
+            done();
         });
 
-        node.on("error", NodeHelpers.createErrorHandler(node, setError));
-
-        initialize();
+        // Initial status on deploy
+        const initialStatusText = node.isWildcardPattern 
+            ? `Waiting for pattern: ${node.stateId}` 
+            : "Waiting for server...";
+        node.status({ fill: "grey", shape: "dot", text: initialStatusText });
     }
 
-    RED.nodes.registerType("iobin", iobin);
+    RED.nodes.registerType("iobin", IoBrokerInNode);
 };
