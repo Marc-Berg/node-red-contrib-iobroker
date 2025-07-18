@@ -49,6 +49,110 @@ module.exports = function (RED) {
             inputMode: inputMode
         };
 
+        // Function to send cached values for external triggering
+        node.sendCachedValues = function() {
+            if (inputMode === 'single') {
+                // First try currentStateValues, then fallback to lastValue
+                let cachedValue = node.currentStateValues.get(subscriptionPattern);
+                let state = cachedValue;
+                
+                if (!state && node.lastValue !== undefined) {
+                    // Use lastValue as fallback
+                    state = { val: node.lastValue };
+                }
+                
+                if (state && state.val !== undefined) {
+                    const message = {
+                        topic: subscriptionPattern,
+                        [settings.outputProperty]: state.val,
+                        state: {
+                            val: state.val,
+                            ts: state.ts || Date.now(),
+                            ack: state.ack !== undefined ? state.ack : true,
+                            from: 'cache'
+                        },
+                        timestamp: Date.now(),
+                        cached: true,
+                        initial: true
+                    };
+                    
+                    node.send(message);
+                }
+            } else if (inputMode === 'multiple') {
+                if (settings.outputMode === 'grouped') {
+                    // Grouped mode: send all cached values in one message
+                    const groupedValues = {};
+                    const groupedStates = {};
+                    let hasValues = false;
+                    
+                    stateList.forEach(stateId => {
+                        const state = node.currentStateValues.get(stateId);
+                        if (state && state.val !== undefined) {
+                            groupedValues[stateId] = state.val;
+                            groupedStates[stateId] = {
+                                val: state.val,
+                                ts: state.ts || Date.now(),
+                                ack: state.ack !== undefined ? state.ack : true,
+                                from: 'cache'
+                            };
+                            hasValues = true;
+                        }
+                    });
+                    
+                    if (hasValues) {
+                        const message = {
+                            topic: 'cached_states',
+                            [settings.outputProperty]: groupedValues,
+                            states: groupedStates,
+                            timestamp: Date.now(),
+                            cached: true,
+                            isInitial: true,
+                            multipleStatesMode: true,
+                            outputMode: 'grouped'
+                        };
+                        
+                        node.send(message);
+                    }
+                } else {
+                    // Individual mode: send separate message for each cached value
+                    stateList.forEach(stateId => {
+                        const state = node.currentStateValues.get(stateId);
+                        if (state && state.val !== undefined) {
+                            const message = {
+                                topic: stateId,
+                                [settings.outputProperty]: state.val,
+                                state: {
+                                    val: state.val,
+                                    ts: state.ts || Date.now(),
+                                    ack: state.ack !== undefined ? state.ack : true,
+                                    from: 'cache'
+                                },
+                                timestamp: Date.now(),
+                                cached: true,
+                                initial: true,
+                                multipleStatesMode: true
+                            };
+                            
+                            node.send(message);
+                        }
+                    });
+                }
+            }
+        };
+
+        // Register node in flow context for external triggering
+        const flowContext = node.context().flow;
+        const existingNodes = flowContext.get('iobroker_in_nodes') || {};
+        existingNodes[node.id] = {
+            nodeRef: node,
+            triggerCached: node.sendCachedValues,
+            states: inputMode === 'single' ? [subscriptionPattern] : stateList,
+            mode: inputMode,
+            name: node.name || `iob-in-${node.id.substring(0, 8)}`,
+            outputMode: settings.outputMode
+        };
+        flowContext.set('iobroker_in_nodes', existingNodes);
+
         node.currentConfig = connectionDetails;
         node.isInitialized = false;
         node.isSubscribed = false;
@@ -339,6 +443,8 @@ module.exports = function (RED) {
                 if (isSingleState) {
                     node.lastValue = state.val;
                     node.hasReceivedValue = true;
+                    // Also store in currentStateValues for caching
+                    node.currentStateValues.set(stateId, state);
                 }
 
                 if (isMultipleStates) {
@@ -441,6 +547,8 @@ module.exports = function (RED) {
                         if (isSingleState) {
                             node.lastValue = state.val;
                             node.hasReceivedValue = true;
+                            // Also store in currentStateValues for caching
+                            node.currentStateValues.set(stateId, state);
                         }
 
                         const message = createMessage(stateId, state, true);
@@ -617,6 +725,12 @@ module.exports = function (RED) {
         node.on("close", async function (removed, done) {
             node.isInitialized = false;
             node.isSubscribed = false;
+
+            // Remove from flow context
+            const flowContext = node.context().flow;
+            const existingNodes = flowContext.get('iobroker_in_nodes') || {};
+            delete existingNodes[node.id];
+            flowContext.set('iobroker_in_nodes', existingNodes);
 
             if (node.fallbackTimeout) {
                 clearTimeout(node.fallbackTimeout);
