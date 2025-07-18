@@ -415,7 +415,7 @@ module.exports = function(RED) {
                         node.log(`[DEBUG] Optimized method completed in ${result.duration || 'unknown'}ms`);
                         
                         // Process results
-                        await processResults(objectResult, enumResult, aliasResult, objectIdOrPattern, currentOutputMode, currentObjectType, msg, send, done);
+                        await processResults(objectResult, enumResult, aliasResult, objectIdOrPattern, currentOutputMode, currentObjectType, msg, send, done, result);
                         
                     } catch (optimizedError) {
                         node.log(`[DEBUG] Optimized method failed: ${optimizedError.message}, falling back to original method`);
@@ -522,7 +522,7 @@ module.exports = function(RED) {
         });
 
         // Helper method to process results (both optimized and original)
-        async function processResults(objectResult, enumResult, aliasResult, objectIdOrPattern, currentOutputMode, currentObjectType, msg, send, done) {
+        async function processResults(objectResult, enumResult, aliasResult, objectIdOrPattern, currentOutputMode, currentObjectType, msg, send, done, optimizedResult = null) {
             try {
                 // Process object result
                 if (!objectResult.success) {
@@ -607,6 +607,31 @@ module.exports = function(RED) {
                 
                 // Add to message
                 Object.assign(msg, output);
+                
+                // Add statistics from optimized result if available
+                if (optimizedResult) {
+                    if (optimizedResult.enumStatistics) {
+                        msg.enumStatistics = optimizedResult.enumStatistics;
+                    }
+                    if (optimizedResult.aliasStatistics) {
+                        msg.aliasStatistics = optimizedResult.aliasStatistics;
+                    }
+                    if (optimizedResult.objectTypeStatistics) {
+                        msg.objectTypeStatistics = optimizedResult.objectTypeStatistics;
+                    }
+                    if (optimizedResult.timestamp) {
+                        msg.timestamp = optimizedResult.timestamp;
+                    }
+                    if (optimizedResult.pattern) {
+                        msg.pattern = optimizedResult.pattern;
+                    }
+                    if (optimizedResult.includesEnums !== undefined) {
+                        msg.includesEnums = optimizedResult.includesEnums;
+                    }
+                    if (optimizedResult.includesAliases !== undefined) {
+                        msg.includesAliases = optimizedResult.includesAliases;
+                    }
+                }
                 
                 // Update status
                 const statusText = createStatusText(node.useWildcard ? "Ready (Pattern mode)" : "Ready");
