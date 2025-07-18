@@ -101,6 +101,121 @@ module.exports = function(RED) {
             return;
         }
 
+        // --- External Triggering System ---
+
+        // Function to send cached values for external triggering
+        node.sendCachedValues = function() {
+            if (node.inputMode === 'single') {
+                // First try currentStateValues, then fallback to lastValue
+                let cachedValue = node.currentStateValues && node.currentStateValues.get ? 
+                    node.currentStateValues.get(node.stateId) : null;
+                let state = cachedValue;
+                
+                if (!state && node.lastValue !== undefined) {
+                    // Use lastValue as fallback
+                    state = { val: node.lastValue };
+                }
+                
+                if (state && state.val !== undefined) {
+                    const message = {
+                        topic: node.stateId,
+                        [node.outputProperty || 'payload']: state.val,
+                        state: {
+                            val: state.val,
+                            ts: state.ts || Date.now(),
+                            ack: state.ack !== undefined ? state.ack : true,
+                            from: 'cache'
+                        },
+                        timestamp: Date.now(),
+                        cached: true,
+                        initial: true
+                    };
+                    
+                    node.send(message);
+                }
+            } else if (node.inputMode === 'multiple') {
+                if (node.outputMode === 'grouped') {
+                    // Grouped mode: send all cached values in one message
+                    const groupedValues = {};
+                    const groupedStates = {};
+                    let hasValues = false;
+                    
+                    if (node.currentStateValues && node.statesList) {
+                        node.statesList.forEach(stateId => {
+                            const state = node.currentStateValues.get(stateId);
+                            if (state && state.val !== undefined) {
+                                groupedValues[stateId] = state.val;
+                                groupedStates[stateId] = {
+                                    val: state.val,
+                                    ts: state.ts || Date.now(),
+                                    ack: state.ack !== undefined ? state.ack : true,
+                                    from: 'cache'
+                                };
+                                hasValues = true;
+                            }
+                        });
+                    }
+                    
+                    if (hasValues) {
+                        const message = {
+                            topic: 'cached_states',
+                            [node.outputProperty || 'payload']: groupedValues,
+                            states: groupedStates,
+                            timestamp: Date.now(),
+                            cached: true,
+                            isInitial: true,
+                            multipleStatesMode: true,
+                            outputMode: 'grouped'
+                        };
+                        
+                        node.send(message);
+                    }
+                } else {
+                    // Individual mode: send separate message for each cached value
+                    if (node.currentStateValues && node.statesList) {
+                        node.statesList.forEach(stateId => {
+                            const state = node.currentStateValues.get(stateId);
+                            if (state && state.val !== undefined) {
+                                const message = {
+                                    topic: stateId,
+                                    [node.outputProperty || 'payload']: state.val,
+                                    state: {
+                                        val: state.val,
+                                        ts: state.ts || Date.now(),
+                                        ack: state.ack !== undefined ? state.ack : true,
+                                        from: 'cache'
+                                    },
+                                    timestamp: Date.now(),
+                                    cached: true,
+                                    initial: true,
+                                    multipleStatesMode: true
+                                };
+                                
+                                node.send(message);
+                            }
+                        });
+                    }
+                }
+            }
+        };
+
+        // Initialize cache for state values
+        node.currentStateValues = new Map();
+        node.lastValue = undefined;
+
+        // Register node in flow context for external triggering
+        const flowContext = node.context().flow;
+        const existingNodes = flowContext.get('iobroker_in_nodes') || {};
+        existingNodes[node.id] = {
+            nodeRef: node,
+            triggerCached: node.sendCachedValues,
+            states: node.inputMode === 'single' ? [node.stateId] : (node.statesList || []),
+            mode: node.inputMode,
+            name: node.name || `iob-in-${node.id.substring(0, 8)}`,
+            outputMode: node.outputMode
+        };
+        flowContext.set('iobroker_in_nodes', existingNodes);
+
         // --- Event Handler ---
 
         const onServerReady = ({ serverId }) => {
@@ -251,6 +366,12 @@ module.exports = function(RED) {
                         pattern: node.isWildcardPattern ? node.stateId : null
                     });
                     
+                    // Cache state value for external triggering
+                    node.currentStateValues.set(stateId, state);
+                    if (node.inputMode === 'single') {
+                        node.lastValue = state.val;
+                    }
+                    
                     // Update previous value using helper
                     FilterHelpers.updatePreviousValue(node.previousValues, stateId, state.val);
                     
@@ -278,6 +399,9 @@ module.exports = function(RED) {
                             multipleStatesMode: true
                         });
                         
+                        // Cache state value for external triggering
+                        node.currentStateValues.set(stateId, state);
+                        
                         // Update previous value using helper
                         FilterHelpers.updatePreviousValue(node.previousValues, stateId, state.val);
                         
@@ -287,6 +411,9 @@ module.exports = function(RED) {
                         sendMessage(message);
                         
                     } else if (node.outputMode === 'grouped') {
+                        // Cache state value for external triggering
+                        node.currentStateValues.set(stateId, state);
+                        
                         // Grouped mode: update the changed state value using helper
                         StateManagementHelpers.storeGroupedStateValue(node.groupedStateValues, stateId, state);
                         
@@ -415,6 +542,10 @@ module.exports = function(RED) {
                             initial: true
                         });
                         
+                        // Cache state value for external triggering
+                        node.currentStateValues.set(stateId, state);
+                        node.lastValue = state.val;
+                        
                         // Update previous value using helper
                         FilterHelpers.updatePreviousValue(node.previousValues, stateId, state.val);
                         
@@ -437,6 +568,9 @@ module.exports = function(RED) {
                                 multipleStatesMode: true
                             });
                             
+                            // Cache state value for external triggering
+                            node.currentStateValues.set(stateId, state);
+                            
                             // Update previous value using helper
                             FilterHelpers.updatePreviousValue(node.previousValues, stateId, state.val);
                             
@@ -449,6 +583,9 @@ module.exports = function(RED) {
                                 
                                 // Store the state value using helper
                                 StateManagementHelpers.storeGroupedStateValue(node.groupedStateValues, stateId, state);
+                                
+                                // Cache state value for external triggering
+                                node.currentStateValues.set(stateId, state);
                                 
                                 // Remove from pending set
                                 node.pendingGroupedStates.delete(stateId);
@@ -486,6 +623,9 @@ module.exports = function(RED) {
                             // Regular initial value processing (not for grouped update)
                             // Grouped mode: Store initial value and check if we have all values using helper
                             StateManagementHelpers.storeGroupedStateValue(node.groupedStateValues, stateId, state);
+                            
+                            // Cache state value for external triggering
+                            node.currentStateValues.set(stateId, state);
                             
                             node.log(`Grouped mode: Stored initial value for ${stateId}. Now have ${Object.keys(node.groupedStateValues).length}/${node.statesList.length} values`);
                             
@@ -576,6 +716,12 @@ module.exports = function(RED) {
             // Clean up timeouts if they exist using helper
             StateManagementHelpers.cleanupTimeout(node, 'initialValueTimeout');
             StateManagementHelpers.cleanupTimeout(node, 'groupedTimeout');
+            
+            // Remove from flow context
+            const flowContext = node.context().flow;
+            const existingNodes = flowContext.get('iobroker_in_nodes') || {};
+            delete existingNodes[node.id];
+            flowContext.set('iobroker_in_nodes', existingNodes);
             
             // Clean up all listeners to prevent memory leaks
             Orchestrator.removeListener('server:ready', onServerReady);
