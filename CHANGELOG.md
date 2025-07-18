@@ -1,6 +1,6 @@
 # Changelog
 
-## [0.14.4] - 2025-xx-xx
+## [0.15.0] - 2025-xx-xx
 
 ### Added
 - **External triggering capability for iob-in nodes**
