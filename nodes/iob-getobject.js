@@ -389,7 +389,8 @@ module.exports = function(RED) {
                         const result = await Orchestrator.getMultipleData(node.id, {
                             objectId: objectIdOrPattern,
                             needsEnums: node.includeEnums,
-                            needsAliases: node.includeAliases
+                            needsAliases: node.includeAliases,
+                            objectType: currentObjectType // Pass object type filter to optimized request
                         });
                         
                         // Process the combined result
@@ -591,6 +592,18 @@ module.exports = function(RED) {
                 );
                 
                 node.log(`[DEBUG] Final output count: ${output.count} objects`);
+                
+                // Add detailed statistics
+                if (Array.isArray(processedObjects)) {
+                    const typeStats = {};
+                    processedObjects.forEach(obj => {
+                        const type = obj?.type || 'unknown';
+                        typeStats[type] = (typeStats[type] || 0) + 1;
+                    });
+                    node.log(`[STATISTICS] Object types found: ${JSON.stringify(typeStats)}`);
+                } else if (processedObjects) {
+                    node.log(`[STATISTICS] Single object type: ${processedObjects.type || 'unknown'}`);
+                }
                 
                 // Add to message
                 Object.assign(msg, output);
