@@ -1,5 +1,13 @@
 # Changelog
 
+## [0.14.4] - 2025-xx-xx
+
+### Added
+- **External triggering capability for iob-in nodes**
+  - Function nodes can trigger cached state values from any iob-in node
+  - Automatic state value caching for all received values (initial and runtime)
+  - Support for all input modes: single state, wildcard patterns, and multiple states
+
 ## [0.14.3] - 2025-07-16
 
  - prevent duplicate messages with delayed subscription consolidation

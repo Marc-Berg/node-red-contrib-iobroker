@@ -170,6 +170,55 @@ Send only value changes (with baseline):
 
 **With "Send initial value"**: Both modes behave identically (initial values bypass filtering).
 
+## External Triggering
+
+iob-in nodes automatically cache all received state values and can be triggered externally by Function nodes to resend their last cached values. This enables dashboard refresh scenarios without duplicating nodes.
+
+### Usage in Function Nodes
+
+**Trigger all iob-in nodes:**
+```javascript
+const flowContext = context.flow;
+const registeredNodes = flowContext.get('iobroker_in_nodes') || {};
+
+// Trigger all registered iob-in nodes
+Object.values(registeredNodes).forEach(nodeInfo => {
+    if (nodeInfo.triggerCached) {
+        nodeInfo.triggerCached();
+    }
+});
+
+return { payload: `Triggered ${Object.keys(registeredNodes).length} nodes` };
+```
+
+**Filter by node name:**
+```javascript
+const flowContext = context.flow;
+const registeredNodes = flowContext.get('iobroker_in_nodes') || {};
+
+// Only trigger dashboard-related nodes
+Object.values(registeredNodes)
+    .filter(node => node.name && node.name.toLowerCase().includes('dashboard'))
+    .forEach(nodeInfo => {
+        if (nodeInfo.triggerCached) {
+            nodeInfo.triggerCached();
+        }
+    });
+
+return { payload: "Dashboard nodes refreshed" };
+```
+
+### Behavior
+- **Cached Values**: All received state values (initial and runtime) are automatically cached
+- **Triggering**: Only works if node has received at least one value (initial value or state change)
+- **Message Format**: Triggered messages include `cached: true` and `initial: true` flags
+- **All Modes Supported**: Single state, wildcard patterns, and multiple states (individual/grouped)
+
+### Use Cases
+- **Dashboard Refresh**: Refresh dashboard displays on page load
+- **Manual State Sync**: Manually resync states without waiting for changes
+- **Multi-Device Updates**: Update multiple displays simultaneously
+
 ## Performance & Optimization
 
 ### Tips
