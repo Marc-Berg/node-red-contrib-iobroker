@@ -101,162 +101,6 @@ module.exports = function(RED) {
             return objectData;
         }
 
-        function processEnumData(enumData) {
-            if (!enumData || typeof enumData !== 'object') {
-                return {
-                    totalEnums: 0,
-                    enumMemberMap: new Map()
-                };
-            }
-
-            const enumMemberMap = new Map();
-            let totalEnums = 0;
-
-            // Handle both formats: direct object map and getObjectView format
-            let enumObjects = [];
-            
-            if (Array.isArray(enumData.rows)) {
-                // getObjectView format: { rows: [{ id, value }] }
-                enumObjects = enumData.rows.map(row => ({
-                    id: row.id,
-                    ...row.value
-                }));
-            } else {
-                // Direct object map format: { "enum.id": { common: {...} } }
-                enumObjects = Object.keys(enumData).map(enumId => ({
-                    id: enumId,
-                    ...enumData[enumId]
-                }));
-            }
-
-            enumObjects.forEach(enumObj => {
-                if (enumObj && enumObj.common && enumObj.common.members && Array.isArray(enumObj.common.members)) {
-                    totalEnums++;
-                    enumObj.common.members.forEach(memberId => {
-                        if (!enumMemberMap.has(memberId)) {
-                            enumMemberMap.set(memberId, []);
-                        }
-                        enumMemberMap.get(memberId).push({
-                            id: enumObj.id,
-                            name: enumObj.common.name || enumObj.id,
-                            desc: enumObj.common.desc
-                        });
-                    });
-                }
-            });
-
-            return {
-                totalEnums,
-                enumMemberMap
-            };
-        }
-
-        function processAliasData(aliasData) {
-            if (!aliasData || typeof aliasData !== 'object') {
-                return {
-                    totalAliases: 0,
-                    aliasMap: new Map(),
-                    reverseAliasMap: new Map()
-                };
-            }
-
-            const aliasMap = new Map();
-            const reverseAliasMap = new Map();
-            let totalAliases = 0;
-
-            Object.keys(aliasData).forEach(aliasId => {
-                const aliasObj = aliasData[aliasId];
-                if (aliasObj && aliasObj.common && aliasObj.common.alias && aliasObj.common.alias.id) {
-                    totalAliases++;
-                    const targetId = aliasObj.common.alias.id;
-                    
-                    aliasMap.set(aliasId, {
-                        targetId: targetId,
-                        name: aliasObj.common.name || aliasId,
-                        desc: aliasObj.common.desc,
-                        read: aliasObj.common.alias.read,
-                        write: aliasObj.common.alias.write
-                    });
-
-                    if (!reverseAliasMap.has(targetId)) {
-                        reverseAliasMap.set(targetId, []);
-                    }
-                    reverseAliasMap.get(targetId).push({
-                        aliasId: aliasId,
-                        name: aliasObj.common.name || aliasId,
-                        desc: aliasObj.common.desc,
-                        read: aliasObj.common.alias.read,
-                        write: aliasObj.common.alias.write
-                    });
-                }
-            });
-
-            return {
-                totalAliases,
-                aliasMap,
-                reverseAliasMap
-            };
-        }
-
-        function enrichObjectsWithEnums(objects, enumData) {
-            if (!objects || !enumData || !enumData.enumMemberMap) {
-                return objects;
-            }
-
-            const enrichSingleObject = (obj) => {
-                if (!obj || !obj._id) return obj;
-                
-                const enums = enumData.enumMemberMap.get(obj._id);
-                if (enums && enums.length > 0) {
-                    return {
-                        ...obj,
-                        enums: enums
-                    };
-                }
-                return obj;
-            };
-
-            if (Array.isArray(objects)) {
-                return objects.map(enrichSingleObject);
-            } else {
-                return enrichSingleObject(objects);
-            }
-        }
-
-        function enrichObjectsWithAliases(objects, aliasData) {
-            if (!objects || !aliasData) {
-                return objects;
-            }
-
-            const enrichSingleObject = (obj) => {
-                if (!obj || !obj._id) return obj;
-                
-                const result = { ...obj };
-                
-                if (node.aliasResolution === 'target' || node.aliasResolution === 'both') {
-                    const aliases = aliasData.reverseAliasMap.get(obj._id);
-                    if (aliases && aliases.length > 0) {
-                        result.aliases = aliases;
-                    }
-                }
-                
-                if (node.aliasResolution === 'alias' || node.aliasResolution === 'both') {
-                    const aliasInfo = aliasData.aliasMap.get(obj._id);
-                    if (aliasInfo) {
-                        result.aliasTarget = aliasInfo;
-                    }
-                }
-                
-                return result;
-            };
-
-            if (Array.isArray(objects)) {
-                return objects.map(enrichSingleObject);
-            } else {
-                return enrichSingleObject(objects);
-            }
-        }
-
         function formatOutput(objects, objectIdOrPattern, outputMode, objectType, enumData, aliasData) {
             let filteredObjects = objects;
 
@@ -291,14 +135,6 @@ module.exports = function(RED) {
                 }
             } else {
                 result[node.outputProperty] = outputMode === 'single' ? null : [];
-            }
-
-            if (enumData) {
-                result.enumsProcessed = enumData.totalEnums;
-            }
-
-            if (aliasData) {
-                result.aliasesProcessed = aliasData.totalAliases;
             }
 
             return result;
@@ -380,130 +216,42 @@ module.exports = function(RED) {
                 node.aliasData = null;
                 
                 // Use optimized parallel request method
-                const useOptimizedMethod = true;
-                
-                if (useOptimizedMethod) {
-                    // New optimized method - single parallel request
-                    try {
-                        node.log(`[DEBUG] Attempting optimized parallel request...`);
-                        const result = await Orchestrator.getMultipleData(node.id, {
-                            objectId: objectIdOrPattern,
-                            needsEnums: node.includeEnums,
-                            needsAliases: node.includeAliases,
-                            objectType: currentObjectType // Pass object type filter to optimized request
-                        });
-                        
-                        // Process the combined result
-                        const objectResult = {
-                            success: result.success && result.objects !== undefined,
-                            object: result.objects,
-                            error: result.objectsError
-                        };
-                        
-                        const enumResult = node.includeEnums ? {
-                            success: result.success && result.enums !== undefined,
-                            enums: result.enums,
-                            error: result.enumsError
-                        } : null;
-                        
-                        const aliasResult = node.includeAliases ? {
-                            success: result.success && result.aliases !== undefined,
-                            aliases: result.aliases,
-                            error: result.aliasesError
-                        } : null;
-                        
-                        node.log(`[DEBUG] Optimized method completed in ${result.duration || 'unknown'}ms`);
-                        
-                        // Process results
-                        await processResults(objectResult, enumResult, aliasResult, objectIdOrPattern, currentOutputMode, currentObjectType, msg, send, done, result);
-                        
-                    } catch (optimizedError) {
-                        node.log(`[DEBUG] Optimized method failed: ${optimizedError.message}, falling back to original method`);
-                        throw optimizedError; // For now, don't use fallback
-                    }
+                try {
+                    node.log(`[DEBUG] Attempting optimized parallel request...`);
+                    const result = await Orchestrator.getMultipleData(node.id, {
+                        objectId: objectIdOrPattern,
+                        needsEnums: node.includeEnums,
+                        needsAliases: node.includeAliases,
+                        objectType: currentObjectType // Pass object type filter to optimized request
+                    });
                     
-                } else {
-                    // Original method - separate sequential requests (fallback)
-                    const promises = [];
+                    // Process the combined result
+                    const objectResult = {
+                        success: result.success && result.objects !== undefined,
+                        object: result.objects,
+                        error: result.objectsError
+                    };
                     
-                    // Request the object(s)
-                    promises.push(new Promise((resolve, reject) => {
-                        const timeout = setTimeout(() => {
-                            reject(new Error('Object request timeout'));
-                        }, 10000);
-                        
-                        const handler = (data) => {
-                            if (data.serverId === node.server.id && data.nodeId === node.id) {
-                                clearTimeout(timeout);
-                                Orchestrator.removeListener(`object:get_result:${node.id}`, handler);
-                                resolve(data);
-                            }
-                        };
-                        
-                        Orchestrator.on(`object:get_result:${node.id}`, handler);
-                        Orchestrator.getObject(node.id, objectIdOrPattern);
-                    }));
+                    const enumResult = node.includeEnums ? {
+                        success: result.success && result.enums !== undefined,
+                        enums: result.enums,
+                        error: result.enumsError
+                    } : null;
                     
-                    // Request enums if needed
-                    if (node.includeEnums) {
-                        promises.push(new Promise((resolve, reject) => {
-                            const timeout = setTimeout(() => {
-                                reject(new Error('Enums request timeout'));
-                            }, 10000);
-                            
-                            const handler = (data) => {
-                                if (data.serverId === node.server.id && data.nodeId === node.id) {
-                                    clearTimeout(timeout);
-                                    Orchestrator.removeListener(`enums:get_result:${node.id}`, handler);
-                                    resolve(data);
-                                }
-                            };
-                            
-                            Orchestrator.on(`enums:get_result:${node.id}`, handler);
-                            Orchestrator.getEnums(node.id);
-                        }));
-                    }
+                    const aliasResult = node.includeAliases ? {
+                        success: result.success && result.aliases !== undefined,
+                        aliases: result.aliases,
+                        error: result.aliasesError
+                    } : null;
                     
-                    // Request aliases if needed
-                    if (node.includeAliases) {
-                        promises.push(new Promise((resolve, reject) => {
-                            const timeout = setTimeout(() => {
-                                reject(new Error('Aliases request timeout'));
-                            }, 10000);
-                            
-                            const handler = (data) => {
-                                if (data.serverId === node.server.id && data.nodeId === node.id) {
-                                    clearTimeout(timeout);
-                                    Orchestrator.removeListener(`aliases:get_result:${node.id}`, handler);
-                                    resolve(data);
-                                }
-                            };
-                            
-                            Orchestrator.on(`aliases:get_result:${node.id}`, handler);
-                            Orchestrator.getAliases(node.id);
-                        }));
-                    }
-                    
-                    // Wait for all requests to complete
-                    node.log(`[DEBUG] Using fallback method with ${promises.length} requests`);
-                    const results = await Promise.all(promises);
+                    node.log(`[DEBUG] Optimized method completed in ${result.duration || 'unknown'}ms`);
                     
                     // Process results
-                    const objectResult = results[0];
-                    let enumResult = null;
-                    let aliasResult = null;
+                    await processResults(objectResult, enumResult, aliasResult, objectIdOrPattern, currentOutputMode, currentObjectType, msg, send, done, result);
                     
-                    if (node.includeEnums) {
-                        enumResult = results[1];
-                    }
-                    
-                    if (node.includeAliases) {
-                        const aliasIndex = node.includeEnums ? 2 : 1;
-                        aliasResult = results[aliasIndex];
-                    }
-                    
-                    // Process results
-                    await processResults(objectResult, enumResult, aliasResult, objectIdOrPattern, currentOutputMode, currentObjectType, msg, send, done);
+                } catch (optimizedError) {
+                    node.error(`Optimized method failed: ${optimizedError.message}`);
+                    throw optimizedError;
                 }
                 
             } catch (error) {
@@ -556,30 +304,8 @@ module.exports = function(RED) {
                 // Debug: Log filtering configuration
                 node.log(`[DEBUG] Object type filter: "${currentObjectType}" (empty = no filter)`);
                 
-                // Process enum data if retrieved
-                if (enumResult && enumResult.success) {
-                    node.enumData = processEnumData(enumResult.enums);
-                    node.log(`Processed enum data: ${node.enumData.totalEnums} enums, ${node.enumData.enumMemberMap.size} object mappings`);
-                }
-                
-                // Process alias data if retrieved
-                if (aliasResult && aliasResult.success) {
-                    node.aliasData = processAliasData(aliasResult.aliases);
-                    node.log(`Processed alias data: ${node.aliasData.totalAliases} aliases, ${node.aliasData.aliasMap.size} mappings, ${node.aliasData.reverseAliasMap.size} reverse mappings`);
-                } else if (aliasResult) {
-                    node.log(`[DEBUG] Alias request failed: ${aliasResult.error || 'Unknown error'}`);
-                }
-                
-                // Enrich objects with enum and alias data
-                if (node.includeEnums && node.enumData) {
-                    processedObjects = enrichObjectsWithEnums(processedObjects, node.enumData);
-                    node.log(`Enriched objects with enum data`);
-                }
-                
-                if (node.includeAliases && node.aliasData) {
-                    processedObjects = enrichObjectsWithAliases(processedObjects, node.aliasData);
-                    node.log(`Enriched objects with alias data`);
-                }
+                // For optimized method, objects are already fully enriched
+                node.log(`[DEBUG] Using optimized result - objects already enriched with enum and alias data`);
                 
                 // Format the output
                 const output = formatOutput(
