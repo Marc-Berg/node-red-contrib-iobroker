@@ -179,6 +179,113 @@ Send only value changes (with baseline):
 - Use **grouped mode** for dashboard applications
 - **Rate limit** downstream for remaining high-frequency states
 
+## External Triggering
+
+External triggering allows Function nodes or other components to request resending of cached state values without waiting for state changes. This feature enables dashboard refresh scenarios, scheduled updates, and manual value retrieval.
+
+### Configuration
+
+**Enable external triggering** (Default: true)
+- Enables the external triggering feature
+
+**Trigger Group** (Default: "iobroker_in_nodes")  
+- Custom group name for organizing triggerable nodes
+- Function nodes can access this group via flow context
+
+### Usage in Function Node
+
+#### Trigger All Nodes in Default Group
+```javascript
+const nodes = flow.get('iobroker_in_nodes') || {};
+
+// Trigger all nodes in the group
+Object.values(nodes).forEach(nodeInfo => {
+    nodeInfo.triggerCached();
+});
+```
+
+#### Use Custom Groups
+```javascript
+const dashboardNodes = flow.get('dashboard_sensors') || {};
+Object.values(dashboardNodes).forEach(nodeInfo => {
+    nodeInfo.triggerCached();
+});
+```
+
+#### Find Nodes by State ID (Single Mode)
+```javascript
+const nodes = flow.get('iobroker_in_nodes') || {};
+
+Object.values(nodes).forEach(nodeInfo => {
+    if (nodeInfo.stateId === '0_userdata.0.temperature') {
+        nodeInfo.triggerCached();
+    }
+});
+```
+
+#### Find Nodes by Name
+```javascript
+const nodes = flow.get('iobroker_in_nodes') || {};
+
+Object.values(nodes).forEach(nodeInfo => {
+    if (nodeInfo.name?.includes('[Dashboard]')) {
+        nodeInfo.triggerCached();
+    }
+});
+```
+
+### Node Information Object
+
+Each registered node provides this information:
+
+```javascript
+{
+  nodeRef: [object],           // Reference to the node
+  triggerCached: [function],   // Function to trigger cached values
+  states: [array],             // Array of state IDs
+  mode: 'single'|'multiple',   // Input mode
+  name: 'Node Name',           // Node name or auto-generated
+  outputMode: 'individual'|'grouped',  // Output mode (multiple states)
+  stateId: 'state.id',         // State ID (single mode only)
+  group: 'group_name'          // Trigger group name
+}
+```
+
+### Use Cases
+
+#### Dashboard Refresh
+```javascript
+// Refresh all dashboard-relevant nodes after browser refresh
+const dashboardNodes = flow.get('dashboard_sensors') || {};
+Object.values(dashboardNodes).forEach(nodeInfo => {
+    nodeInfo.triggerCached();
+});
+```
+
+#### Scheduled Updates
+```javascript
+// Periodic resending of current values (e.g., every 5 minutes)
+const nodes = flow.get('iobroker_in_nodes') || {};
+Object.values(nodes).forEach(nodeInfo => {
+    if (nodeInfo.name?.includes('sensor')) {
+        nodeInfo.triggerCached();
+    }
+});
+```
+
+#### Manual Triggers
+```javascript
+// Button-activated value refresh
+const nodes = flow.get('iobroker_in_nodes') || {};
+const temperatureNodes = Object.values(nodes).filter(node => 
+    node.states?.some(state => state.includes('temperature'))
+);
+
+temperatureNodes.forEach(nodeInfo => {
+    nodeInfo.triggerCached();
+});
+```
+
 ## Troubleshooting
 
 ### No Messages Received
@@ -199,6 +306,14 @@ Send only value changes (with baseline):
 2. Monitor node status for [Changes] indicator
 3. Test with "Send all events" first
 4. Check data types for complex objects
+
+### External Triggering Issues
+1. Verify "Enable external triggering" is checked
+2. Check correct trigger group name in Function node
+3. Ensure nodes are registered: `Object.keys(flow.get('group_name'))`
+4. Test with simple trigger: `Object.values(flow.get('iobroker_in_nodes')).forEach(n => n.triggerCached())`
+5. Check node logs for registration messages
+6. Verify Function node has access to flow context
 
 ## Connection Status
 

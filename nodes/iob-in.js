@@ -23,8 +23,12 @@ module.exports = function(RED) {
         node.multipleStates = config.multipleStates || "";
         node.outputMode = config.outputMode || "individual";
         
+        // External triggering configuration
+        node.enableExternalTrigger = config.enableExternalTrigger !== false; // Default: true
+        node.triggerGroup = config.triggerGroup || 'iobroker_in_nodes';
+        
         // Debug configuration
-        node.log(`Node configuration: inputMode=${node.inputMode}, sendInitialValue=${node.sendInitialValue}, outputMode=${node.outputMode}, outputProperty=${node.outputProperty}, filterMode=${node.filterMode}, ackFilter=${node.ackFilter}, multipleStates="${node.multipleStates}"`);
+        node.log(`Node configuration: inputMode=${node.inputMode}, sendInitialValue=${node.sendInitialValue}, outputMode=${node.outputMode}, outputProperty=${node.outputProperty}, filterMode=${node.filterMode}, ackFilter=${node.ackFilter}, multipleStates="${node.multipleStates}", enableExternalTrigger=${node.enableExternalTrigger}, triggerGroup=${node.triggerGroup}`);
         
         // Parse multiple states if in multiple mode
         const stateTracking = StateManagementHelpers.initializeStateTracking();
@@ -203,18 +207,28 @@ module.exports = function(RED) {
         node.currentStateValues = new Map();
         node.lastValue = undefined;
 
-        // Register node in flow context for external triggering
-        const flowContext = node.context().flow;
-        const existingNodes = flowContext.get('iobroker_in_nodes') || {};
-        existingNodes[node.id] = {
-            nodeRef: node,
-            triggerCached: node.sendCachedValues,
-            states: node.inputMode === 'single' ? [node.stateId] : (node.statesList || []),
-            mode: node.inputMode,
-            name: node.name || `iob-in-${node.id.substring(0, 8)}`,
-            outputMode: node.outputMode
-        };
-        flowContext.set('iobroker_in_nodes', existingNodes);
+        // External triggering configuration
+        const enableExternalTrigger = node.enableExternalTrigger;
+        const triggerGroup = node.triggerGroup;
+
+        // Register node in flow context for external triggering (if enabled)
+        if (enableExternalTrigger) {
+            const flowContext = node.context().flow;
+            const existingNodes = flowContext.get(triggerGroup) || {};
+            existingNodes[node.id] = {
+                nodeRef: node,
+                triggerCached: node.sendCachedValues,
+                states: node.inputMode === 'single' ? [node.stateId] : (node.statesList || []),
+                mode: node.inputMode,
+                name: node.name || `iob-in-${node.id.substring(0, 8)}`,
+                outputMode: node.outputMode,
+                stateId: node.stateId, // For single mode
+                group: triggerGroup
+            };
+            flowContext.set(triggerGroup, existingNodes);
+            
+            node.log(`External triggering enabled - registered in group: ${triggerGroup}`);
+        }
 
         // --- Event Handler ---
 
@@ -717,11 +731,16 @@ module.exports = function(RED) {
             StateManagementHelpers.cleanupTimeout(node, 'initialValueTimeout');
             StateManagementHelpers.cleanupTimeout(node, 'groupedTimeout');
             
-            // Remove from flow context
-            const flowContext = node.context().flow;
-            const existingNodes = flowContext.get('iobroker_in_nodes') || {};
-            delete existingNodes[node.id];
-            flowContext.set('iobroker_in_nodes', existingNodes);
+            // Remove from flow context (if external triggering was enabled)
+            const enableExternalTrigger = node.enableExternalTrigger;
+            const triggerGroup = node.triggerGroup;
+            
+            if (enableExternalTrigger) {
+                const flowContext = node.context().flow;
+                const existingNodes = flowContext.get(triggerGroup) || {};
+                delete existingNodes[node.id];
+                flowContext.set(triggerGroup, existingNodes);
+            }
             
             // Clean up all listeners to prevent memory leaks
             Orchestrator.removeListener('server:ready', onServerReady);
