@@ -1,5 +1,7 @@
-const connectionManager = require('../lib/manager/websocket-manager');
 const { NodeHelpers } = require('../lib/utils/node-helpers');
+const { Logger } = require('../lib/utils/logger');
+const { NodeRegistrationHelpers } = require('../lib/utils/node-registration-helpers');
+const Orchestrator = require('../lib/orchestrator');
 const dayjs = require('dayjs');
 const utc = require('dayjs/plugin/utc');
 const timezone = require('dayjs/plugin/timezone');
@@ -11,6 +13,7 @@ module.exports = function (RED) {
     function iobhistory(config) {
         RED.nodes.createNode(this, config);
         const node = this;
+        const logger = new Logger(node);
 
         const { setStatus, setError } = NodeHelpers.createStatusHelpers(node);
         
@@ -47,7 +50,14 @@ module.exports = function (RED) {
             nodeId: node.id
         };
 
-        node.currentConfig = connectionDetails;
+        logger.info(`Initialized with adapter: ${settings.historyAdapter}, mode: ${settings.queryMode}`);
+
+        node.server = RED.nodes.getNode(config.server);
+        if (!node.server) {
+            setError("Server not configured", "No server configuration");
+            return;
+        }
+
         node.isInitialized = false;
         node.isQueryRunning = false;
         node.queryQueue = [];
@@ -104,6 +114,7 @@ module.exports = function (RED) {
                 throw new Error('Start time must be before end time');
             }
 
+            logger.debug(`Time range calculated: ${new Date(start).toISOString()} to ${new Date(end).toISOString()}`);
             return { start, end };
         }
 
@@ -155,6 +166,7 @@ module.exports = function (RED) {
                 options.integralUnit = msg.integralUnit || settings.integralUnit;
             }
 
+            logger.debug(`Query options built: aggregate=${aggregate}, step=${stepMs}ms, maxEntries=${maxEntries}`);
             return options;
         }
 
@@ -420,7 +432,7 @@ module.exports = function (RED) {
                     break;
                 case 'drop':
                     if (node.isQueryRunning) {
-                        node.warn(`Query ${queryId} dropped - another query is running`);
+                        logger.debug(`Query ${queryId} dropped - another query is running`);
                         const errorMsg = { ...queueItem.msg };
                         errorMsg.error = "Query dropped - another query was already running";
                         errorMsg[settings.outputProperty] = null;
@@ -453,10 +465,15 @@ module.exports = function (RED) {
             updateQueueStatus();
 
             const queryStartTime = Date.now();
+            logger.debug(`Executing query ${id} for state: ${stateId}`);
 
             try {
-                const result = await connectionManager.getHistory(
-                    settings.serverId,
+                if (!orchestratorRef) {
+                    orchestratorRef = node.getOrchestratorRef();
+                }
+
+                const result = await orchestratorRef.getHistory(
+                    node.id,
                     settings.historyAdapter,
                     stateId,
                     queryOptions
@@ -474,13 +491,15 @@ module.exports = function (RED) {
                     msg.topic = stateId;
                 }
 
+                logger.info(`Query ${id} completed in ${queryTime}ms, returned ${formattedResult.count} entries`);
                 send(msg);
                 done && done();
 
             } catch (queryError) {
-                node.error(`History query ${id} failed for ${stateId}: ${queryError.message}`);
+                const errorMessage = queryError.message || queryError.toString();
+                logger.error(`History query ${id} failed for ${stateId}: ${errorMessage}`);
 
-                msg.error = queryError.message;
+                msg.error = errorMessage;
                 msg[settings.outputProperty] = null;
                 msg.stateId = stateId;
                 msg.adapter = settings.historyAdapter;
@@ -508,12 +527,61 @@ module.exports = function (RED) {
             ready: getQueueStatusText()
         };
 
-        NodeHelpers.initializeConnection(
-            node, config, RED, settings, globalConfig, setStatus, statusTexts
-        );
+        let orchestratorRef = null;
+
+        const onServerReady = ({ serverId }) => {
+            if (serverId === settings.serverId) {
+                logger.info("Server connection ready for history queries");
+                setStatus("green", "dot", statusTexts.ready);
+            }
+        };
+
+        const onDisconnected = ({ serverId }) => {
+            if (serverId === settings.serverId) {
+                setStatus("red", "ring", "Disconnected");
+                orchestratorRef = null;
+            }
+        };
+
+        const onRetrying = ({ serverId, attempt }) => {
+            if (serverId === settings.serverId) {
+                setStatus("yellow", "ring", `Retry ${attempt}`);
+            }
+        };
+
+        const onPermanentFailure = ({ serverId, error }) => {
+            if (serverId === settings.serverId) {
+                setError("Connection failed", `Failed: ${error.message}`);
+                orchestratorRef = null;
+            }
+        };
+
+        const registerWithOrchestrator = () => {
+            NodeRegistrationHelpers.registerWithOrchestrator(node);
+        };
+
+        NodeRegistrationHelpers.setupDelayedRegistration(node, 300);
+
+        const eventHandlers = {
+            onServerReady,
+            onDisconnected,
+            onRetrying,
+            onPermanentFailure
+        };
+
+        NodeRegistrationHelpers.registerEventListeners(node, eventHandlers);
+
+        node.getOrchestratorRef = () => {
+            if (!orchestratorRef) {
+                orchestratorRef = Orchestrator;
+            }
+            return orchestratorRef;
+        };
 
         node.on('input', function (msg, send, done) {
             try {
+                logger.info(`iob-history received input message: ${JSON.stringify(msg)}`);
+                
                 if (NodeHelpers.handleStatusRequest(msg, send, done, settings)) {
                     msg.payload = {
                         ...msg.payload,
@@ -531,6 +599,16 @@ module.exports = function (RED) {
                         }
                     };
                     send(msg);
+                    return;
+                }
+
+                if (!orchestratorRef) {
+                    orchestratorRef = node.getOrchestratorRef();
+                }
+
+                if (!orchestratorRef) {
+                    setError("Not connected", "No orchestrator connection");
+                    done && done(new Error("No orchestrator connection"));
                     return;
                 }
 
@@ -554,9 +632,10 @@ module.exports = function (RED) {
 
                 } catch (queryError) {
                     setError("Query error", "Query error");
-                    node.error(`History query preparation failed for ${stateId}: ${queryError.message}`);
+                    const errorMessage = queryError.message || queryError.toString();
+                    logger.error(`History query preparation failed for ${stateId}: ${errorMessage}`);
 
-                    msg.error = queryError.message;
+                    msg.error = errorMessage;
                     msg[settings.outputProperty] = null;
                     msg.stateId = stateId;
                     msg.adapter = settings.historyAdapter;
@@ -568,7 +647,7 @@ module.exports = function (RED) {
 
             } catch (error) {
                 setError("Error", "Error");
-                node.error(`Error processing input: ${error.message}`);
+                logger.error("Error processing input", error);
                 done && done(error);
             }
         });
@@ -582,7 +661,12 @@ module.exports = function (RED) {
             });
             node.queryQueue = [];
 
-            await NodeHelpers.handleNodeClose(node, settings, "History");
+            if (droppedQueries > 0) {
+                logger.info(`Dropped ${droppedQueries} queued queries during close`);
+            }
+
+            const cleanupCallbacks = [];
+            NodeRegistrationHelpers.setupCloseHandler(node, eventHandlers, cleanupCallbacks);
             done();
         });
 

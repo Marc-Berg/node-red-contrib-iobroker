@@ -61,7 +61,16 @@ function setupAPIEndpoints(RED) {
         // API endpoint that uses the Event-based architecture for states
         RED.httpAdmin.get('/iobroker/ws/states/:serverId', async (req, res) => {
             try {
-                const serverId = decodeURIComponent(req.params.serverId);
+                const serverParam = decodeURIComponent(req.params.serverId);
+                
+                // Try to find server by host:port if it's not a direct server ID
+                let serverId = serverParam;
+                if (serverParam.includes(':')) {
+                    const foundServerId = Orchestrator.findServerByHostPort(serverParam);
+                    if (foundServerId) {
+                        serverId = foundServerId;
+                    }
+                }
                 
                 // Get states via the new Event-based architecture
                 const states = await getStatesViaEventArchitecture(serverId);
@@ -124,11 +133,23 @@ function setupAPIEndpoints(RED) {
 
         RED.httpAdmin.get('/iobroker/ws/status/:serverId', (req, res) => {
             try {
-                const serverId = decodeURIComponent(req.params.serverId);
-                const status = connectionManager.getConnectionStatus(serverId);
+                const serverParam = decodeURIComponent(req.params.serverId);
+                
+                // Try to find server by host:port if it's not a direct server ID
+                let serverId = serverParam;
+                if (serverParam.includes(':')) {
+                    const foundServerId = Orchestrator.findServerByHostPort(serverParam);
+                    if (foundServerId) {
+                        serverId = foundServerId;
+                    }
+                }
+                
+                const status = Orchestrator.getConnectionStatus(serverId);
 
                 res.json({
                     ...status,
+                    requestedServer: serverParam,
+                    resolvedServerId: serverId,
                     requestTime: Date.now()
                 });
 
@@ -143,10 +164,26 @@ function setupAPIEndpoints(RED) {
 
         RED.httpAdmin.get('/iobroker/ws/adapters/:serverId', async (req, res) => {
             try {
-                const serverId = decodeURIComponent(req.params.serverId);
-                const connectionManager = require('../lib/manager/websocket-manager');
-
-                const states = await connectionManager.getStates(serverId);
+                const serverParam = decodeURIComponent(req.params.serverId);
+                
+                // Try to find server by host:port if it's not a direct server ID
+                let serverId = serverParam;
+                if (serverParam.includes(':')) {
+                    const foundServerId = Orchestrator.findServerByHostPort(serverParam);
+                    if (foundServerId) {
+                        serverId = foundServerId;
+                    } else {
+                        throw new Error(`No server found for ${serverParam}. Available servers: ${Array.from(Orchestrator.servers.keys()).join(', ')}`);
+                    }
+                }
+                
+                // Check if server exists and is ready
+                const status = Orchestrator.getConnectionStatus(serverId);
+                if (!status.ready) {
+                    throw new Error(`Server ${serverId} (${serverParam}) is not ready. Status: connected=${status.connected}, ready=${status.ready}. Available servers: ${status.availableServers?.join(', ') || 'none'}`);
+                }
+                
+                const states = await Orchestrator.getStates(serverId);
                 const historyAdapters = [];
 
                 if (states && typeof states === 'object') {
