@@ -423,7 +423,8 @@ RED.nodes.registerType('iobin', {
                         <i class="fa fa-play"></i> Enable external triggering
                     </label>
                     <div style="margin-top: 5px; font-size: 12px; color: #666;">
-                        Allows other nodes to trigger resending of cached values via Flow Context
+                        Allows external nodes to resend cached values via flow context.<br>
+                        Useful for manually triggering "Send initial value on startup" without node restart.
                     </div>
                 </div>
                 
@@ -431,7 +432,8 @@ RED.nodes.registerType('iobin', {
                     <label for="node-input-triggerGroup"><i class="fa fa-tags"></i> Trigger Group</label>
                     <input type="text" id="node-input-triggerGroup" placeholder="iobroker_in_nodes">
                     <div style="margin-top: 5px; font-size: 12px; color: #666;">
-                        Group name for organizing triggerable nodes. Function nodes can access this group via flow context.
+                        Group name to organize triggerable nodes. Function nodes can access this group via flow context.<br>
+                        <strong>Example:</strong> <code>flow.get('iobroker_in_nodes')</code> returns all available nodes.
                     </div>
                 </div>
             </div>
@@ -551,6 +553,58 @@ Both modes behave identically because initial values bypass change filtering.
         <li>Grouped mode always sends ALL current values when any subscribed state changes</li>
         <li>Initial values for multiple states: all current values sent at startup</li>
         <li>Change filtering reduces message volume but requires storing previous values</li>
+    </ul>
+    
+    <h3>External Triggering</h3>
+    <p>External triggering allows other nodes (e.g., Function nodes) to resend cached state values without requiring a node restart.</p>
+    
+    <h4>Usage in Function Nodes</h4>
+    <pre>
+// Get all available triggerable nodes
+const triggerableNodes = flow.get('iobroker_in_nodes') || {};
+
+// Trigger all nodes in the group
+Object.values(triggerableNodes).forEach(nodeInfo => {
+    if (nodeInfo.triggerCached) {
+        nodeInfo.triggerCached();
+        node.log(`Triggered: ${nodeInfo.name} (${nodeInfo.mode})`);
+    }
+});
+
+// Filter specific nodes by name
+Object.values(triggerableNodes)
+    .filter(nodeInfo => nodeInfo.name?.includes('[Dashboard]'))
+    .forEach(nodeInfo => {
+        nodeInfo.triggerCached();
+        node.log(`Dashboard trigger: ${nodeInfo.name}`);
+    });
+
+// Trigger only single-mode nodes
+Object.values(triggerableNodes)
+    .filter(nodeInfo => nodeInfo.mode === 'single')
+    .forEach(nodeInfo => nodeInfo.triggerCached());
+    </pre>
+    
+    <h4>Node Info Object Structure</h4>
+    <pre>
+{
+    nodeRef: [Node Reference],
+    triggerCached: [Function],        // Function to trigger resend
+    states: ["state1", "state2"],     // Monitored states
+    mode: "single|multiple",          // Input mode
+    name: "Node Name",                // Node name
+    outputMode: "individual|grouped", // Output mode (multiple only)
+    stateId: "single.state.id",       // State ID (single mode only)
+    group: "iobroker_in_nodes"        // Trigger group name
+}
+    </pre>
+    
+    <h4>Use Cases</h4>
+    <ul>
+        <li><b>Dashboard Refresh:</b> Reload all dashboard-relevant states after system updates</li>
+        <li><b>Startup Trigger:</b> Externally trigger initial values after flow start</li>
+        <li><b>Conditional Refresh:</b> Trigger only specific nodes based on conditions</li>
+        <li><b>Debugging:</b> Manually retrieve current values for error diagnosis</li>
     </ul>
 </script>
 
