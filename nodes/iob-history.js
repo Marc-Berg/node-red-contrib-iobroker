@@ -1,7 +1,7 @@
-const { NodeHelpers } = require('../lib/utils/node-helpers');
-const { Logger } = require('../lib/utils/logger');
-const { NodeRegistrationHelpers } = require('../lib/utils/node-registration-helpers');
 const Orchestrator = require('../lib/orchestrator');
+const { StatusHelpers } = require('../lib/utils/status-helpers');
+const { NodeRegistrationHelpers } = require('../lib/utils/node-registration-helpers');
+const { Logger } = require('../lib/utils/logger');
 const dayjs = require('dayjs');
 const utc = require('dayjs/plugin/utc');
 const timezone = require('dayjs/plugin/timezone');
@@ -15,12 +15,12 @@ module.exports = function (RED) {
         const node = this;
         const logger = new Logger(node);
 
-        const { setStatus, setError } = NodeHelpers.createStatusHelpers(node);
+        node.server = RED.nodes.getNode(config.server);
         
-        const serverConfig = NodeHelpers.validateServerConfig(RED, config, setError);
-        if (!serverConfig) return;
-
-        const { globalConfig, connectionDetails, serverId } = serverConfig;
+        if (!node.server) {
+            node.status({ fill: "red", shape: "dot", text: "Error: Server not configured" });
+            return;
+        }
 
         const settings = {
             stateId: config.stateId?.trim() || "",
@@ -46,17 +46,10 @@ module.exports = function (RED) {
             timezone: config.timezone || "Berlin",
             customTimezone: config.customTimezone?.trim() || "",
             dataFormat: config.dataFormat || "full",
-            serverId,
             nodeId: node.id
         };
 
         logger.info(`Initialized with adapter: ${settings.historyAdapter}, mode: ${settings.queryMode}`);
-
-        node.server = RED.nodes.getNode(config.server);
-        if (!node.server) {
-            setError("Server not configured", "No server configuration");
-            return;
-        }
 
         node.isInitialized = false;
         node.isQueryRunning = false;
@@ -405,9 +398,9 @@ module.exports = function (RED) {
         function updateQueueStatus() {
             const queueText = getQueueStatusText();
             if (node.isQueryRunning) {
-                setStatus("blue", "dot", queueText);
+                StatusHelpers.updateConnectionStatus(node, 'processing', queueText);
             } else {
-                setStatus("green", "dot", queueText);
+                StatusHelpers.updateConnectionStatus(node, 'ready', queueText);
             }
         }
 
@@ -530,28 +523,30 @@ module.exports = function (RED) {
         let orchestratorRef = null;
 
         const onServerReady = ({ serverId }) => {
-            if (serverId === settings.serverId) {
+            if (serverId === node.server.id) {
                 logger.info("Server connection ready for history queries");
-                setStatus("green", "dot", statusTexts.ready);
+                StatusHelpers.updateConnectionStatus(node, 'ready', statusTexts.ready);
+                node.isInitialized = true;
             }
         };
 
         const onDisconnected = ({ serverId }) => {
-            if (serverId === settings.serverId) {
-                setStatus("red", "ring", "Disconnected");
+            if (serverId === node.server.id) {
+                StatusHelpers.updateConnectionStatus(node, 'disconnected');
                 orchestratorRef = null;
+                node.isInitialized = false;
             }
         };
 
-        const onRetrying = ({ serverId, attempt }) => {
-            if (serverId === settings.serverId) {
-                setStatus("yellow", "ring", `Retry ${attempt}`);
+        const onRetrying = ({ serverId, attempt, delay }) => {
+            if (serverId === node.server.id) {
+                StatusHelpers.updateConnectionStatus(node, 'retrying', `Retrying in ${delay / 1000}s (Attempt #${attempt})`);
             }
         };
 
         const onPermanentFailure = ({ serverId, error }) => {
-            if (serverId === settings.serverId) {
-                setError("Connection failed", `Failed: ${error.message}`);
+            if (serverId === node.server.id) {
+                StatusHelpers.updateConnectionStatus(node, 'error', `Failed: ${error.message}`);
                 orchestratorRef = null;
             }
         };
@@ -580,8 +575,8 @@ module.exports = function (RED) {
             try {
                 logger.info(`iob-history received input message: ${JSON.stringify(msg)}`);
                 
-                if (NodeHelpers.handleStatusRequest(msg, send, done, settings)) {
-                    msg.payload = {
+                if (msg.topic === "status") {
+                    const statusInfo = {
                         ...msg.payload,
                         queryMode: settings.queryMode,
                         isQueryRunning: node.isQueryRunning,
@@ -596,7 +591,9 @@ module.exports = function (RED) {
                             dataFormat: settings.dataFormat
                         }
                     };
+                    msg.payload = statusInfo;
                     send(msg);
+                    done && done();
                     return;
                 }
 
@@ -611,7 +608,10 @@ module.exports = function (RED) {
                 }
 
                 const stateId = settings.stateId || (typeof msg.topic === "string" ? msg.topic.trim() : "");
-                if (!NodeHelpers.validateRequiredInput(stateId, "State ID", setStatus, done)) {
+                if (!stateId || !stateId.trim()) {
+                    const error = new Error("State ID missing (neither configured nor in msg.topic)");
+                    StatusHelpers.updateConnectionStatus(node, 'error', "State ID missing");
+                    done && done(error);
                     return;
                 }
 
@@ -668,7 +668,10 @@ module.exports = function (RED) {
             done();
         });
 
-        node.on("error", NodeHelpers.createErrorHandler(node, setError));
+        const cleanupCallbacks = [];
+        NodeRegistrationHelpers.setupCloseHandler(node, eventHandlers, cleanupCallbacks);
+
+        StatusHelpers.updateConnectionStatus(node, 'waiting', "Waiting for server...");
     }
 
     RED.nodes.registerType("iobhistory", iobhistory);
