@@ -1,85 +1,116 @@
-const connectionManager = require('../lib/manager/websocket-manager');
-const { NodeHelpers } = require('../lib/utils/node-helpers');
+const Orchestrator = require('../lib/orchestrator');
+const { StatusHelpers } = require('../lib/utils/status-helpers');
+const { NodeRegistrationHelpers } = require('../lib/utils/node-registration-helpers');
 
 module.exports = function(RED) {
     function iobsendto(config) {
         RED.nodes.createNode(this, config);
         const node = this;
 
+        node.server = RED.nodes.getNode(config.server);
         
-        const { setStatus, setError } = NodeHelpers.createStatusHelpers(node);
-        
-        
-        const serverConfig = NodeHelpers.validateServerConfig(RED, config, setError);
-        if (!serverConfig) return;
+        if (!node.server) {
+            node.status({ fill: "red", shape: "dot", text: "Error: Server not configured" });
+            return;
+        }
 
-        const { globalConfig, connectionDetails, serverId } = serverConfig;
+        node.adapter = config.adapter?.trim() || "";
+        node.command = config.command?.trim() || "";
+        node.message = config.message?.trim() || "";
+        node.waitForResponse = config.waitForResponse || false;
+        node.responseTimeout = parseInt(config.responseTimeout) || 10000;
 
-        const settings = {
-            adapter: config.adapter?.trim() || "",
-            command: config.command?.trim() || "",
-            message: config.message?.trim() || "",
-            waitForResponse: config.waitForResponse || false,
-            responseTimeout: parseInt(config.responseTimeout) || 10000,
-            serverId,
-            nodeId: node.id
-        };
-
-        node.currentConfig = connectionDetails;
-        node.isInitialized = false;
+        node.log(`SendTo node initialized: adapter=${node.adapter}, command=${node.command}, waitForResponse=${node.waitForResponse}, timeout=${node.responseTimeout}ms`);
 
         let staticMessageParsed = null;
-        if (settings.message) {
+        if (node.message) {
             try {
-                staticMessageParsed = JSON.parse(settings.message);
+                staticMessageParsed = JSON.parse(node.message);
             } catch (error) {
-                return setError(`Invalid JSON in static message: ${error.message}`, "JSON error");
+                node.status({ fill: "red", shape: "dot", text: `JSON error: ${error.message}` });
+                return;
             }
         }
 
-        const statusTexts = {
-            ready: settings.waitForResponse ? "Ready (with response)" : "Ready (fire-and-forget)",
-            reconnected: settings.waitForResponse ? "Reconnected (with response)" : "Reconnected (fire-and-forget)"
+        node.isRegistered = false;
+
+        const onServerReady = ({ serverId }) => {
+            if (serverId === node.server.id) {
+                const statusText = node.waitForResponse ? "Ready (with response)" : "Ready (fire-and-forget)";
+                StatusHelpers.updateConnectionStatus(node, 'ready', statusText);
+            }
         };
 
-        NodeHelpers.initializeConnection(
-            node, config, RED, settings, globalConfig, setStatus, statusTexts
-        );
+        const onDisconnected = ({ serverId }) => {
+            if (serverId === node.server.id) {
+                StatusHelpers.updateConnectionStatus(node, 'disconnected');
+            }
+        };
+
+        const onRetrying = ({ serverId, attempt, delay }) => {
+            if (serverId === node.server.id) {
+                StatusHelpers.updateConnectionStatus(node, 'retrying', `Retrying in ${delay / 1000}s (Attempt #${attempt})`);
+            }
+        };
+
+        const onPermanentFailure = ({ serverId, error }) => {
+            if (serverId === node.server.id) {
+                StatusHelpers.updateConnectionStatus(node, 'error', `Failed: ${error.message}`);
+            }
+        };
+
+        const onSendToResponse = ({ nodeId, response, error, responseTime }) => {
+            if (nodeId === node.id) {
+                if (error) {
+                    node.error(`SendTo failed: ${error.message}`);
+                    StatusHelpers.updateConnectionStatus(node, 'error', 'SendTo failed');
+                } else {
+                    node.debug(`SendTo response received in ${responseTime}ms: ${JSON.stringify(response)}`);
+                    const statusText = node.waitForResponse ? "Ready (with response)" : "Ready (fire-and-forget)";
+                    StatusHelpers.updateConnectionStatus(node, 'ready', statusText);
+                }
+            }
+        };
+
+        const eventHandlers = {
+            onServerReady,
+            onDisconnected,
+            onRetrying,
+            onPermanentFailure,
+            onSendToResponse
+        };
+
+        NodeRegistrationHelpers.setupDelayedRegistrationWithListeners(node, eventHandlers, 0);
 
         node.on('input', async function(msg, send, done) {
             try {
-                
-                if (NodeHelpers.handleStatusRequest(msg, send, done, settings)) {
-                    return;
-                }
-
-                const adapter = msg.adapter || settings.adapter;
+                const adapter = msg.adapter || node.adapter;
                 if (!adapter || !adapter.trim()) {
-                    setStatus("red", "ring", "Adapter missing");
                     const error = new Error("Target adapter missing (neither configured nor in msg.adapter)");
+                    StatusHelpers.updateConnectionStatus(node, 'error', "Adapter missing");
                     done && done(error);
                     return;
                 }
 
-                const command = msg.command !== undefined ? msg.command : settings.command;
+                const command = msg.command !== undefined ? msg.command : node.command;
                 const messageContent = msg.message !== undefined ? msg.message : 
                                      (staticMessageParsed !== null ? staticMessageParsed : msg.payload);
-                const timeout = msg.timeout || settings.responseTimeout;
+                const timeout = msg.timeout || node.responseTimeout;
 
                 if (messageContent === undefined) {
-                    setStatus("red", "ring", "Message missing");
                     const error = new Error("Message content missing (no payload, static message, or msg.message)");
+                    StatusHelpers.updateConnectionStatus(node, 'error', "Message missing");
                     done && done(error);
                     return;
                 }
 
-                setStatus("blue", "dot", `Sending to ${adapter}...`);
+                StatusHelpers.updateConnectionStatus(node, 'sending', `Sending to ${adapter}...`);
                 const startTime = Date.now();
 
                 try {
-                    if (settings.waitForResponse) {
-                        const response = await connectionManager.sendToAdapter(
-                            settings.serverId,
+                    if (node.waitForResponse) {
+                        const response = await Orchestrator.sendToAdapter(
+                            node.id,
                             adapter.trim(),
                             command ? command.trim() : null,
                             messageContent,
@@ -87,6 +118,7 @@ module.exports = function(RED) {
                         );
 
                         const responseTime = Date.now() - startTime;
+                        node.debug(`SendTo completed in ${responseTime}ms`);
                         
                         const responseMsg = {
                             payload: response,
@@ -97,44 +129,45 @@ module.exports = function(RED) {
                             timestamp: Date.now()
                         };
 
-                        const readyText = statusTexts.ready;
-                        setStatus("green", "dot", readyText);
+                        const statusText = node.waitForResponse ? "Ready (with response)" : "Ready (fire-and-forget)";
+                        StatusHelpers.updateConnectionStatus(node, 'ready', statusText);
                         
                         send(responseMsg);
                         done && done();
                     } else {
-                        await connectionManager.sendToAdapter(
-                            settings.serverId,
+                        await Orchestrator.sendToAdapter(
+                            node.id,
                             adapter.trim(),
                             command ? command.trim() : null,
                             messageContent,
                             null
                         );
 
-                        const readyText = statusTexts.ready;
-                        setStatus("green", "dot", readyText);                        
+                        const responseTime = Date.now() - startTime;
+                        node.debug(`SendTo completed in ${responseTime}ms`);
+
+                        const statusText = node.waitForResponse ? "Ready (with response)" : "Ready (fire-and-forget)";
+                        StatusHelpers.updateConnectionStatus(node, 'ready', statusText);                       
                         done && done();
                     }
                     
                 } catch (sendError) {
-                    setStatus("red", "ring", "SendTo failed");
                     node.error(`SendTo failed for ${adapter}: ${sendError.message}`);
+                    StatusHelpers.updateConnectionStatus(node, 'error', 'SendTo failed');
                     done && done(sendError);
                 }
                 
             } catch (error) {
-                setStatus("red", "ring", "Error");
                 node.error(`Error processing input: ${error.message}`);
+                StatusHelpers.updateConnectionStatus(node, 'error', 'Error');
                 done && done(error);
             }
         });
 
-        node.on("close", async function(removed, done) {
-            await NodeHelpers.handleNodeClose(node, settings, "SendTo");
-            done();
-        });
+        const cleanupCallbacks = [];
+        NodeRegistrationHelpers.setupCloseHandler(node, eventHandlers, cleanupCallbacks);
 
-        node.on("error", NodeHelpers.createErrorHandler(node, setError));
+        StatusHelpers.updateConnectionStatus(node, 'waiting', "Waiting for server...");
     }
 
     RED.nodes.registerType("iobsendto", iobsendto);
