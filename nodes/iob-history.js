@@ -461,11 +461,7 @@ module.exports = function (RED) {
             logger.debug(`Executing query ${id} for state: ${stateId}`);
 
             try {
-                if (!orchestratorRef) {
-                    orchestratorRef = node.getOrchestratorRef();
-                }
-
-                const result = await orchestratorRef.getHistory(
+                const result = await Orchestrator.getHistory(
                     node.id,
                     settings.historyAdapter,
                     stateId,
@@ -520,8 +516,6 @@ module.exports = function (RED) {
             ready: getQueueStatusText()
         };
 
-        let orchestratorRef = null;
-
         const onServerReady = ({ serverId }) => {
             if (serverId === node.server.id) {
                 logger.info("Server connection ready for history queries");
@@ -533,7 +527,6 @@ module.exports = function (RED) {
         const onDisconnected = ({ serverId }) => {
             if (serverId === node.server.id) {
                 StatusHelpers.updateConnectionStatus(node, 'disconnected');
-                orchestratorRef = null;
                 node.isInitialized = false;
             }
         };
@@ -547,7 +540,6 @@ module.exports = function (RED) {
         const onPermanentFailure = ({ serverId, error }) => {
             if (serverId === node.server.id) {
                 StatusHelpers.updateConnectionStatus(node, 'error', `Failed: ${error.message}`);
-                orchestratorRef = null;
             }
         };
 
@@ -563,13 +555,6 @@ module.exports = function (RED) {
         };
 
         NodeRegistrationHelpers.setupDelayedRegistrationWithListeners(node, eventHandlers, 300);
-
-        node.getOrchestratorRef = () => {
-            if (!orchestratorRef) {
-                orchestratorRef = Orchestrator;
-            }
-            return orchestratorRef;
-        };
 
         node.on('input', function (msg, send, done) {
             try {
@@ -597,13 +582,10 @@ module.exports = function (RED) {
                     return;
                 }
 
-                if (!orchestratorRef) {
-                    orchestratorRef = node.getOrchestratorRef();
-                }
-
-                if (!orchestratorRef) {
-                    setError("Not connected", "No orchestrator connection");
-                    done && done(new Error("No orchestrator connection"));
+                if (!node.isInitialized) {
+                    const error = new Error("Server not ready");
+                    StatusHelpers.updateConnectionStatus(node, 'error', "Not connected");
+                    done && done(error);
                     return;
                 }
 
@@ -629,7 +611,7 @@ module.exports = function (RED) {
                     });
 
                 } catch (queryError) {
-                    setError("Query error", "Query error");
+                    StatusHelpers.updateConnectionStatus(node, 'error', "Query error");
                     const errorMessage = queryError.message || queryError.toString();
                     logger.error(`History query preparation failed for ${stateId}: ${errorMessage}`);
 
@@ -644,7 +626,7 @@ module.exports = function (RED) {
                 }
 
             } catch (error) {
-                setError("Error", "Error");
+                StatusHelpers.updateConnectionStatus(node, 'error', "Error");
                 logger.error("Error processing input", error);
                 done && done(error);
             }

@@ -1,5 +1,6 @@
 const Orchestrator = require('../lib/orchestrator');
 const { StatusHelpers } = require('../lib/utils/status-helpers');
+const { NodeRegistrationHelpers } = require('../lib/utils/node-registration-helpers');
 
 module.exports = function(RED) {
     function iobgetobject(config) {
@@ -188,17 +189,14 @@ module.exports = function(RED) {
             }
         };
 
-        // Register with orchestrator
-        if (node.server && node.server.id) {
-            Orchestrator.registerNode(node.id, node.server);
-            node.isRegistered = true;
-        }
+        const eventHandlers = {
+            onServerReady,
+            onDisconnected,
+            onRetrying,
+            onPermanentFailure
+        };
 
-        // Connection event listeners
-        Orchestrator.on('server:ready', onServerReady);
-        Orchestrator.on('connection:disconnected', onDisconnected);
-        Orchestrator.on('connection:retrying', onRetrying);
-        Orchestrator.on('connection:failed_permanently', onPermanentFailure);
+        NodeRegistrationHelpers.setupDelayedRegistrationWithListeners(node, eventHandlers, 0);
 
         // Input handler
         node.on('input', async function(msg, send, done) {
@@ -382,18 +380,9 @@ module.exports = function(RED) {
             }
         }
 
-        node.on('close', function(done) {
-            // Clean up all listeners to prevent memory leaks
-            Orchestrator.removeListener('server:ready', onServerReady);
-            Orchestrator.removeListener('connection:disconnected', onDisconnected);
-            Orchestrator.removeListener('connection:retrying', onRetrying);
-            Orchestrator.removeListener('connection:failed_permanently', onPermanentFailure);
-            
-            // Only unregister if we were actually registered
-            if (node.isRegistered) {
-                Orchestrator.unregisterNode(node.id, node.server.id);
-            }
-            
+        node.on('close', function(removed, done) {
+            const cleanupCallbacks = [];
+            NodeRegistrationHelpers.setupCloseHandler(node, eventHandlers, cleanupCallbacks);
             done();
         });
 

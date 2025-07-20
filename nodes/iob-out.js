@@ -1,5 +1,6 @@
 const Orchestrator = require('../lib/orchestrator');
 const { StatusHelpers } = require('../lib/utils/status-helpers');
+const { NodeRegistrationHelpers } = require('../lib/utils/node-registration-helpers');
 
 module.exports = function(RED) {
     function IoBrokerOutNode(config) {
@@ -372,47 +373,24 @@ module.exports = function(RED) {
 
         // --- Node Lifecycle ---
 
-        // Function to register with orchestrator
-        const registerWithOrchestrator = () => {
-            if (!node.isRegistered) {
-                node.log(`Registering node with orchestrator after flows started`);
-                Orchestrator.registerNode(node.id, node.server);
-                node.isRegistered = true;
-                
-                // Set up event listeners AFTER registration is complete
-                Orchestrator.on('server:ready', onServerReady);
-                Orchestrator.on(`state:set_result:${node.id}`, onStateSetResult);
-                Orchestrator.on(`object:get_result:${node.id}`, onObjectGetResult);
-                Orchestrator.on(`object:set_result:${node.id}`, onObjectSetResult);
-                Orchestrator.on('connection:disconnected', onDisconnected);
-                Orchestrator.on('connection:retrying', onRetrying);
-                Orchestrator.on('connection:failed_permanently', onPermanentFailure);
-            }
+        const eventHandlers = {
+            onServerReady,
+            onStateSetResult,
+            onObjectGetResult,
+            onObjectSetResult,
+            onDisconnected,
+            onRetrying,
+            onPermanentFailure
         };
 
-        // Register with orchestrator when flows are ready
-        // Use timeout to ensure registration happens after flows are started
-        setTimeout(() => {
-            registerWithOrchestrator();
-        }, 300);
+        NodeRegistrationHelpers.setupDelayedRegistrationWithListeners(node, eventHandlers, 300);
 
-        node.on('close', function(done) {
+        node.on('close', function(removed, done) {
             // Clean up any pending operations
             node.pendingOperations.clear();
             
-            // Clean up all listeners to prevent memory leaks
-            Orchestrator.removeListener('server:ready', onServerReady);
-            Orchestrator.removeListener(`state:set_result:${node.id}`, onStateSetResult);
-            Orchestrator.removeListener(`object:get_result:${node.id}`, onObjectGetResult);
-            Orchestrator.removeListener(`object:set_result:${node.id}`, onObjectSetResult);
-            Orchestrator.removeListener('connection:disconnected', onDisconnected);
-            Orchestrator.removeListener('connection:retrying', onRetrying);
-            Orchestrator.removeListener('connection:failed_permanently', onPermanentFailure);
-            
-            // Only unregister if we were actually registered
-            if (node.isRegistered) {
-                Orchestrator.unregisterNode(node.id, node.server.id);
-            }
+            const cleanupCallbacks = [];
+            NodeRegistrationHelpers.setupCloseHandler(node, eventHandlers, cleanupCallbacks);
             done();
         });
 

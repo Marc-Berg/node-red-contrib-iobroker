@@ -1,5 +1,6 @@
 const Orchestrator = require('../lib/orchestrator');
 const { StatusHelpers } = require('../lib/utils/status-helpers');
+const { NodeRegistrationHelpers } = require('../lib/utils/node-registration-helpers');
 
 module.exports = function (RED) {
     function iobinobject(config) {
@@ -142,48 +143,25 @@ module.exports = function (RED) {
 
         // --- Node Lifecycle ---
 
-        // Function to register with orchestrator
-        const registerWithOrchestrator = () => {
-            if (!node.isRegistered) {
-                node.log(`Registering node with orchestrator after flows started`);
-                Orchestrator.registerNode(node.id, node.server);
-                node.isRegistered = true;
-                
-                // Set up event listeners AFTER registration is complete
-                Orchestrator.on('server:ready', onServerReady);
-                Orchestrator.on('object:subscription_confirmed', onObjectSubscriptionConfirmed);
-                Orchestrator.on('object:changed', onObjectChanged);
-                Orchestrator.on('connection:disconnected', onDisconnected);
-                Orchestrator.on('connection:retrying', onRetrying);
-                Orchestrator.on('connection:failed_permanently', onPermanentFailure);
-            }
+        const eventHandlers = {
+            onServerReady,
+            onObjectSubscriptionConfirmed,
+            onObjectChanged,
+            onDisconnected,
+            onRetrying,
+            onPermanentFailure
         };
 
-        // Register with orchestrator when flows are ready
-        // Use timeout to ensure registration happens after flows are started
-        setTimeout(() => {
-            registerWithOrchestrator();
-        }, 300);
+        NodeRegistrationHelpers.setupDelayedRegistrationWithListeners(node, eventHandlers, 300);
 
-        node.on('close', function(done) {
+        node.on('close', function(removed, done) {
             // Unsubscribe from objects if subscribed
             if (node.isSubscribed) {
                 Orchestrator.unsubscribeFromObjects(node.id, node.objectPattern);
             }
             
-            // Clean up all listeners to prevent memory leaks
-            Orchestrator.removeListener('server:ready', onServerReady);
-            Orchestrator.removeListener('object:subscription_confirmed', onObjectSubscriptionConfirmed);
-            Orchestrator.removeListener('object:changed', onObjectChanged);
-            Orchestrator.removeListener('connection:disconnected', onDisconnected);
-            Orchestrator.removeListener('connection:retrying', onRetrying);
-            Orchestrator.removeListener('connection:failed_permanently', onPermanentFailure);
-            
-            // Only unregister if we were actually registered
-            if (node.isRegistered) {
-                Orchestrator.unregisterNode(node.id, node.server.id);
-            }
-            
+            const cleanupCallbacks = [];
+            NodeRegistrationHelpers.setupCloseHandler(node, eventHandlers, cleanupCallbacks);
             done();
         });
 
