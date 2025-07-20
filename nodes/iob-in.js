@@ -1,12 +1,8 @@
 const Orchestrator = require('../lib/orchestrator');
-const { MessageHelpers } = require('../lib/utils/message-helpers');
-const { FilterHelpers } = require('../lib/utils/filter-helpers');
-const { StatusHelpers } = require('../lib/utils/status-helpers');
-const { WildcardHelpers } = require('../lib/utils/wildcard-helpers');
-const { StateManagementHelpers } = require('../lib/utils/state-management-helpers');
-const { ExternalTriggerHelpers } = require('../lib/utils/external-trigger-helpers');
-const { NodeRegistrationHelpers } = require('../lib/utils/node-registration-helpers');
-const { SubscriptionHelpers } = require('../lib/utils/subscription-helpers');
+const { MessageHelpers, FilterHelpers, StateManagementHelpers } = require('../lib/utils/state-and-message-helpers');
+const { StatusHelpers, NodeRegistrationHelpers } = require('../lib/utils/node-lifecycle-helpers');
+const { WildcardHelpers } = require('../lib/utils/pattern-and-wildcard-helpers');
+const { ExternalTriggerHelpers, SubscriptionHelpers } = require('../lib/utils/service-integration-helpers');
 
 module.exports = function(RED) {
     function IoBrokerInNode(config) {

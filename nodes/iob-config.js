@@ -1,7 +1,7 @@
 const path = require('path');
 const express = require('express');
 const fs = require('fs');
-const { Logger } = require('../lib/utils/logger');
+const { Logger } = require('../lib/utils/error-and-logger-helpers');
 const Orchestrator = require('../lib/orchestrator');
 const eventBus = require('../lib/events/event-bus');
 
@@ -9,8 +9,6 @@ let staticResourcesSetup = false;
 let apiEndpointsSetup = false;
 
 function setupStaticResources(RED) {
-    Logger.setRED(RED);
-
     if (staticResourcesSetup) return true;
 
     // Initialize the Orchestrator once when the config node is loaded

@@ -1,6 +1,5 @@
 const Orchestrator = require('../lib/orchestrator');
-const { StatusHelpers } = require('../lib/utils/status-helpers');
-const { NodeRegistrationHelpers } = require('../lib/utils/node-registration-helpers');
+const { StatusHelpers, NodeRegistrationHelpers } = require('../lib/utils/node-lifecycle-helpers');
 
 module.exports = function(RED) {
     function iobsendto(config) {

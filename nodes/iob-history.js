@@ -1,7 +1,6 @@
 const Orchestrator = require('../lib/orchestrator');
-const { StatusHelpers } = require('../lib/utils/status-helpers');
-const { NodeRegistrationHelpers } = require('../lib/utils/node-registration-helpers');
-const { Logger } = require('../lib/utils/logger');
+const { StatusHelpers, NodeRegistrationHelpers } = require('../lib/utils/node-lifecycle-helpers');
+const { Logger } = require('../lib/utils/error-and-logger-helpers');
 const dayjs = require('dayjs');
 const utc = require('dayjs/plugin/utc');
 const timezone = require('dayjs/plugin/timezone');
@@ -13,7 +12,12 @@ module.exports = function (RED) {
     function iobhistory(config) {
         RED.nodes.createNode(this, config);
         const node = this;
-        const logger = new Logger(node);
+        const logger = {
+            info: (msg, context) => Logger.logWithContext(node, 'info', msg, context),
+            debug: (msg, context) => Logger.logWithContext(node, 'debug', msg, context),
+            error: (msg, context) => Logger.logWithContext(node, 'error', msg, context),
+            warn: (msg, context) => Logger.logWithContext(node, 'warn', msg, context)
+        };
 
         node.server = RED.nodes.getNode(config.server);
         
