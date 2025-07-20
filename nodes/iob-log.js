@@ -105,40 +105,32 @@ module.exports = function(RED) {
             }
         }
 
-        // Helper function to update status with log info
-        function updateStatusWithLogLevel(level) {
-            const now = new Date().toLocaleTimeString(undefined, { hour12: false });
-            const levelColor = {
-                error: "red",
-                warn: "yellow", 
-                info: "blue",
-                debug: "grey",
-                silly: "grey"
-            }[level] || "blue";
-            
-            node.status({ fill: levelColor, shape: "dot", text: `${level} - ${now}` });
-        }
-
         // --- Event Handlers ---
 
         const onServerReady = ({ serverId }) => {
             if (serverId === node.server.id) {
                 if (!node.isSubscribed) {
                     node.log(`Server ready for ${serverId}, subscribing to logs with level ${node.logLevel}`);
-                    StatusHelpers.updateConnectionStatus(node, 'subscribing', 'Subscribing to logs...');
                     Orchestrator.subscribeToLogs(node.id, node.logLevel);
+                    
+                    // Assume subscription is successful immediately
+                    // ioBroker often doesn't send confirmation responses
+                    node.isSubscribed = true;
+                    StatusHelpers.updateConnectionStatus(node, 'connected', 'Subscribed to logs');
                 } else {
                     node.log(`Server ready for ${serverId}, but already subscribed`);
                 }
             }
         };
 
-        const onLogSubscriptionConfirmed = ({ serverId, nodeId }) => {
-            node.log(`Log subscription confirmed event received: serverId=${serverId}, nodeId=${nodeId}, myServerId=${node.server.id}, myNodeId=${node.id}`);
+                const onLogSubscriptionConfirmed = ({ serverId, nodeId }) => {
+            node.log(`Received log subscription confirmed: serverId=${serverId}, nodeId=${nodeId}, myNodeId=${node.id}`);
             if (serverId === node.server.id && nodeId === node.id) {
-                node.log(`Log subscription confirmed for level ${node.logLevel}`);
+                node.log(`Log subscription confirmed for this node`);
                 node.isSubscribed = true;
-                node.status({ fill: "green", shape: "dot", text: `Monitoring (${node.logLevel}+)` });
+                StatusHelpers.updateConnectionStatus(node, 'connected', 'Subscribed to logs');
+            } else {
+                node.log(`Log subscription confirmed but not for this node (serverId match: ${serverId === node.server.id}, nodeId match: ${nodeId === node.id})`);
             }
         };
 
@@ -147,7 +139,7 @@ module.exports = function(RED) {
                 try {
                     const message = createLogMessage(logData);
                     if (message) {
-                        updateStatusWithLogLevel(message.level);
+                        // Don't update status for each log message - keep connection status
                         node.send(message);
                     }
                 } catch (error) {
@@ -184,6 +176,14 @@ module.exports = function(RED) {
                 node.log(`Registering node with orchestrator after flows started`);
                 Orchestrator.registerNode(node.id, node.server);
                 node.isRegistered = true;
+                
+                // Set up event listeners AFTER registration is complete
+                Orchestrator.on('server:ready', onServerReady);
+                Orchestrator.on(`log:subscription_confirmed:${node.id}`, onLogSubscriptionConfirmed);
+                Orchestrator.on('log:message', onLogMessage);
+                Orchestrator.on('connection:disconnected', onDisconnected);
+                Orchestrator.on('connection:retrying', onRetrying);
+                Orchestrator.on('connection:failed_permanently', onPermanentFailure);
             }
         };
 
@@ -193,14 +193,6 @@ module.exports = function(RED) {
             registerWithOrchestrator();
         }, 300);
 
-        // Listen for events from the Orchestrator
-        Orchestrator.on('server:ready', onServerReady);
-        Orchestrator.on('log:subscription_confirmed', onLogSubscriptionConfirmed);
-        Orchestrator.on('log:message', onLogMessage);
-        Orchestrator.on('connection:disconnected', onDisconnected);
-        Orchestrator.on('connection:retrying', onRetrying);
-        Orchestrator.on('connection:failed_permanently', onPermanentFailure);
-
         node.on('close', function(done) {
             // Unsubscribe from logs if subscribed
             if (node.isSubscribed) {
@@ -209,7 +201,7 @@ module.exports = function(RED) {
             
             // Clean up all listeners to prevent memory leaks
             Orchestrator.removeListener('server:ready', onServerReady);
-            Orchestrator.removeListener('log:subscription_confirmed', onLogSubscriptionConfirmed);
+            Orchestrator.removeListener(`log:subscription_confirmed:${node.id}`, onLogSubscriptionConfirmed);
             Orchestrator.removeListener('log:message', onLogMessage);
             Orchestrator.removeListener('connection:disconnected', onDisconnected);
             Orchestrator.removeListener('connection:retrying', onRetrying);

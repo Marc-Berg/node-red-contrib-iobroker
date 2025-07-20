@@ -148,6 +148,14 @@ module.exports = function (RED) {
                 node.log(`Registering node with orchestrator after flows started`);
                 Orchestrator.registerNode(node.id, node.server);
                 node.isRegistered = true;
+                
+                // Set up event listeners AFTER registration is complete
+                Orchestrator.on('server:ready', onServerReady);
+                Orchestrator.on('object:subscription_confirmed', onObjectSubscriptionConfirmed);
+                Orchestrator.on('object:changed', onObjectChanged);
+                Orchestrator.on('connection:disconnected', onDisconnected);
+                Orchestrator.on('connection:retrying', onRetrying);
+                Orchestrator.on('connection:failed_permanently', onPermanentFailure);
             }
         };
 
@@ -156,14 +164,6 @@ module.exports = function (RED) {
         setTimeout(() => {
             registerWithOrchestrator();
         }, 300);
-
-        // Listen for events from the Orchestrator
-        Orchestrator.on('server:ready', onServerReady);
-        Orchestrator.on('object:subscription_confirmed', onObjectSubscriptionConfirmed);
-        Orchestrator.on('object:changed', onObjectChanged);
-        Orchestrator.on('connection:disconnected', onDisconnected);
-        Orchestrator.on('connection:retrying', onRetrying);
-        Orchestrator.on('connection:failed_permanently', onPermanentFailure);
 
         node.on('close', function(done) {
             // Unsubscribe from objects if subscribed

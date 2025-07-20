@@ -426,8 +426,6 @@ module.exports = function(RED) {
             NodeRegistrationHelpers.registerWithOrchestrator(node);
         };
 
-        NodeRegistrationHelpers.setupDelayedRegistration(node, 300);
-
         const eventHandlers = {
             onServerReady,
             onSubscriptionConfirmed,
@@ -438,7 +436,8 @@ module.exports = function(RED) {
             onPermanentFailure
         };
 
-        NodeRegistrationHelpers.registerEventListeners(node, eventHandlers);
+        // Use immediate registration with event listeners
+        NodeRegistrationHelpers.setupDelayedRegistrationWithListeners(node, eventHandlers, 0);
 
         const cleanupCallbacks = [
             () => StateManagementHelpers.cleanupTimeout(node, 'initialValueTimeout'),

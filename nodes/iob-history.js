@@ -560,8 +560,6 @@ module.exports = function (RED) {
             NodeRegistrationHelpers.registerWithOrchestrator(node);
         };
 
-        NodeRegistrationHelpers.setupDelayedRegistration(node, 300);
-
         const eventHandlers = {
             onServerReady,
             onDisconnected,
@@ -569,7 +567,7 @@ module.exports = function (RED) {
             onPermanentFailure
         };
 
-        NodeRegistrationHelpers.registerEventListeners(node, eventHandlers);
+        NodeRegistrationHelpers.setupDelayedRegistrationWithListeners(node, eventHandlers, 300);
 
         node.getOrchestratorRef = () => {
             if (!orchestratorRef) {
