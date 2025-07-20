@@ -61,23 +61,30 @@ module.exports = function(RED) {
             }
         }
         
-        const wildcardValidation = WildcardHelpers.validateWildcardConfig(
-            node.inputMode, 
-            node.stateId, 
-            node.sendInitialValue
-        );
-        
-        node.isWildcardPattern = wildcardValidation.isWildcard;
-        
-        if (wildcardValidation.isWildcard && !wildcardValidation.valid) {
-            node.status({ fill: "red", shape: "dot", text: wildcardValidation.error });
-            return;
-        }
-        
-        if (wildcardValidation.adjustments) {
-            if (wildcardValidation.adjustments.sendInitialValue !== undefined) {
-                node.sendInitialValue = wildcardValidation.adjustments.sendInitialValue;
+        // Only validate wildcards when in single mode
+        let wildcardValidation = { isWildcard: false, valid: true };
+        if (node.inputMode === 'single') {
+            wildcardValidation = WildcardHelpers.validateWildcardConfig(
+                node.inputMode, 
+                node.stateId, 
+                node.sendInitialValue
+            );
+            
+            node.isWildcardPattern = wildcardValidation.isWildcard;
+            
+            if (wildcardValidation.isWildcard && !wildcardValidation.valid) {
+                node.status({ fill: "red", shape: "dot", text: wildcardValidation.error });
+                return;
             }
+            
+            if (wildcardValidation.adjustments) {
+                if (wildcardValidation.adjustments.sendInitialValue !== undefined) {
+                    node.sendInitialValue = wildcardValidation.adjustments.sendInitialValue;
+                }
+            }
+        } else {
+            // For multiple mode, wildcard patterns are not relevant
+            node.isWildcardPattern = false;
         }
 
         const stateValidation = StateManagementHelpers.validateStateConfiguration(

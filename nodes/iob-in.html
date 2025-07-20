@@ -96,8 +96,15 @@ RED.nodes.registerType('iobin', {
             }
         }
         
-        // Wildcard detection
+        // Wildcard detection - only for single mode
         function checkForWildcard() {
+            const inputMode = $('#node-input-inputMode').val();
+            
+            // Only check wildcards in single mode
+            if (inputMode !== 'single') {
+                return;
+            }
+            
             const stateValue = $('#node-input-state').val() || '';
             const hasWildcardChars = stateValue.includes('*');
             
@@ -138,6 +145,7 @@ RED.nodes.registerType('iobin', {
                 $('#single-state-row').show();
                 $('#multiple-states-row').hide();
                 $('.tab-pane[data-tab="output"] #output-mode-row').hide();
+                hideMultipleStatesWildcardWarning(); // Hide multiple states wildcard warning
                 checkForWildcard();
             } else if (inputMode === 'multiple') {
                 $('#single-state-row').hide();
@@ -145,7 +153,10 @@ RED.nodes.registerType('iobin', {
                 $('.tab-pane[data-tab="output"] #output-mode-row').show();
                 $('#node-input-sendInitialValue').prop('disabled', false);
                 $('#initial-value-container').removeClass('wildcard-disabled');
+                
+                // Hide single-state related warnings
                 hideWildcardInfo();
+                
                 updateMultipleStatesCount();
                 updateOutputModeDisplay();
             }
@@ -194,8 +205,34 @@ RED.nodes.registerType('iobin', {
         
         // Multiple states count helper
         function updateMultipleStatesCount() {
-            const states = $('#node-input-multipleStates').val().split('\n').filter(s => s.trim()).length;
+            const statesText = $('#node-input-multipleStates').val();
+            const states = statesText.split('\n').filter(s => s.trim()).length;
             $('#multiple-states-count').text(`${states} state(s) configured`);
+            
+            // Check for wildcards in multiple states
+            checkMultipleStatesForWildcards(statesText);
+        }
+        
+        // Check for wildcards in multiple states and show warning
+        function checkMultipleStatesForWildcards(statesText) {
+            const states = statesText.split('\n').map(s => s.trim()).filter(s => s.length > 0);
+            const wildcardStates = states.filter(state => state.includes('*'));
+            
+            if (wildcardStates.length > 0) {
+                showMultipleStatesWildcardWarning(wildcardStates);
+            } else {
+                hideMultipleStatesWildcardWarning();
+            }
+        }
+        
+        function showMultipleStatesWildcardWarning(wildcardStates) {
+            $('#multiple-states-wildcard-warning').show();
+            const list = wildcardStates.map(state => `<li>${state}</li>`).join('');
+            $('#wildcard-states-list').html(list);
+        }
+        
+        function hideMultipleStatesWildcardWarning() {
+            $('#multiple-states-wildcard-warning').hide();
         }
         
         // External triggering visibility
@@ -224,7 +261,9 @@ RED.nodes.registerType('iobin', {
         }
         
         // Event handlers
-        $('#node-input-state').on('input', checkForWildcard);
+        $('#node-input-state').on('input', function() {
+            checkForWildcard(); // Only relevant in single mode
+        });
         $('#node-input-inputMode').on('change', updateInputModeDisplay);
         $('#node-input-outputMode').on('change', updateOutputModeDisplay);
         $('#node-input-filterMode').on('change', updateFilterModeDisplay);
@@ -237,7 +276,6 @@ RED.nodes.registerType('iobin', {
             updateInputModeDisplay();
             updateFilterModeDisplay();
             updateExternalTriggerVisibility();
-            checkForWildcard();
         }, 100);
 
         // Load and initialize TreeView component
@@ -253,7 +291,6 @@ RED.nodes.registerType('iobin', {
                 wildcardInputId: 'node-input-sendInitialValue',
                 onStateSelected: function(stateId) {
                     $('#node-input-state').val(stateId).trigger('input');
-                    checkForWildcard();
                 }
             });
         }).catch(error => {
@@ -284,12 +321,25 @@ RED.nodes.registerType('iobin', {
                 .split('\n')
                 .map(s => s.trim())
                 .filter(s => s.length > 0);
+            
+            // Check for wildcards in multiple states
+            const wildcardStates = states.filter(state => state.includes('*'));
+            if (wildcardStates.length > 0) {
+                RED.notify(`Cannot save: Wildcard patterns (*) are not allowed in multiple states mode. Found in: ${wildcardStates.join(', ')}`, {
+                    type: "error",
+                    timeout: 5000
+                });
+                return false; // Prevent saving
+            }
+            
             this.multipleStates = states.join('\n');
         }
         
         if (this.treeController) {
             this.treeController.cleanup();
         }
+        
+        return true; // Allow saving
     },
     
     oneditresize: function() {
@@ -334,6 +384,15 @@ RED.nodes.registerType('iobin', {
                     <textarea id="node-input-multipleStates" rows="6" style="width:100%; font-family: monospace;" placeholder="Enter one state ID per line:&#10;0_userdata.0.state1&#10;0_userdata.0.state2&#10;system.adapter.history.0.alive"></textarea>
                     <div style="margin-top: 5px; font-size: 12px; color: #666;">
                         <span id="multiple-states-count">0 state(s) configured</span>
+                    </div>
+                    
+                    <div id="multiple-states-wildcard-warning" style="display: none; margin-top: 10px;">
+                        <div style="background: #f8d7da; border: 1px solid #f5c6cb; border-radius: 4px; padding: 8px; font-size: 12px;">
+                            <strong>⚠️ Wildcard Error:</strong>
+                            <p style="margin: 5px 0;">Wildcard patterns (*) are not supported in multiple states mode. Please remove wildcards from these states:</p>
+                            <ul id="wildcard-states-list" style="margin: 5px 0 0 15px; padding: 0;"></ul>
+                            <p style="margin: 5px 0 0 0; font-style: italic;">Use "Single State / Wildcard Pattern" mode for wildcard subscriptions.</p>
+                        </div>
                     </div>
                 </div>
             </div>
