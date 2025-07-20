@@ -30,6 +30,7 @@ RED.nodes.registerType('iobsendto', {
         const serverInput = $('#node-input-server');
         const adapterSelect = $('#node-input-adapter');
         
+        // Only auto-select server if none is configured
         if (!this.server || this.server === '') {
             const configNodes = [];
             RED.nodes.eachConfig(function(config) {
@@ -82,7 +83,9 @@ RED.nodes.registerType('iobsendto', {
             adapterSelect.find('option:contains("Loading")').remove();
             
             const emptyOption = adapterSelect.find('option[value=""]');
-            $('<option value="" disabled>Loading instances...</option>').insertAfter(emptyOption);
+            if (adapterSelect.find('option:contains("Loading instances...")').length === 0) {
+                $('<option value="" disabled>Loading instances...</option>').insertAfter(emptyOption);
+            }
             
             setTimeout(() => {
                 loadAvailableInstances();
@@ -185,7 +188,9 @@ RED.nodes.registerType('iobsendto', {
             
             const currentAdapter = node.adapter;
             if (currentAdapter && instances.find(i => i.name === currentAdapter)) {
-                adapterSelect.val(currentAdapter);
+                if (adapterSelect.val() !== currentAdapter) {
+                    adapterSelect.val(currentAdapter);
+                }
             }
         }
         
@@ -225,9 +230,6 @@ RED.nodes.registerType('iobsendto', {
         } else {
             this.adapter = "";
         }
-        
-        this.changed = true;
-        this.dirty = true;
     },
     
     oneditresize: function() {
