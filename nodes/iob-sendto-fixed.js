@@ -1,6 +1,5 @@
 const Orchestrator = require('../lib/orchestrator');
 const { NodeLifecycleHelpers } = require('../lib/utils/node-lifecycle-helpers');
-const { ErrorAndLoggerHelpers } = require('../lib/utils/error-and-logger-helpers');
 
 module.exports = function(RED) {
     function iobsendto(config) {

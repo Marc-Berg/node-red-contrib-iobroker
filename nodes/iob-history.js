@@ -1,6 +1,6 @@
 const Orchestrator = require('../lib/orchestrator');
-const { StatusHelpers, NodeRegistrationHelpers } = require('../lib/utils/node-lifecycle-helpers');
-const { Logger } = require('../lib/utils/error-and-logger-helpers');
+const { NodeLifecycleHelpers } = require('../lib/utils/node-lifecycle-helpers');
+const { ErrorAndLoggerHelpers } = require('../lib/utils/error-and-logger-helpers');
 const dayjs = require('dayjs');
 const utc = require('dayjs/plugin/utc');
 const timezone = require('dayjs/plugin/timezone');
@@ -13,10 +13,10 @@ module.exports = function (RED) {
         RED.nodes.createNode(this, config);
         const node = this;
         const logger = {
-            info: (msg, context) => Logger.logWithContext(node, 'info', msg, context),
-            debug: (msg, context) => Logger.logWithContext(node, 'debug', msg, context),
-            error: (msg, context) => Logger.logWithContext(node, 'error', msg, context),
-            warn: (msg, context) => Logger.logWithContext(node, 'warn', msg, context)
+            info: (msg, context) => ErrorAndLoggerHelpers.logWithContext(node, 'info', msg, context),
+            debug: (msg, context) => ErrorAndLoggerHelpers.logWithContext(node, 'debug', msg, context),
+            error: (msg, context) => ErrorAndLoggerHelpers.logWithContext(node, 'error', msg, context),
+            warn: (msg, context) => ErrorAndLoggerHelpers.logWithContext(node, 'warn', msg, context)
         };
 
         node.server = RED.nodes.getNode(config.server);
@@ -402,9 +402,9 @@ module.exports = function (RED) {
         function updateQueueStatus() {
             const queueText = getQueueStatusText();
             if (node.isQueryRunning) {
-                StatusHelpers.updateConnectionStatus(node, 'processing', queueText);
+                NodeLifecycleHelpers.updateConnectionStatus(node, 'processing', queueText);
             } else {
-                StatusHelpers.updateConnectionStatus(node, 'ready', queueText);
+                NodeLifecycleHelpers.updateConnectionStatus(node, 'ready', queueText);
             }
         }
 
@@ -523,32 +523,32 @@ module.exports = function (RED) {
         const onServerReady = ({ serverId }) => {
             if (serverId === node.server.id) {
                 logger.info("Server connection ready for history queries");
-                StatusHelpers.updateConnectionStatus(node, 'ready', statusTexts.ready);
+                NodeLifecycleHelpers.updateConnectionStatus(node, 'ready', statusTexts.ready);
                 node.isInitialized = true;
             }
         };
 
         const onDisconnected = ({ serverId }) => {
             if (serverId === node.server.id) {
-                StatusHelpers.updateConnectionStatus(node, 'disconnected');
+                NodeLifecycleHelpers.updateConnectionStatus(node, 'disconnected');
                 node.isInitialized = false;
             }
         };
 
         const onRetrying = ({ serverId, attempt, delay }) => {
             if (serverId === node.server.id) {
-                StatusHelpers.updateConnectionStatus(node, 'retrying', `Retrying in ${delay / 1000}s (Attempt #${attempt})`);
+                NodeLifecycleHelpers.updateConnectionStatus(node, 'retrying', `Retrying in ${delay / 1000}s (Attempt #${attempt})`);
             }
         };
 
         const onPermanentFailure = ({ serverId, error }) => {
             if (serverId === node.server.id) {
-                StatusHelpers.updateConnectionStatus(node, 'error', `Failed: ${error.message}`);
+                NodeLifecycleHelpers.updateConnectionStatus(node, 'error', `Failed: ${error.message}`);
             }
         };
 
         const registerWithOrchestrator = () => {
-            NodeRegistrationHelpers.registerWithOrchestrator(node);
+            NodeLifecycleHelpers.registerWithOrchestrator(node);
         };
 
         const eventHandlers = {
@@ -558,7 +558,7 @@ module.exports = function (RED) {
             onPermanentFailure
         };
 
-        NodeRegistrationHelpers.setupDelayedRegistrationWithListeners(node, eventHandlers, 300);
+        NodeLifecycleHelpers.setupDelayedRegistrationWithListeners(node, eventHandlers, 300);
 
         node.on('input', function (msg, send, done) {
             try {
@@ -588,7 +588,7 @@ module.exports = function (RED) {
 
                 if (!node.isInitialized) {
                     const error = new Error("Server not ready");
-                    StatusHelpers.updateConnectionStatus(node, 'error', "Not connected");
+                    NodeLifecycleHelpers.updateConnectionStatus(node, 'error', "Not connected");
                     done && done(error);
                     return;
                 }
@@ -596,7 +596,7 @@ module.exports = function (RED) {
                 const stateId = settings.stateId || (typeof msg.topic === "string" ? msg.topic.trim() : "");
                 if (!stateId || !stateId.trim()) {
                     const error = new Error("State ID missing (neither configured nor in msg.topic)");
-                    StatusHelpers.updateConnectionStatus(node, 'error', "State ID missing");
+                    NodeLifecycleHelpers.updateConnectionStatus(node, 'error', "State ID missing");
                     done && done(error);
                     return;
                 }
@@ -615,7 +615,7 @@ module.exports = function (RED) {
                     });
 
                 } catch (queryError) {
-                    StatusHelpers.updateConnectionStatus(node, 'error', "Query error");
+                    NodeLifecycleHelpers.updateConnectionStatus(node, 'error', "Query error");
                     const errorMessage = queryError.message || queryError.toString();
                     logger.error(`History query preparation failed for ${stateId}: ${errorMessage}`);
 
@@ -630,7 +630,7 @@ module.exports = function (RED) {
                 }
 
             } catch (error) {
-                StatusHelpers.updateConnectionStatus(node, 'error', "Error");
+                NodeLifecycleHelpers.updateConnectionStatus(node, 'error', "Error");
                 logger.error("Error processing input", error);
                 done && done(error);
             }
@@ -650,14 +650,14 @@ module.exports = function (RED) {
             }
 
             const cleanupCallbacks = [];
-            NodeRegistrationHelpers.setupCloseHandler(node, eventHandlers, cleanupCallbacks);
+            NodeLifecycleHelpers.setupCloseHandler(node, eventHandlers, cleanupCallbacks);
             done();
         });
 
         const cleanupCallbacks = [];
-        NodeRegistrationHelpers.setupCloseHandler(node, eventHandlers, cleanupCallbacks);
+        NodeLifecycleHelpers.setupCloseHandler(node, eventHandlers, cleanupCallbacks);
 
-        StatusHelpers.updateConnectionStatus(node, 'waiting', "Waiting for server...");
+        NodeLifecycleHelpers.updateConnectionStatus(node, 'waiting', "Waiting for server...");
     }
 
     RED.nodes.registerType("iobhistory", iobhistory);

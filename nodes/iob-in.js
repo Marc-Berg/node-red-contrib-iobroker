@@ -3,6 +3,7 @@ const { StateMessageHelpers } = require('../lib/utils/state-and-message-helpers'
 const { NodeLifecycleHelpers } = require('../lib/utils/node-lifecycle-helpers');
 const { PatternHelpers } = require('../lib/utils/pattern-and-wildcard-helpers');
 const { ServiceIntegrationHelpers } = require('../lib/utils/service-integration-helpers');
+const { ErrorAndLoggerHelpers } = require('../lib/utils/error-and-logger-helpers');
 
 module.exports = function(RED) {
     function IoBrokerInNode(config) {
@@ -119,7 +120,7 @@ module.exports = function(RED) {
 
         const onStateChanged = ({ serverId, stateId, state }) => {
             if (serverId === node.server.id) {
-                if (!FilterHelpers.shouldSendMessage(state.ack, node.ackFilter)) {
+                if (!StateMessageHelpers.shouldSendMessage(state.ack, node.ackFilter)) {
                     return;
                 }
                 
@@ -134,12 +135,12 @@ module.exports = function(RED) {
                         }
                     }
                     
-                    if (FilterHelpers.shouldFilterValue(stateId, state.val, node.previousValues, node.filterMode, false, (msg) => node.log(msg))) {
-                        FilterHelpers.updatePreviousValue(node.previousValues, stateId, state.val);
+                    if (StateMessageHelpers.shouldFilterValue(stateId, state.val, node.previousValues, node.filterMode, false, (msg) => node.log(msg))) {
+                        StateMessageHelpers.updatePreviousValue(node, stateId, state.val);
                         return;
                     }
                     
-                    const message = MessageHelpers.createEnhancedMessage(state, stateId, node.outputProperty, {
+                    const message = StateMessageHelpers.createEnhancedMessage(state, stateId, node.outputProperty, {
                         pattern: node.isWildcardPattern ? node.stateId : null
                     });
                     
@@ -148,7 +149,7 @@ module.exports = function(RED) {
                         node.lastValue = state.val;
                     }
                     
-                    FilterHelpers.updatePreviousValue(node.previousValues, stateId, state.val);
+                    StateMessageHelpers.updatePreviousValue(node, stateId, state.val);
                     
                     updateNodeStatus(stateId, state.val, false);
                     
@@ -160,18 +161,18 @@ module.exports = function(RED) {
                     }
                     
                     if (node.outputMode === 'individual') {
-                        if (FilterHelpers.shouldFilterValue(stateId, state.val, node.previousValues, node.filterMode, false, (msg) => node.log(msg))) {
-                            FilterHelpers.updatePreviousValue(node.previousValues, stateId, state.val);
+                        if (StateMessageHelpers.shouldFilterValue(stateId, state.val, node.previousValues, node.filterMode, false, (msg) => node.log(msg))) {
+                            StateMessageHelpers.updatePreviousValue(node.previousValues, stateId, state.val);
                             return;
                         }
                         
-                        const message = MessageHelpers.createEnhancedMessage(state, stateId, node.outputProperty, {
+                        const message = StateStateMessageHelpers.createEnhancedMessage(state, stateId, node.outputProperty, {
                             multipleStatesMode: true
                         });
                         
                         node.currentStateValues.set(stateId, state);
                         
-                        FilterHelpers.updatePreviousValue(node.previousValues, stateId, state.val);
+                        StateMessageHelpers.updatePreviousValue(node.previousValues, stateId, state.val);
                         
                         updateNodeStatus(stateId, state.val, false);
                         
@@ -180,9 +181,9 @@ module.exports = function(RED) {
                     } else if (node.outputMode === 'grouped') {
                         node.currentStateValues.set(stateId, state);
                         
-                        StateManagementHelpers.storeGroupedStateValue(node.groupedStateValues, stateId, state);
+                        StateMessageHelpers.storeGroupedStateValue(node.groupedStateValues, stateId, state);
                         
-                        const missingStates = StateManagementHelpers.getMissingStates(node.groupedStateValues, node.statesList);
+                        const missingStates = StateMessageHelpers.getMissingStates(node.groupedStateValues, node.statesList);
                         
                         if (missingStates.length > 0) {
                             node.log(`Grouped mode: Missing ${missingStates.length} states, requesting current values: [${missingStates.join(', ')}]`);
@@ -194,10 +195,10 @@ module.exports = function(RED) {
                                 Orchestrator.getState(node.id, missingStateId);
                             });
                             
-                            node.groupedTimeout = StateManagementHelpers.setupGroupedTimeout(node, 2000, () => {
+                            node.groupedTimeout = StateMessageHelpers.setupGroupedTimeout(node, 2000, () => {
                                 if (Object.keys(node.groupedStateValues).length > 0) {
                                     node.log(`Grouped mode: Timeout reached, sending partial grouped message`);
-                                    const partialGroupedMessage = MessageHelpers.createGroupedMessage(
+                                    const partialGroupedMessage = StateStateMessageHelpers.createGroupedMessage(
                                         node.groupedStateValues, 
                                         node.outputProperty, 
                                         {
@@ -216,7 +217,7 @@ module.exports = function(RED) {
                             
                         } else {
                             node.log(`Grouped mode: All states available, sending grouped message immediately`);
-                            const groupedMessage = MessageHelpers.createGroupedMessage(
+                            const groupedMessage = StateStateMessageHelpers.createGroupedMessage(
                                 node.groupedStateValues, 
                                 node.outputProperty, 
                                 {
@@ -251,14 +252,14 @@ module.exports = function(RED) {
             }
             
             node.log(`Requesting baseline value for changes-smart mode: ${stateToRequest}`);
-            StateManagementHelpers.trackBaselineRequest(node.pendingBaselineRequests, stateToRequest);
+            StateMessageHelpers.trackBaselineRequest(node.pendingBaselineRequests, stateToRequest);
             Orchestrator.getState(node.id, stateToRequest);
         }
         
         const onInitialStateValue = ({ serverId, stateId, state, nodeId }) => {
             node.log(`Initial value response: serverId=${serverId}, stateId=${stateId}, nodeId=${nodeId}, state=${state ? 'present' : 'null'}`);
             
-            const isBaselineRequest = StateManagementHelpers.isBaselineRequest(node.pendingBaselineRequests, stateId);
+            const isBaselineRequest = StateMessageHelpers.isBaselineRequest(node.pendingBaselineRequests, stateId);
             
             if (serverId === node.server.id && nodeId === node.id) {
                 const isRelevantState = (node.inputMode === 'single' && stateId === node.stateId) ||
@@ -267,32 +268,32 @@ module.exports = function(RED) {
                 if (isRelevantState && state) {
                     if (isBaselineRequest) {
                         node.log(`Setting baseline value for changes-smart mode: ${stateId} = ${state.val}`);
-                        FilterHelpers.updatePreviousValue(node.previousValues, stateId, state.val);
-                        StateManagementHelpers.completeBaselineRequest(node.pendingBaselineRequests, stateId);
+                        StateMessageHelpers.updatePreviousValue(node.previousValues, stateId, state.val);
+                        StateMessageHelpers.completeBaselineRequest(node.pendingBaselineRequests, stateId);
                         return;
                     }
                     
                     node.log(`Processing initial value for ${stateId}: ${state.val}`);
                     
-                    if (!FilterHelpers.shouldSendMessage(state.ack, node.ackFilter)) {
+                    if (!StateMessageHelpers.shouldSendMessage(state.ack, node.ackFilter)) {
                         node.log(`Initial value filtered by ACK filter for ${stateId}`);
                         return;
                     }
                     
                     if (node.inputMode === 'single') {
-                        if (FilterHelpers.shouldFilterValue(stateId, state.val, node.previousValues, node.filterMode, true, (msg) => node.log(msg))) {
-                            FilterHelpers.updatePreviousValue(node.previousValues, stateId, state.val);
+                        if (StateMessageHelpers.shouldFilterValue(stateId, state.val, node.previousValues, node.filterMode, true, (msg) => node.log(msg))) {
+                            StateMessageHelpers.updatePreviousValue(node.previousValues, stateId, state.val);
                             return;
                         }
                         
-                        const message = MessageHelpers.createEnhancedMessage(state, stateId, node.outputProperty, {
+                        const message = StateStateMessageHelpers.createEnhancedMessage(state, stateId, node.outputProperty, {
                             initial: true
                         });
                         
                         node.currentStateValues.set(stateId, state);
                         node.lastValue = state.val;
                         
-                        FilterHelpers.updatePreviousValue(node.previousValues, stateId, state.val);
+                        StateMessageHelpers.updatePreviousValue(node.previousValues, stateId, state.val);
                         
                         updateNodeStatus(stateId, state.val, true);
                         
@@ -300,33 +301,33 @@ module.exports = function(RED) {
                         
                     } else if (node.inputMode === 'multiple') {
                         if (node.outputMode === 'individual') {
-                            if (FilterHelpers.shouldFilterValue(stateId, state.val, node.previousValues, node.filterMode, true, (msg) => node.log(msg))) {
-                                FilterHelpers.updatePreviousValue(node.previousValues, stateId, state.val);
+                            if (StateMessageHelpers.shouldFilterValue(stateId, state.val, node.previousValues, node.filterMode, true, (msg) => node.log(msg))) {
+                                StateMessageHelpers.updatePreviousValue(node.previousValues, stateId, state.val);
                                 return;
                             }
                             
-                            const message = MessageHelpers.createEnhancedMessage(state, stateId, node.outputProperty, {
+                            const message = StateStateMessageHelpers.createEnhancedMessage(state, stateId, node.outputProperty, {
                                 initial: true,
                                 multipleStatesMode: true
                             });
                             
                             node.currentStateValues.set(stateId, state);
                             
-                            FilterHelpers.updatePreviousValue(node.previousValues, stateId, state.val);
+                            StateMessageHelpers.updatePreviousValue(node.previousValues, stateId, state.val);
                             
-                            StateManagementHelpers.storeGroupedStateValue(node.groupedStateValues, stateId, state);
+                            StateMessageHelpers.storeGroupedStateValue(node.groupedStateValues, stateId, state);
                             
                             sendMessage(message, "initial value");
                             
                             const receivedCount = Object.keys(node.groupedStateValues).length;
                             const totalCount = node.statesList.length;
-                            StatusHelpers.updateInitialValuesProgress(node, receivedCount, totalCount);
+                            ErrorAndLoggerHelpers.updateInitialValuesProgress(node, receivedCount, totalCount);
                             
                         } else if (node.outputMode === 'grouped') {
                             if (node.pendingGroupedStates && node.pendingGroupedStates.has(stateId)) {
                                 node.log(`Grouped mode: Received missing state for grouped update: ${stateId}: ${state.val}`);
                                 
-                                StateManagementHelpers.storeGroupedStateValue(node.groupedStateValues, stateId, state);
+                                StateMessageHelpers.storeGroupedStateValue(node.groupedStateValues, stateId, state);
                                 
                                 node.currentStateValues.set(stateId, state);
                                 
@@ -340,7 +341,7 @@ module.exports = function(RED) {
                                         node.groupedTimeout = null;
                                     }
                                     
-                                    const completeGroupedMessage = MessageHelpers.createGroupedMessage(
+                                    const completeGroupedMessage = StateStateMessageHelpers.createGroupedMessage(
                                         node.groupedStateValues, 
                                         node.outputProperty, 
                                         {
@@ -358,13 +359,13 @@ module.exports = function(RED) {
                                 return;
                             }
                             
-                            StateManagementHelpers.storeGroupedStateValue(node.groupedStateValues, stateId, state);
+                            StateMessageHelpers.storeGroupedStateValue(node.groupedStateValues, stateId, state);
                             
                             node.currentStateValues.set(stateId, state);
                             
                             node.log(`Grouped mode: Stored initial value for ${stateId}. Now have ${Object.keys(node.groupedStateValues).length}/${node.statesList.length} values`);
                             
-                            const hasAllInitialValues = StateManagementHelpers.areAllInitialValuesReceived(node.groupedStateValues, node.statesList);
+                            const hasAllInitialValues = StateMessageHelpers.areAllInitialValuesReceived(node.groupedStateValues, node.statesList);
                             
                             node.log(`Grouped mode: hasAllInitialValues = ${hasAllInitialValues}`);
                             
@@ -375,7 +376,7 @@ module.exports = function(RED) {
                                     node.initialValueTimeout = null;
                                 }
                                 
-                                const groupedMessage = MessageHelpers.createGroupedMessage(
+                                const groupedMessage = StateStateMessageHelpers.createGroupedMessage(
                                     node.groupedStateValues, 
                                     node.outputProperty, 
                                     {
@@ -387,18 +388,18 @@ module.exports = function(RED) {
                                 sendMessage(groupedMessage, "grouped initial values");
                                 
                                 setTimeout(() => {
-                                    StatusHelpers.updateMultipleStatesStatus(node, node.statesList, node.outputMode, node.filterMode);
+                                    ErrorAndLoggerHelpers.updateMultipleStatesStatus(node, node.statesList, node.outputMode, node.filterMode);
                                 }, 1000);
                             }
                         }
                         
                         const receivedCount = Object.keys(node.groupedStateValues).length;
                         const totalCount = node.statesList.length;
-                        StatusHelpers.updateInitialValuesProgress(node, receivedCount, totalCount);
+                        ErrorAndLoggerHelpers.updateInitialValuesProgress(node, receivedCount, totalCount);
                         
                         if (receivedCount === totalCount && node.outputMode === 'individual') {
                             setTimeout(() => {
-                                StatusHelpers.updateMultipleStatesStatus(node, node.statesList, node.outputMode, node.filterMode);
+                                ErrorAndLoggerHelpers.updateMultipleStatesStatus(node, node.statesList, node.outputMode, node.filterMode);
                             }, 1000);
                         }
                     }
@@ -408,25 +409,25 @@ module.exports = function(RED) {
         
         const onDisconnected = ({ serverId }) => {
             if (serverId === node.server.id) {
-                StatusHelpers.updateConnectionStatus(node, 'disconnected');
+                ErrorAndLoggerHelpers.updateConnectionStatus(node, 'disconnected');
                 node.isSubscribed = false;
             }
         };
 
         const onRetrying = ({ serverId, attempt, delay }) => {
             if (serverId === node.server.id) {
-                StatusHelpers.updateConnectionStatus(node, 'retrying', `Retrying in ${delay / 1000}s (Attempt #${attempt})`);
+                ErrorAndLoggerHelpers.updateConnectionStatus(node, 'retrying', `Retrying in ${delay / 1000}s (Attempt #${attempt})`);
             }
         };
 
         const onPermanentFailure = ({ serverId, error }) => {
             if (serverId === node.server.id) {
-                StatusHelpers.updateConnectionStatus(node, 'error', `Failed: ${error.message}`);
+                ErrorAndLoggerHelpers.updateConnectionStatus(node, 'error', `Failed: ${error.message}`);
             }
         };
 
         const registerWithOrchestrator = () => {
-            NodeRegistrationHelpers.registerWithOrchestrator(node);
+            NodeLifecycleHelpers.registerWithOrchestrator(node);
         };
 
         const eventHandlers = {
@@ -440,20 +441,20 @@ module.exports = function(RED) {
         };
 
         // Use immediate registration with event listeners
-        NodeRegistrationHelpers.setupDelayedRegistrationWithListeners(node, eventHandlers, 0);
+        NodeLifecycleHelpers.setupDelayedRegistrationWithListeners(node, eventHandlers, 0);
 
         const cleanupCallbacks = [
-            () => StateManagementHelpers.cleanupTimeout(node, 'initialValueTimeout'),
-            () => StateManagementHelpers.cleanupTimeout(node, 'groupedTimeout'),
-            () => ExternalTriggerHelpers.unregisterNodeFromExternalTrigger(node)
+            () => StateMessageHelpers.cleanupTimeout(node, 'initialValueTimeout'),
+            () => StateMessageHelpers.cleanupTimeout(node, 'groupedTimeout'),
+            () => PatternHelpers.unregisterNodeFromExternalTrigger(node)
         ];
 
-        NodeRegistrationHelpers.setupCloseHandler(node, eventHandlers, cleanupCallbacks);
+        NodeLifecycleHelpers.setupCloseHandler(node, eventHandlers, cleanupCallbacks);
 
         const initialStatusText = node.isWildcardPattern 
             ? `Waiting for pattern: ${node.stateId}` 
             : "Waiting for server...";
-        StatusHelpers.updateConnectionStatus(node, 'waiting', initialStatusText);
+        ErrorAndLoggerHelpers.updateConnectionStatus(node, 'waiting', initialStatusText);
     }
 
     RED.nodes.registerType("iobin", IoBrokerInNode);

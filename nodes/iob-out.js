@@ -1,5 +1,6 @@
 const Orchestrator = require('../lib/orchestrator');
-const { StatusHelpers, NodeRegistrationHelpers } = require('../lib/utils/node-lifecycle-helpers');
+const { NodeLifecycleHelpers } = require('../lib/utils/node-lifecycle-helpers');
+const { ErrorAndLoggerHelpers } = require('../lib/utils/error-and-logger-helpers');
 
 module.exports = function(RED) {
     function IoBrokerOutNode(config) {
@@ -33,7 +34,7 @@ module.exports = function(RED) {
         node.operationCounter = 0;
 
         if (!node.server) {
-            StatusHelpers.updateConnectionStatus(node, 'error', "Error: Server not configured");
+            ErrorAndLoggerHelpers.updateConnectionStatus(node, 'error', "Error: Server not configured");
             return;
         }
 
@@ -142,7 +143,7 @@ module.exports = function(RED) {
 
         const onServerReady = ({ serverId }) => {
             if (serverId === node.server.id) {
-                StatusHelpers.updateConnectionStatus(node, 'ready', 'Ready');
+                ErrorAndLoggerHelpers.updateConnectionStatus(node, 'ready', 'Ready');
                 updateStatusWithValue();
             }
         };
@@ -172,7 +173,7 @@ module.exports = function(RED) {
                             operation.done();
                         }
                     } else {
-                        StatusHelpers.updateConnectionStatus(node, 'error', 'Set failed');
+                        ErrorAndLoggerHelpers.updateConnectionStatus(node, 'error', 'Set failed');
                         node.error(`Failed to set state ${stateId}: ${error}`);
                         if (operation.done) {
                             operation.done(new Error(`Failed to set state: ${error}`));
@@ -229,7 +230,7 @@ module.exports = function(RED) {
                         node.log(`Successfully created object ${objectId}`);
                         operation.callback(true);
                     } else {
-                        StatusHelpers.updateConnectionStatus(node, 'error', 'Object creation failed');
+                        ErrorAndLoggerHelpers.updateConnectionStatus(node, 'error', 'Object creation failed');
                         node.error(`Failed to create object ${objectId}: ${error}`);
                         operation.callback(false, error);
                     }
@@ -239,19 +240,19 @@ module.exports = function(RED) {
 
         const onDisconnected = ({ serverId }) => {
             if (serverId === node.server.id) {
-                StatusHelpers.updateConnectionStatus(node, 'disconnected', 'Disconnected');
+                ErrorAndLoggerHelpers.updateConnectionStatus(node, 'disconnected', 'Disconnected');
             }
         };
 
         const onRetrying = ({ serverId, attempt, delay }) => {
             if (serverId === node.server.id) {
-                StatusHelpers.updateConnectionStatus(node, 'retrying', `Retrying in ${delay / 1000}s (Attempt #${attempt})`);
+                ErrorAndLoggerHelpers.updateConnectionStatus(node, 'retrying', `Retrying in ${delay / 1000}s (Attempt #${attempt})`);
             }
         };
 
         const onPermanentFailure = ({ serverId, error }) => {
             if (serverId === node.server.id) {
-                StatusHelpers.updateConnectionStatus(node, 'error', `Failed: ${error.message}`);
+                ErrorAndLoggerHelpers.updateConnectionStatus(node, 'error', `Failed: ${error.message}`);
             }
         };
 
@@ -313,7 +314,7 @@ module.exports = function(RED) {
             try {
                 // Check if orchestrator is ready
                 if (!node.isRegistered) {
-                    StatusHelpers.updateConnectionStatus(node, 'error', 'Node not registered');
+                    ErrorAndLoggerHelpers.updateConnectionStatus(node, 'error', 'Node not registered');
                     if (done) done(new Error('Node not registered with orchestrator'));
                     return;
                 }
@@ -322,7 +323,7 @@ module.exports = function(RED) {
                 const stateId = node.configState || (typeof msg.topic === "string" ? msg.topic.trim() : "");
                 
                 if (!stateId) {
-                    StatusHelpers.updateConnectionStatus(node, 'error', 'Missing state ID');
+                    ErrorAndLoggerHelpers.updateConnectionStatus(node, 'error', 'Missing state ID');
                     if (done) done(new Error('State ID is required'));
                     return;
                 }
@@ -330,7 +331,7 @@ module.exports = function(RED) {
                 // Get value from message
                 const value = msg[node.inputProperty];
                 if (value === undefined) {
-                    StatusHelpers.updateConnectionStatus(node, 'error', 'Input missing');
+                    ErrorAndLoggerHelpers.updateConnectionStatus(node, 'error', 'Input missing');
                     node.error(`Input property "${node.inputProperty}" not found in message`);
                     if (done) done(new Error(`Input property "${node.inputProperty}" not found in message`));
                     return;
@@ -338,11 +339,11 @@ module.exports = function(RED) {
 
                 // Check/create object if auto-create is enabled
                 if (node.autoCreate) {
-                    StatusHelpers.updateConnectionStatus(node, 'checking', 'Checking object...');
+                    ErrorAndLoggerHelpers.updateConnectionStatus(node, 'checking', 'Checking object...');
                     try {
                         await ensureObjectExists(stateId, msg, value);
                     } catch (error) {
-                        StatusHelpers.updateConnectionStatus(node, 'error', 'Object creation failed');
+                        ErrorAndLoggerHelpers.updateConnectionStatus(node, 'error', 'Object creation failed');
                         node.error(`Object creation failed for ${stateId}: ${error.message}`);
                         if (done) done(error);
                         return;
@@ -351,7 +352,7 @@ module.exports = function(RED) {
 
                 // Set the state
                 const ack = node.setMode === "value";
-                StatusHelpers.updateConnectionStatus(node, 'setting', 'Setting...');
+                ErrorAndLoggerHelpers.updateConnectionStatus(node, 'setting', 'Setting...');
                 
                 const operationId = ++node.operationCounter;
                 node.pendingOperations.set(operationId, {
@@ -364,7 +365,7 @@ module.exports = function(RED) {
                 Orchestrator.setState(node.id, stateId, value, ack);
                 
             } catch (error) {
-                StatusHelpers.updateConnectionStatus(node, 'error', 'Error');
+                ErrorAndLoggerHelpers.updateConnectionStatus(node, 'error', 'Error');
                 node.error(`Failed to process input: ${error.message}`);
                 if (done) done(error);
             }
@@ -382,20 +383,20 @@ module.exports = function(RED) {
             onPermanentFailure
         };
 
-        NodeRegistrationHelpers.setupDelayedRegistrationWithListeners(node, eventHandlers, 300);
+        NodeLifecycleHelpers.setupDelayedRegistrationWithListeners(node, eventHandlers, 300);
 
         node.on('close', function(removed, done) {
             // Clean up any pending operations
             node.pendingOperations.clear();
             
             const cleanupCallbacks = [];
-            NodeRegistrationHelpers.setupCloseHandler(node, eventHandlers, cleanupCallbacks);
+            NodeLifecycleHelpers.setupCloseHandler(node, eventHandlers, cleanupCallbacks);
             done();
         });
 
         // Initial status
         const initialStatusText = node.autoCreate ? "Waiting for server... (auto-create)" : "Waiting for server...";
-        StatusHelpers.updateConnectionStatus(node, 'waiting', initialStatusText);
+        ErrorAndLoggerHelpers.updateConnectionStatus(node, 'waiting', initialStatusText);
     }
 
     RED.nodes.registerType("iobout", IoBrokerOutNode);

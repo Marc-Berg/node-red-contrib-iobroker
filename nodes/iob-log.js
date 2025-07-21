@@ -1,5 +1,6 @@
 const Orchestrator = require('../lib/orchestrator');
-const { StatusHelpers, NodeRegistrationHelpers } = require('../lib/utils/node-lifecycle-helpers');
+const { NodeLifecycleHelpers } = require('../lib/utils/node-lifecycle-helpers');
+const { ErrorAndLoggerHelpers } = require('../lib/utils/error-and-logger-helpers');
 
 module.exports = function(RED) {
     function IoBrokerLogNode(config) {
@@ -17,7 +18,7 @@ module.exports = function(RED) {
         node.isSubscribed = false;
 
         if (!node.server) {
-            StatusHelpers.updateConnectionStatus(node, 'error', "Error: Server not configured");
+            ErrorAndLoggerHelpers.updateConnectionStatus(node, 'error', "Error: Server not configured");
             return;
         }
 
@@ -116,7 +117,7 @@ module.exports = function(RED) {
                     // Assume subscription is successful immediately
                     // ioBroker often doesn't send confirmation responses
                     node.isSubscribed = true;
-                    StatusHelpers.updateConnectionStatus(node, 'connected', 'Subscribed to logs');
+                    ErrorAndLoggerHelpers.updateConnectionStatus(node, 'connected', 'Subscribed to logs');
                 } else {
                     node.log(`Server ready for ${serverId}, but already subscribed`);
                 }
@@ -128,7 +129,7 @@ module.exports = function(RED) {
             if (serverId === node.server.id && nodeId === node.id) {
                 node.log(`Log subscription confirmed for this node`);
                 node.isSubscribed = true;
-                StatusHelpers.updateConnectionStatus(node, 'connected', 'Subscribed to logs');
+                ErrorAndLoggerHelpers.updateConnectionStatus(node, 'connected', 'Subscribed to logs');
             } else {
                 node.log(`Log subscription confirmed but not for this node (serverId match: ${serverId === node.server.id}, nodeId match: ${nodeId === node.id})`);
             }
@@ -144,27 +145,27 @@ module.exports = function(RED) {
                     }
                 } catch (error) {
                     node.error(`Log processing error: ${error.message}`);
-                    StatusHelpers.updateConnectionStatus(node, 'error', `Processing error: ${error.message}`);
+                    ErrorAndLoggerHelpers.updateConnectionStatus(node, 'error', `Processing error: ${error.message}`);
                 }
             }
         };
 
         const onDisconnected = ({ serverId }) => {
             if (serverId === node.server.id) {
-                StatusHelpers.updateConnectionStatus(node, 'disconnected', 'Disconnected');
+                ErrorAndLoggerHelpers.updateConnectionStatus(node, 'disconnected', 'Disconnected');
                 node.isSubscribed = false;
             }
         };
 
         const onRetrying = ({ serverId, attempt, delay }) => {
             if (serverId === node.server.id) {
-                StatusHelpers.updateConnectionStatus(node, 'retrying', `Retrying in ${delay / 1000}s (Attempt #${attempt})`);
+                ErrorAndLoggerHelpers.updateConnectionStatus(node, 'retrying', `Retrying in ${delay / 1000}s (Attempt #${attempt})`);
             }
         };
 
         const onPermanentFailure = ({ serverId, error }) => {
             if (serverId === node.server.id) {
-                StatusHelpers.updateConnectionStatus(node, 'error', `Failed: ${error.message}`);
+                ErrorAndLoggerHelpers.updateConnectionStatus(node, 'error', `Failed: ${error.message}`);
             }
         };
 
@@ -177,7 +178,7 @@ module.exports = function(RED) {
             onPermanentFailure
         };
 
-        NodeRegistrationHelpers.setupDelayedRegistrationWithListeners(node, eventHandlers, 300);
+        NodeLifecycleHelpers.setupDelayedRegistrationWithListeners(node, eventHandlers, 300);
 
         node.on('close', function(removed, done) {
             // Unsubscribe from logs if subscribed
@@ -186,12 +187,12 @@ module.exports = function(RED) {
             }
             
             const cleanupCallbacks = [];
-            NodeRegistrationHelpers.setupCloseHandler(node, eventHandlers, cleanupCallbacks);
+            NodeLifecycleHelpers.setupCloseHandler(node, eventHandlers, cleanupCallbacks);
             done();
         });
 
         // Initial status
-        StatusHelpers.updateConnectionStatus(node, 'waiting', 'Waiting for server...');
+        ErrorAndLoggerHelpers.updateConnectionStatus(node, 'waiting', 'Waiting for server...');
     }
 
     RED.nodes.registerType("ioblog", IoBrokerLogNode);

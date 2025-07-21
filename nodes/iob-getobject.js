@@ -1,5 +1,6 @@
 const Orchestrator = require('../lib/orchestrator');
-const { StatusHelpers, NodeRegistrationHelpers } = require('../lib/utils/node-lifecycle-helpers');
+const { NodeLifecycleHelpers } = require('../lib/utils/node-lifecycle-helpers');
+const { ErrorAndLoggerHelpers } = require('../lib/utils/error-and-logger-helpers');
 
 module.exports = function(RED) {
     function iobgetobject(config) {
@@ -9,7 +10,7 @@ module.exports = function(RED) {
         // Get the server configuration
         node.server = RED.nodes.getNode(config.server);
         if (!node.server) {
-            StatusHelpers.updateConnectionStatus(node, 'error', "Error: Server not configured");
+            NodeLifecycleHelpers.updateConnectionStatus(node, 'error', "Error: Server not configured");
             return;
         }
 
@@ -166,25 +167,25 @@ module.exports = function(RED) {
         const onServerReady = ({ serverId }) => {
             if (serverId === node.server.id) {
                 const statusText = createStatusText(node.useWildcard ? "Ready (Pattern mode)" : "Ready");
-                StatusHelpers.updateConnectionStatus(node, 'ready', statusText);
+                NodeLifecycleHelpers.updateConnectionStatus(node, 'ready', statusText);
             }
         };
 
         const onDisconnected = ({ serverId }) => {
             if (serverId === node.server.id) {
-                StatusHelpers.updateConnectionStatus(node, 'disconnected', 'Disconnected');
+                ErrorAndLoggerHelpers.updateConnectionStatus(node, 'disconnected', 'Disconnected');
             }
         };
 
         const onRetrying = ({ serverId }) => {
             if (serverId === node.server.id) {
-                StatusHelpers.updateConnectionStatus(node, 'connecting', 'Retrying connection...');
+                ErrorAndLoggerHelpers.updateConnectionStatus(node, 'connecting', 'Retrying connection...');
             }
         };
 
         const onPermanentFailure = ({ serverId }) => {
             if (serverId === node.server.id) {
-                StatusHelpers.updateConnectionStatus(node, 'error', 'Connection failed permanently');
+                ErrorAndLoggerHelpers.updateConnectionStatus(node, 'error', 'Connection failed permanently');
             }
         };
 
@@ -195,7 +196,7 @@ module.exports = function(RED) {
             onPermanentFailure
         };
 
-        NodeRegistrationHelpers.setupDelayedRegistrationWithListeners(node, eventHandlers, 0);
+        NodeLifecycleHelpers.setupDelayedRegistrationWithListeners(node, eventHandlers, 0);
 
         // Input handler
         node.on('input', async function(msg, send, done) {
@@ -206,7 +207,7 @@ module.exports = function(RED) {
                 node.log(`Requesting object(s) for pattern: ${objectIdOrPattern} (mode: ${currentOutputMode}, type: ${currentObjectType})`);
                 
                 // Update status
-                StatusHelpers.updateConnectionStatus(node, 'requesting', 'Requesting objects...');
+                ErrorAndLoggerHelpers.updateConnectionStatus(node, 'requesting', 'Requesting objects...');
                 
                 // Clear previous results
                 node.enumData = null;
@@ -252,7 +253,7 @@ module.exports = function(RED) {
                 }
                 
             } catch (error) {
-                StatusHelpers.updateConnectionStatus(node, 'error', `Error: ${error.message}`);
+                ErrorAndLoggerHelpers.updateConnectionStatus(node, 'error', `Error: ${error.message}`);
                 node.error(`Error processing input: ${error.message}`);
                 
                 // Send error response
@@ -358,14 +359,14 @@ module.exports = function(RED) {
                 
                 // Update status
                 const statusText = createStatusText(node.useWildcard ? "Ready (Pattern mode)" : "Ready");
-                StatusHelpers.updateConnectionStatus(node, 'ready', statusText);
+                ErrorAndLoggerHelpers.updateConnectionStatus(node, 'ready', statusText);
                 
                 // Send message
                 send(msg);
                 done();
                 
             } catch (error) {
-                StatusHelpers.updateConnectionStatus(node, 'error', `Error: ${error.message}`);
+                ErrorAndLoggerHelpers.updateConnectionStatus(node, 'error', `Error: ${error.message}`);
                 node.error(`Error processing input: ${error.message}`);
                 
                 // Send error response
@@ -381,12 +382,12 @@ module.exports = function(RED) {
 
         node.on('close', function(removed, done) {
             const cleanupCallbacks = [];
-            NodeRegistrationHelpers.setupCloseHandler(node, eventHandlers, cleanupCallbacks);
+            NodeLifecycleHelpers.setupCloseHandler(node, eventHandlers, cleanupCallbacks);
             done();
         });
 
         // Initial status
-        StatusHelpers.updateConnectionStatus(node, 'waiting', 'Waiting for server...');
+        ErrorAndLoggerHelpers.updateConnectionStatus(node, 'waiting', 'Waiting for server...');
     }
 
     RED.nodes.registerType("iobgetobject", iobgetobject);

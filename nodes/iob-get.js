@@ -1,5 +1,6 @@
 const Orchestrator = require('../lib/orchestrator');
-const { StatusHelpers, NodeRegistrationHelpers } = require('../lib/utils/node-lifecycle-helpers');
+const { NodeLifecycleHelpers } = require('../lib/utils/node-lifecycle-helpers');
+const { ErrorAndLoggerHelpers } = require('../lib/utils/error-and-logger-helpers');
 
 module.exports = function(RED) {
     function IoBrokerGetNode(config) {
@@ -17,7 +18,7 @@ module.exports = function(RED) {
         node.hasRetrievedValue = false;
 
         if (!node.server) {
-            StatusHelpers.updateConnectionStatus(node, 'error', "Error: Server not configured");
+            ErrorAndLoggerHelpers.updateConnectionStatus(node, 'error', "Error: Server not configured");
             return;
         }
 
@@ -62,7 +63,7 @@ module.exports = function(RED) {
 
         const onServerReady = ({ serverId }) => {
             if (serverId === node.server.id) {
-                StatusHelpers.updateConnectionStatus(node, 'ready', 'Ready');
+                ErrorAndLoggerHelpers.updateConnectionStatus(node, 'ready', 'Ready');
                 updateStatusWithValue();
             }
         };
@@ -99,19 +100,19 @@ module.exports = function(RED) {
 
         const onDisconnected = ({ serverId }) => {
             if (serverId === node.server.id) {
-                StatusHelpers.updateConnectionStatus(node, 'disconnected', 'Disconnected');
+                ErrorAndLoggerHelpers.updateConnectionStatus(node, 'disconnected', 'Disconnected');
             }
         };
 
         const onRetrying = ({ serverId, attempt, delay }) => {
             if (serverId === node.server.id) {
-                StatusHelpers.updateConnectionStatus(node, 'retrying', `Retrying in ${delay / 1000}s (Attempt #${attempt})`);
+                ErrorAndLoggerHelpers.updateConnectionStatus(node, 'retrying', `Retrying in ${delay / 1000}s (Attempt #${attempt})`);
             }
         };
 
         const onPermanentFailure = ({ serverId, error }) => {
             if (serverId === node.server.id) {
-                StatusHelpers.updateConnectionStatus(node, 'error', `Failed: ${error.message}`);
+                ErrorAndLoggerHelpers.updateConnectionStatus(node, 'error', `Failed: ${error.message}`);
             }
         };
 
@@ -121,7 +122,7 @@ module.exports = function(RED) {
             try {
                 // Check if orchestrator is ready
                 if (!node.isRegistered) {
-                    StatusHelpers.updateConnectionStatus(node, 'error', 'Node not registered');
+                    ErrorAndLoggerHelpers.updateConnectionStatus(node, 'error', 'Node not registered');
                     if (done) done(new Error('Node not registered with orchestrator'));
                     return;
                 }
@@ -131,7 +132,7 @@ module.exports = function(RED) {
                 const stateId = configState || (typeof msg.topic === "string" ? msg.topic.trim() : "");
                 
                 if (!stateId) {
-                    StatusHelpers.updateConnectionStatus(node, 'error', 'Missing state ID');
+                    ErrorAndLoggerHelpers.updateConnectionStatus(node, 'error', 'Missing state ID');
                     if (done) done(new Error('State ID is required'));
                     return;
                 }
@@ -140,13 +141,13 @@ module.exports = function(RED) {
                 node.pendingMessage = msg;
                 node.pendingDone = done;
 
-                StatusHelpers.updateConnectionStatus(node, 'requesting', `Reading ${stateId}...`);
+                ErrorAndLoggerHelpers.updateConnectionStatus(node, 'requesting', `Reading ${stateId}...`);
 
                 // Request the state value through the orchestrator
                 Orchestrator.getState(node.id, stateId);
                 
             } catch (error) {
-                StatusHelpers.updateConnectionStatus(node, 'error', 'Error');
+                ErrorAndLoggerHelpers.updateConnectionStatus(node, 'error', 'Error');
                 node.error(`Error processing input: ${error.message}`);
                 if (done) done(error);
             }
@@ -162,7 +163,7 @@ module.exports = function(RED) {
             onPermanentFailure
         };
 
-        NodeRegistrationHelpers.setupDelayedRegistrationWithListeners(node, eventHandlers, 300);
+        NodeLifecycleHelpers.setupDelayedRegistrationWithListeners(node, eventHandlers, 300);
 
         node.on('close', function(removed, done) {
             // Clean up any pending operations
@@ -170,12 +171,12 @@ module.exports = function(RED) {
             node.pendingDone = null;
             
             const cleanupCallbacks = [];
-            NodeRegistrationHelpers.setupCloseHandler(node, eventHandlers, cleanupCallbacks);
+            NodeLifecycleHelpers.setupCloseHandler(node, eventHandlers, cleanupCallbacks);
             done();
         });
 
         // Initial status
-        StatusHelpers.updateConnectionStatus(node, 'waiting', 'Waiting for server...');
+        ErrorAndLoggerHelpers.updateConnectionStatus(node, 'waiting', 'Waiting for server...');
     }
 
     RED.nodes.registerType("iobget", IoBrokerGetNode);
