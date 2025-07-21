@@ -116,8 +116,8 @@ module.exports = function(RED) {
 
         ExternalTriggerHelpers.registerNodeForExternalTrigger(node);
 
-        const onServerReady = ({ serverId }) => {
-            SubscriptionHelpers.handleServerReady(node, { serverId });
+        const onServerReady = ({ serverId, isReconnect }) => {
+            SubscriptionHelpers.handleServerReady(node, { serverId, isReconnect });
         };
 
         const onSubscriptionConfirmed = ({ serverId, stateId }) => {
