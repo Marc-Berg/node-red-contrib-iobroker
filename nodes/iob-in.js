@@ -1,8 +1,8 @@
 const Orchestrator = require('../lib/orchestrator');
-const { MessageHelpers, FilterHelpers, StateManagementHelpers } = require('../lib/utils/state-and-message-helpers');
-const { StatusHelpers, NodeRegistrationHelpers } = require('../lib/utils/node-lifecycle-helpers');
-const { WildcardHelpers } = require('../lib/utils/pattern-and-wildcard-helpers');
-const { ExternalTriggerHelpers, SubscriptionHelpers } = require('../lib/utils/service-integration-helpers');
+const { StateMessageHelpers } = require('../lib/utils/state-and-message-helpers');
+const { NodeLifecycleHelpers } = require('../lib/utils/node-lifecycle-helpers');
+const { PatternHelpers } = require('../lib/utils/pattern-and-wildcard-helpers');
+const { ServiceIntegrationHelpers } = require('../lib/utils/service-integration-helpers');
 
 module.exports = function(RED) {
     function IoBrokerInNode(config) {
@@ -26,7 +26,7 @@ module.exports = function(RED) {
         
         node.log(`Node configuration: inputMode=${node.inputMode}, sendInitialValue=${node.sendInitialValue}, outputMode=${node.outputMode}, outputProperty=${node.outputProperty}, filterMode=${node.filterMode}, ackFilter=${node.ackFilter}, multipleStates="${node.multipleStates}", enableExternalTrigger=${node.enableExternalTrigger}, triggerGroup=${node.triggerGroup}`);
         
-        const stateTracking = StateManagementHelpers.initializeStateTracking();
+        const stateTracking = StateMessageHelpers.initializeStateTracking();
         Object.assign(node, stateTracking);
         
         node.initialValueTimeout = null;
@@ -36,7 +36,7 @@ module.exports = function(RED) {
         node.groupedTimeout = null;
         
         if (node.inputMode === 'multiple' && node.multipleStates) {
-            node.statesList = StateManagementHelpers.parseMultipleStates(node.multipleStates);
+            node.statesList = StateMessageHelpers.parseMultipleStates(node.multipleStates);
             node.log(`Parsed ${node.statesList.length} states: [${node.statesList.join(', ')}]`);
         }
         
@@ -51,16 +51,16 @@ module.exports = function(RED) {
         
         function updateNodeStatus(stateId, value, isInitial = false) {
             if (node.inputMode === 'single') {
-                StatusHelpers.updateSingleStateStatus(node, stateId, value, node.filterMode, isInitial);
+                NodeLifecycleHelpers.updateSingleStateStatus(node, stateId, value, node.filterMode, isInitial);
             } else if (node.inputMode === 'multiple') {
-                StatusHelpers.updateMultipleStatesStatus(node, node.statesList, node.outputMode, node.filterMode);
+                NodeLifecycleHelpers.updateMultipleStatesStatus(node, node.statesList, node.outputMode, node.filterMode);
             }
         }
         
         // Only validate wildcards when in single mode
         let wildcardValidation = { isWildcard: false, valid: true };
         if (node.inputMode === 'single') {
-            wildcardValidation = WildcardHelpers.validateWildcardConfig(
+            wildcardValidation = PatternHelpers.validateWildcardConfig(
                 node.inputMode, 
                 node.stateId, 
                 node.sendInitialValue
@@ -83,7 +83,7 @@ module.exports = function(RED) {
             node.isWildcardPattern = false;
         }
 
-        const stateValidation = StateManagementHelpers.validateStateConfiguration(
+        const stateValidation = StateMessageHelpers.validateStateConfiguration(
             node.inputMode, 
             node.stateId, 
             node.statesList
@@ -101,20 +101,20 @@ module.exports = function(RED) {
         }
 
         node.sendCachedValues = function() {
-            ExternalTriggerHelpers.sendCachedValues(node);
+            ServiceIntegrationHelpers.sendCachedValues(node);
         };
 
         node.currentStateValues = new Map();
         node.lastValue = undefined;
 
-        ExternalTriggerHelpers.registerNodeForExternalTrigger(node);
+        ServiceIntegrationHelpers.registerNodeForExternalTrigger(node);
 
         const onServerReady = ({ serverId }) => {
-            SubscriptionHelpers.handleServerReady(node, { serverId });
+            ServiceIntegrationHelpers.handleServerReady(node, { serverId });
         };
 
         const onSubscriptionConfirmed = ({ serverId, stateId }) => {
-            SubscriptionHelpers.handleSubscriptionConfirmed(node, { serverId, stateId }, requestInitialValue, requestBaselineValue);
+            ServiceIntegrationHelpers.handleSubscriptionConfirmed(node, { serverId, stateId }, requestInitialValue, requestBaselineValue);
         };
 
         const onStateChanged = ({ serverId, stateId, state }) => {
@@ -125,7 +125,7 @@ module.exports = function(RED) {
                 
                 if (node.inputMode === 'single') {
                     if (node.isWildcardPattern) {
-                        if (!WildcardHelpers.matchesWildcardPattern(stateId, node.stateId)) {
+                        if (!PatternHelpers.matchesWildcardPattern(stateId, node.stateId)) {
                             return;
                         }
                     } else {
