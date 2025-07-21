@@ -306,40 +306,50 @@ RED.nodes.registerType('iobin', {
     
     oneditsave: function() {
         const inputMode = $('#node-input-inputMode').val();
-        
+        let hasChanges = false;
+
         if (inputMode === 'single') {
             const stateValue = $('#node-input-state').val();
-            this.useWildcard = stateValue && stateValue.includes('*');
-            
-            if (this.useWildcard) {
-                this.sendInitialValue = false;
+            const useWildcard = stateValue && stateValue.includes('*');
+
+            if (this.state !== stateValue) {
+                this.state = stateValue;
+                hasChanges = true;
+            }
+
+            if (this.useWildcard !== useWildcard) {
+                this.useWildcard = useWildcard;
+                hasChanges = true;
+            }
+
+            if (useWildcard && this.sendInitialValue) {
+                this.sendInitialValue = false; // Force disable for wildcards
+                hasChanges = true;
             }
         } else if (inputMode === 'multiple') {
-            this.useWildcard = false;
-            
             const states = $('#node-input-multipleStates').val()
                 .split('\n')
                 .map(s => s.trim())
                 .filter(s => s.length > 0);
-            
-            // Check for wildcards in multiple states
-            const wildcardStates = states.filter(state => state.includes('*'));
-            if (wildcardStates.length > 0) {
-                RED.notify(`Cannot save: Wildcard patterns (*) are not allowed in multiple states mode. Found in: ${wildcardStates.join(', ')}`, {
-                    type: "error",
-                    timeout: 5000
-                });
-                return false; // Prevent saving
+            const multipleStates = states.join('\n');
+
+            if (this.multipleStates !== multipleStates) {
+                this.multipleStates = multipleStates;
+                hasChanges = true;
             }
-            
-            this.multipleStates = states.join('\n');
+
+            if (this.useWildcard) {
+                this.useWildcard = false;
+                hasChanges = true;
+            }
         }
-        
+
         if (this.treeController) {
             this.treeController.cleanup();
         }
-        
-        return true; // Allow saving
+
+        // Only mark the node as changed if there are actual changes
+        return hasChanges;
     },
     
     oneditresize: function() {
@@ -747,360 +757,6 @@ Object.values(triggerableNodes)
         margin-bottom: 0;
     }
     
-    .wildcard-disabled {
-        opacity: 0.5;
-        pointer-events: none;
-    }
-    
-    .wildcard-disabled label {
-        color: #999 !important;
-    }
-</style>
-});
-            const filterMode = $('#node-input-filterMode').val();
-            let description = '';
-            
-            switch(filterMode) {
-                case 'all':
-                    description = 'Send all state changes';
-                    break;
-                case 'changes-only':
-                    description = 'Only send when value changes - first change is always sent (no pre-initialization)';
-                    break;
-                case 'changes-smart':
-                    description = 'Only send when value changes - pre-loads current value, first change may be blocked';
-                    break;
-                default:
-                    description = 'Send all state changes';
-            }
-            
-            $('#filter-mode-description').text(description);
-        }
-        
-        // Wildcard detection for single mode
-        function checkForWildcard() {
-            const mode = $('#node-input-inputMode').val();
-            if (mode === 'single') {
-                const stateValue = $('#node-input-state').val() || '';
-                const hasWildcardChars = stateValue.includes('*');
-                
-                if (hasWildcardChars) {
-                    // Disable initial values for wildcards
-                    $('#node-input-sendInitialValue').prop('checked', false).prop('disabled', true);
-                    $('#initial-value-container').addClass('wildcard-disabled');
-                    
-                    // Show wildcard info
-                    const wildcardInfo = detectWildcardPattern(stateValue);
-                    showWildcardInfo(wildcardInfo.warnings);
-                } else {
-                    // Re-enable initial values for single states
-                    $('#node-input-sendInitialValue').prop('disabled', false);
-                    $('#initial-value-container').removeClass('wildcard-disabled');
-                    
-                    // Hide wildcard info
-                    hideWildcardInfo();
-                }
-            }
-        }
-        
-        // Setup output mode display
-        function updateOutputModeDisplay() {
-            const outputMode = $('#node-input-outputMode').val();
-            let description = '';
-            
-            switch(outputMode) {
-                case 'individual':
-                    description = 'Each state change creates a separate message';
-                    break;
-                case 'grouped':
-                    description = 'All current values of subscribed states in one message object';
-                    break;
-                default:
-                    description = 'Each state change creates a separate message';
-            }
-            
-            $('#output-mode-description').text(description);
-        }
-        
-        // Event handlers
-        $('#node-input-inputMode').on('change', function() {
-            updateInputModeDisplay();
-            if ($(this).val() === 'single') {
-                setTimeout(checkForWildcard, 100);
-            }
-        });
-        
-        $('#node-input-outputMode').on('change', function() {
-            updateOutputModeDisplay();
-        });
-        
-        $('#node-input-filterMode').on('change', function() {
-            updateFilterModeDisplay();
-        });
-        
-        $('#node-input-state').on('input keyup change', function() {
-            checkForWildcard();
-        });
-        
-        // Initialize display
-        updateInputModeDisplay();
-        updateOutputModeDisplay();
-        updateFilterModeDisplay();
-        checkForWildcard();
-        
-        // Load and initialize TreeView component for single state mode only
-        loadSharedTreeView().then(() => {
-            this.treeController = window.ioBrokerSharedTreeView.setup({
-                nodeType: 'iobin',
-                inputId: 'node-input-state',
-                serverInputId: 'node-input-server',
-                searchPlaceholder: 'Search states (supports wildcards)...',
-                itemType: 'states',
-                dataEndpoint: '/iobroker/ws/states',
-                enableWildcardDetection: true,
-                wildcardInputId: 'node-input-sendInitialValue'
-            });
-        }).catch(error => {
-            console.error('Failed to load TreeView component:', error);
-            
-            // Show fallback message
-            const fallbackMessage = $(`
-                <div style="margin-top: 5px; padding: 8px; background-color: #fff3cd; border: 1px solid #ffeaa7; border-radius: 4px; font-size: 12px; color: #856404;">
-                    <i class="fa fa-exclamation-triangle"></i> TreeView component not available. Manual input with basic wildcard detection.
-                </div>
-            `);
-            $('#node-input-state').after(fallbackMessage);
-        });
-        
-        // Wildcard info functions (fallback if TreeView not available)
-        function showWildcardInfo(warnings) {
-            let existingInfo = $('#wildcard-info-' + nodeType);
-            if (existingInfo.length === 0) {
-                existingInfo = $(`<div id="wildcard-info-${nodeType}"></div>`);
-                $('#node-input-state').after(existingInfo);
-            }
-            
-            let warningText = '';
-            if (warnings && warnings.length > 0) {
-                warningText = `
-                    <div style="color: #f39c12; font-size: 12px; margin-top: 5px;">
-                        <i class="fa fa-exclamation-triangle"></i> 
-                        ${warnings.join('; ')}
-                    </div>
-                `;
-            }
-            
-            existingInfo.html(`
-                <div style="background-color: #e8f4fd; border: 1px solid #bee5eb; border-radius: 4px; padding: 10px; font-size: 13px; color: #0c5460; margin-top: 5px;">
-                    <i class="fa fa-info-circle" style="color: #17a2b8; margin-right: 5px;"></i>
-                    <strong>Wildcard Mode (Auto-detected):</strong><br>
-                    <ul style="margin: 8px 0 0 20px; padding: 0;">
-                        <li><code>*</code> matches any number of characters</li>
-                        <li><code>?</code> is <strong>not supported</strong> by ioBroker</li>
-                        <li>Example: <code>system.adapter.*.alive</code></li>
-                    </ul>
-                    ${warningText}
-                </div>
-            `).show();
-        }
-        
-        function hideWildcardInfo() {
-            $('#wildcard-info-' + nodeType).hide();
-        }
-        
-        function detectWildcardPattern(pattern) {
-            if (!pattern) return { isWildcard: false, hasUnsupported: false, warnings: [] };
-            
-            const hasWildcardChars = pattern.includes('*');
-            const hasUnsupportedChars = pattern.includes('?');
-            
-            const warnings = [];
-            if (hasUnsupportedChars) {
-                warnings.push('ioBroker only supports * wildcards, not ? wildcards');
-            }
-            if (pattern.includes('**')) {
-                warnings.push('Avoid consecutive wildcards (**)');
-            }
-            if (pattern === '*' || pattern === '*.*') {
-                warnings.push('This pattern will match ALL states - use with caution!');
-            }
-            
-            return {
-                isWildcard: hasWildcardChars,
-                hasUnsupported: hasUnsupportedChars,
-                warnings: warnings
-            };
-        }
-        
-        // Multiple states helpers
-        $('#node-input-multipleStates').on('input', function() {
-            const states = $(this).val().split('\n').filter(s => s.trim()).length;
-            $('#multiple-states-count').text(`${states} state(s) configured`);
-        });
-        
-        // Helper button to add current single state to multiple states
-        $('#add-current-state').on('click', function() {
-            const currentState = $('#node-input-state').val().trim();
-            if (currentState) {
-                const existingStates = $('#node-input-multipleStates').val();
-                const newStates = existingStates ? `${existingStates}\n${currentState}` : currentState;
-                $('#node-input-multipleStates').val(newStates).trigger('input');
-                RED.notify(`Added "${currentState}" to multiple states`, { type: "success", timeout: 2000 });
-            }
-        });
-        
-        // Initialize multiple states count
-        const initialStates = $('#node-input-multipleStates').val().split('\n').filter(s => s.trim()).length;
-        $('#multiple-states-count').text(`${initialStates} state(s) configured`);
-    },
-    
-    oneditsave: function() {
-        const inputMode = $('#node-input-inputMode').val();
-        
-        if (inputMode === 'single') {
-            const stateValue = $('#node-input-state').val();
-            this.useWildcard = stateValue && stateValue.includes('*');
-            
-            if (this.useWildcard) {
-                this.sendInitialValue = false; // Force disable for wildcards
-            }
-        } else if (inputMode === 'multiple') {
-            this.useWildcard = false;
-            
-            const states = $('#node-input-multipleStates').val()
-                .split('\n')
-                .map(s => s.trim())
-                .filter(s => s.length > 0);
-            this.multipleStates = states.join('\n');
-        }
-        
-        if (this.treeController) {
-            this.treeController.cleanup();
-        }
-    },
-    
-    oneditresize: function() {
-        // Handle responsive design
-    }
-});
-</script>
-
-<script type="text/html" data-help-name="iobin">
-    <p>ioBroker state subscription via WebSocket with support for single states, wildcard patterns, and multiple predefined states.</p>
-    
-    <h3>Input Modes</h3>
-    <ul>
-        <li><b>Single State / Wildcard Pattern:</b> One state ID or wildcard pattern (auto-detected when * is present)</li>
-        <li><b>Multiple States:</b> Predefined list of states</li>
-    </ul>
-    
-    <h3>Output Modes (Multiple States)</h3>
-    <ul>
-        <li><b>Individual Messages:</b> Each state change creates a separate message (like single state mode)</li>
-        <li><b>Grouped Object:</b> All current values of subscribed states in one message object</li>
-    </ul>
-    
-    <h3>Filter Modes</h3>
-    <ul>
-        <li><b>Send all events:</b> Every state change triggers a message - no filtering</li>
-        <li><b>Send only value changes:</b> Only send when value actually changes - first change is always sent</li>
-        <li><b>Send only value changes (with baseline):</b> Pre-loads current value as baseline, then only sends actual changes - first change may be blocked if same as current</li>
-    </ul>
-    
-    <h3>Wildcard Patterns (Single Mode)</h3>
-    <ul>
-        <li><code>*</code> matches any number of characters (auto-detected)</li>
-        <li><code>?</code> is <strong>not supported</strong> by ioBroker</li>
-        <li>Examples:
-            <ul>
-                <li><code>system.adapter.*.alive</code> - all adapter alive states</li>
-                <li><code>0_userdata.0.*</code> - all states under 0_userdata.0</li>
-                <li><code>*.temperature</code> - all temperature states</li>
-            </ul>
-        </li>
-        <li><strong>Note:</strong> Initial values are automatically disabled when * is detected</li>
-    </ul>
-    
-    <h3>Multiple States Configuration</h3>
-    <ul>
-        <li>Enter one state ID per line in the textarea</li>
-        <li>Empty lines are ignored</li>
-        <li>No wildcards supported in multiple states mode</li>
-    </ul>
-    
-    <h3>Output Examples</h3>
-    
-    <h4>Individual Messages (default)</h4>
-    <pre>
-msg = {
-  topic: "0_userdata.0.state1",
-  payload: 42,
-  state: { val: 42, ack: true, ts: 1234567890 },
-  timestamp: 1234567890
-}
-    </pre>
-    
-    <h4>Grouped Object (Multiple States)</h4>
-    <pre>
-// When any of the subscribed states changes, ALL current values are sent:
-msg = {
-  topic: "grouped_states",
-  payload: {
-    "0_userdata.0.state1": 42,      // All subscribed states
-    "0_userdata.0.state2": "hello", // with their current values
-    "0_userdata.0.state3": true
-  },
-  states: {
-    "0_userdata.0.state1": { val: 42, ack: true, ts: 1234567890 },
-    "0_userdata.0.state2": { val: "hello", ack: true, ts: 1234567891 },
-    "0_userdata.0.state3": { val: true, ack: true, ts: 1234567892 }
-  },
-  timestamp: 1234567890,
-  changedState: "0_userdata.0.state1"  // Which state triggered this message
-}
-    </pre>
-    
-    <h3>Value Change Filtering</h3>
-    <ul>
-        <li><b>Send only value changes:</b> First state change is always sent, subsequent changes only if value differs</li>
-        <li><b>Send only value changes (with baseline):</b> Current value is pre-loaded as baseline, then only actual changes are sent</li>
-        <li><b>Initial Values:</b> Always bypass change filtering (when "Send initial value on startup" is enabled)</li>
-        <li>Identical consecutive values are blocked</li>
-        <li>Works with all data types (numbers, strings, booleans, objects)</li>
-        <li>Useful for reducing message volume and avoiding unnecessary processing</li>
-    </ul>
-    
-    <h4>Filter Mode Comparison (without "Send initial value")</h4>
-    <pre>
-Current state value: 25
-
-Send only value changes:
-1. First change: 25 → SENT (no baseline yet)
-2. Second change: 25 → BLOCKED (same value)  
-3. Third change: 26 → SENT (value changed)
-
-Send only value changes (with baseline):
-1. Startup: Load baseline 25 (stored, not sent)
-2. First change: 25 → BLOCKED (same as baseline)
-3. Second change: 26 → SENT (value changed)
-    </pre>
-    
-    <h4>With "Send initial value" enabled</h4>
-    <pre>
-Both modes behave identically because initial values bypass change filtering.
-    </pre>
-    
-    <h3>Performance Notes</h3>
-    <ul>
-        <li>Avoid overly broad patterns like <code>*</code> or <code>*.*</code></li>
-        <li>Initial values are automatically disabled for wildcards only</li>
-        <li>Grouped mode always sends ALL current values when any subscribed state changes</li>
-        <li>Initial values for multiple states: all current values sent at startup</li>
-        <li>Change filtering reduces message volume but requires storing previous values</li>
-    </ul>
-</script>
-
-<style>
     .wildcard-disabled {
         opacity: 0.5;
         pointer-events: none;

@@ -33,6 +33,9 @@ module.exports = function(RED) {
         const stateTracking = StateManagementHelpers.initializeStateTracking();
         Object.assign(node, stateTracking);
         
+        // Initialize subscription tracking
+        SubscriptionHelpers.initializeSubscriptionTracking(node);
+        
         node.initialValueTimeout = null;
         
         node.pendingGroupedStates = null;
@@ -449,7 +452,8 @@ module.exports = function(RED) {
         const cleanupCallbacks = [
             () => StateManagementHelpers.cleanupTimeout(node, 'initialValueTimeout'),
             () => StateManagementHelpers.cleanupTimeout(node, 'groupedTimeout'),
-            () => ExternalTriggerHelpers.unregisterNodeFromExternalTrigger(node)
+            () => ExternalTriggerHelpers.unregisterNodeFromExternalTrigger(node),
+            () => SubscriptionHelpers.cleanupSubscriptions(node)
         ];
 
         NodeRegistrationHelpers.setupCloseHandler(node, eventHandlers, cleanupCallbacks);

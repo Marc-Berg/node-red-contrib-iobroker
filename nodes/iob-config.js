@@ -275,8 +275,6 @@ module.exports = function (RED) {
     const staticResult = setupStaticResources(RED);
     const apiResult = setupAPIEndpoints(RED);
 
-    Orchestrator.init(RED);
-
     function ioBConfig(n) {
         RED.nodes.createNode(this, n);
         this.iobhost = n.iobhost;
