@@ -52,9 +52,9 @@ module.exports = function(RED) {
         
         function updateNodeStatus(stateId, value, isInitial = false) {
             if (node.inputMode === 'single') {
-                NodeLifecycleHelpers.updateSingleStateStatus(node, stateId, value, node.filterMode, isInitial);
+                ErrorAndLoggerHelpers.updateSingleStateStatus(node, stateId, value, node.filterMode, isInitial);
             } else if (node.inputMode === 'multiple') {
-                NodeLifecycleHelpers.updateMultipleStatesStatus(node, node.statesList, node.outputMode, node.filterMode);
+                ErrorAndLoggerHelpers.updateMultipleStatesStatus(node, node.statesList, node.outputMode, node.filterMode);
             }
         }
         
@@ -111,11 +111,66 @@ module.exports = function(RED) {
         ServiceIntegrationHelpers.registerNodeForExternalTrigger(node);
 
         const onServerReady = ({ serverId }) => {
-            ServiceIntegrationHelpers.handleServerReady(node, { serverId });
+            if (serverId === node.server.id) {
+                node.log("Server connection ready");
+                ErrorAndLoggerHelpers.updateConnectionStatus(node, 'connected', 'Starting subscriptions...');
+                node.serverReady = true;
+                
+                // Subscribe to states based on input mode
+                if (node.inputMode === 'single') {
+                    if (node.isWildcardPattern) {
+                        // For wildcard patterns, subscribe to the pattern
+                        node.log(`Subscribing to wildcard pattern: ${node.stateId}`);
+                        Orchestrator.subscribe(node.id, node.stateId);
+                    } else {
+                        // For single states, subscribe directly
+                        node.log(`Subscribing to single state: ${node.stateId}`);
+                        Orchestrator.subscribe(node.id, node.stateId);
+                    }
+                } else if (node.inputMode === 'multiple' && node.statesList) {
+                    // For multiple states, subscribe to each state
+                    node.log(`Subscribing to ${node.statesList.length} states`);
+                    node.statesList.forEach(stateId => {
+                        Orchestrator.subscribe(node.id, stateId);
+                    });
+                }
+            }
         };
 
         const onSubscriptionConfirmed = ({ serverId, stateId }) => {
-            ServiceIntegrationHelpers.handleSubscriptionConfirmed(node, { serverId, stateId }, requestInitialValue, requestBaselineValue);
+            if (serverId === node.server.id) {
+                node.log(`Subscription confirmed for state: ${stateId}`);
+                node.isSubscribed = true;
+                
+                if (node.sendInitialValue) {
+                    if (node.inputMode === 'single') {
+                        if (!node.isWildcardPattern) {
+                            requestInitialValue(stateId);
+                        }
+                    } else if (node.inputMode === 'multiple') {
+                        if (node.statesList.includes(stateId)) {
+                            requestInitialValue(stateId);
+                        }
+                    }
+                } else if (node.filterMode === 'changes-smart') {
+                    if (node.inputMode === 'single') {
+                        if (!node.isWildcardPattern) {
+                            requestBaselineValue(stateId);
+                        }
+                    } else if (node.inputMode === 'multiple') {
+                        if (node.statesList.includes(stateId)) {
+                            requestBaselineValue(stateId);
+                        }
+                    }
+                }
+                
+                // Update status to show we're ready
+                if (node.inputMode === 'single') {
+                    ErrorAndLoggerHelpers.updateConnectionStatus(node, 'connected', `Listening: ${stateId}`);
+                } else if (node.inputMode === 'multiple') {
+                    ErrorAndLoggerHelpers.updateConnectionStatus(node, 'connected', `Listening to ${node.statesList.length} states`);
+                }
+            }
         };
 
         const onStateChanged = ({ serverId, stateId, state }) => {
@@ -162,17 +217,17 @@ module.exports = function(RED) {
                     
                     if (node.outputMode === 'individual') {
                         if (StateMessageHelpers.shouldFilterValue(stateId, state.val, node.previousValues, node.filterMode, false, (msg) => node.log(msg))) {
-                            StateMessageHelpers.updatePreviousValue(node.previousValues, stateId, state.val);
+                            StateMessageHelpers.updatePreviousValue(node, stateId, state.val);
                             return;
                         }
                         
-                        const message = StateStateMessageHelpers.createEnhancedMessage(state, stateId, node.outputProperty, {
+                        const message = StateMessageHelpers.createEnhancedMessage(state, stateId, node.outputProperty, {
                             multipleStatesMode: true
                         });
                         
                         node.currentStateValues.set(stateId, state);
                         
-                        StateMessageHelpers.updatePreviousValue(node.previousValues, stateId, state.val);
+                        StateMessageHelpers.updatePreviousValue(node, stateId, state.val);
                         
                         updateNodeStatus(stateId, state.val, false);
                         
@@ -198,7 +253,7 @@ module.exports = function(RED) {
                             node.groupedTimeout = StateMessageHelpers.setupGroupedTimeout(node, 2000, () => {
                                 if (Object.keys(node.groupedStateValues).length > 0) {
                                     node.log(`Grouped mode: Timeout reached, sending partial grouped message`);
-                                    const partialGroupedMessage = StateStateMessageHelpers.createGroupedMessage(
+                                    const partialGroupedMessage = StateMessageHelpers.createGroupedMessage(
                                         node.groupedStateValues, 
                                         node.outputProperty, 
                                         {
@@ -217,7 +272,7 @@ module.exports = function(RED) {
                             
                         } else {
                             node.log(`Grouped mode: All states available, sending grouped message immediately`);
-                            const groupedMessage = StateStateMessageHelpers.createGroupedMessage(
+                            const groupedMessage = StateMessageHelpers.createGroupedMessage(
                                 node.groupedStateValues, 
                                 node.outputProperty, 
                                 {
@@ -268,7 +323,7 @@ module.exports = function(RED) {
                 if (isRelevantState && state) {
                     if (isBaselineRequest) {
                         node.log(`Setting baseline value for changes-smart mode: ${stateId} = ${state.val}`);
-                        StateMessageHelpers.updatePreviousValue(node.previousValues, stateId, state.val);
+                        StateMessageHelpers.updatePreviousValue(node, stateId, state.val);
                         StateMessageHelpers.completeBaselineRequest(node.pendingBaselineRequests, stateId);
                         return;
                     }
@@ -282,18 +337,18 @@ module.exports = function(RED) {
                     
                     if (node.inputMode === 'single') {
                         if (StateMessageHelpers.shouldFilterValue(stateId, state.val, node.previousValues, node.filterMode, true, (msg) => node.log(msg))) {
-                            StateMessageHelpers.updatePreviousValue(node.previousValues, stateId, state.val);
+                            StateMessageHelpers.updatePreviousValue(node, stateId, state.val);
                             return;
                         }
                         
-                        const message = StateStateMessageHelpers.createEnhancedMessage(state, stateId, node.outputProperty, {
+                        const message = StateMessageHelpers.createEnhancedMessage(state, stateId, node.outputProperty, {
                             initial: true
                         });
                         
                         node.currentStateValues.set(stateId, state);
                         node.lastValue = state.val;
                         
-                        StateMessageHelpers.updatePreviousValue(node.previousValues, stateId, state.val);
+                        StateMessageHelpers.updatePreviousValue(node, stateId, state.val);
                         
                         updateNodeStatus(stateId, state.val, true);
                         
@@ -302,18 +357,18 @@ module.exports = function(RED) {
                     } else if (node.inputMode === 'multiple') {
                         if (node.outputMode === 'individual') {
                             if (StateMessageHelpers.shouldFilterValue(stateId, state.val, node.previousValues, node.filterMode, true, (msg) => node.log(msg))) {
-                                StateMessageHelpers.updatePreviousValue(node.previousValues, stateId, state.val);
+                                StateMessageHelpers.updatePreviousValue(node, stateId, state.val);
                                 return;
                             }
                             
-                            const message = StateStateMessageHelpers.createEnhancedMessage(state, stateId, node.outputProperty, {
+                            const message = StateMessageHelpers.createEnhancedMessage(state, stateId, node.outputProperty, {
                                 initial: true,
                                 multipleStatesMode: true
                             });
                             
                             node.currentStateValues.set(stateId, state);
                             
-                            StateMessageHelpers.updatePreviousValue(node.previousValues, stateId, state.val);
+                            StateMessageHelpers.updatePreviousValue(node, stateId, state.val);
                             
                             StateMessageHelpers.storeGroupedStateValue(node.groupedStateValues, stateId, state);
                             
@@ -341,7 +396,7 @@ module.exports = function(RED) {
                                         node.groupedTimeout = null;
                                     }
                                     
-                                    const completeGroupedMessage = StateStateMessageHelpers.createGroupedMessage(
+                                    const completeGroupedMessage = StateMessageHelpers.createGroupedMessage(
                                         node.groupedStateValues, 
                                         node.outputProperty, 
                                         {
@@ -376,7 +431,7 @@ module.exports = function(RED) {
                                     node.initialValueTimeout = null;
                                 }
                                 
-                                const groupedMessage = StateStateMessageHelpers.createGroupedMessage(
+                                const groupedMessage = StateMessageHelpers.createGroupedMessage(
                                     node.groupedStateValues, 
                                     node.outputProperty, 
                                     {
@@ -426,10 +481,6 @@ module.exports = function(RED) {
             }
         };
 
-        const registerWithOrchestrator = () => {
-            NodeLifecycleHelpers.registerWithOrchestrator(node);
-        };
-
         const eventHandlers = {
             onServerReady,
             onSubscriptionConfirmed,
@@ -440,7 +491,7 @@ module.exports = function(RED) {
             onPermanentFailure
         };
 
-        // Use immediate registration with event listeners
+        // Setup event listeners and register with orchestrator
         NodeLifecycleHelpers.setupDelayedRegistrationWithListeners(node, eventHandlers, 0);
 
         const cleanupCallbacks = [
@@ -451,10 +502,7 @@ module.exports = function(RED) {
 
         NodeLifecycleHelpers.setupCloseHandler(node, eventHandlers, cleanupCallbacks);
 
-        const initialStatusText = node.isWildcardPattern 
-            ? `Waiting for pattern: ${node.stateId}` 
-            : "Waiting for server...";
-        ErrorAndLoggerHelpers.updateConnectionStatus(node, 'waiting', initialStatusText);
+        ErrorAndLoggerHelpers.updateConnectionStatus(node, 'waiting', "Waiting for server...");
     }
 
     RED.nodes.registerType("iobin", IoBrokerInNode);
