@@ -56,7 +56,7 @@ RED.nodes.registerType('iobinobject', {
         return "iob-inobject";
     },
     
-    oneditprepare: function() {
+    oneditprepare: async function() {
         const node = this;
         const serverInput = $('#node-input-server');
         
@@ -83,7 +83,8 @@ RED.nodes.registerType('iobinobject', {
         }
         
         // Load and initialize TreeView component with wildcard detection
-        loadSharedTreeView().then(() => {
+        try {
+            await loadSharedTreeView();
             this.treeController = window.ioBrokerSharedTreeView.setup({
                 nodeType: 'iobinobject',
                 inputId: 'node-input-objectPattern',
@@ -94,7 +95,7 @@ RED.nodes.registerType('iobinobject', {
                 enableWildcardDetection: true,
                 wildcardInputId: null // No initial value checkbox for objects
             });
-        }).catch(error => {
+        } catch (error) {
             console.error('Failed to load TreeView component:', error);
             
             // Show fallback message and implement basic wildcard detection
@@ -126,7 +127,7 @@ RED.nodes.registerType('iobinobject', {
                     $('#basic-wildcard-warning-obj').hide();
                 }
             });
-        });
+        }
     },
     
     oneditsave: function() {

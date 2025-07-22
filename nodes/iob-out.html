@@ -55,7 +55,7 @@ RED.nodes.registerType('iobout', {
         return this.name || "iob-out";
     },
     
-    oneditprepare: function() {
+    oneditprepare: async function() {
         const serverInput = $('#node-input-server');
         
         // Auto-select server configuration
@@ -98,7 +98,8 @@ RED.nodes.registerType('iobout', {
         $('#auto-create-info').toggle(autoCreateChecked);
         
         // Load and initialize TreeView component
-        loadSharedTreeView().then(() => {
+        try {
+            await loadSharedTreeView();
             this.treeController = window.ioBrokerSharedTreeView.setup({
                 nodeType: 'iobout',
                 inputId: 'node-input-state',
@@ -108,7 +109,7 @@ RED.nodes.registerType('iobout', {
                 dataEndpoint: '/iobroker/ws/states',
                 enableWildcardDetection: false
             });
-        }).catch(error => {
+        } catch (error) {
             console.error('Failed to load TreeView component:', error);
             
             // Show fallback message
@@ -118,7 +119,7 @@ RED.nodes.registerType('iobout', {
                 </div>
             `);
             $('#node-input-state').after(fallbackMessage);
-        });
+        }
     },
 
     oneditsave: function() {
