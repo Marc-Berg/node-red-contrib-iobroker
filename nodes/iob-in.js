@@ -446,8 +446,8 @@ module.exports = function(RED) {
             onPermanentFailure
         };
 
-        // Use immediate registration with event listeners
-        NodeRegistrationHelpers.setupDelayedRegistrationWithListeners(node, eventHandlers, 0);
+        // Use delayed registration with event listeners (wait for Node-RED to be fully ready)
+        NodeRegistrationHelpers.setupDelayedRegistrationWithListeners(node, eventHandlers, 300);
 
         const cleanupCallbacks = [
             () => StateManagementHelpers.cleanupTimeout(node, 'initialValueTimeout'),
