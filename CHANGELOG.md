@@ -1,13 +1,16 @@
 # Changelog
 
-## [0.15.0] - 2025-xx-xx
+## [0.15.0] - 2025-07-25
 
 ### Added
-- **External triggering capability for iob-in nodes**
-  - Function nodes can trigger cached state values from any iob-in node
-  - Automatic state value caching for all received values (initial and runtime)
-  - Support for all input modes: single state, wildcard patterns, and multiple states
+- **Tab-based configuration UI for iob-in node**
+  - Reorganized configuration into 4 tabs: Data Source, Filtering, Output, Advanced
 
+- **Configurable external triggering for iob-in nodes**
+  - Enable/disable external triggering via checkbox (disabled by default for better performance)
+  - Configurable trigger group names for organizing nodes by function/area
+  - Function nodes can trigger cached state values using `flow.get('trigger_group_name')`
+ 
 ## [0.14.3] - 2025-07-16
 
  - prevent duplicate messages with delayed subscription consolidation

@@ -1,6 +1,15 @@
 # WS ioB in - State Subscription
 
-Subscribe to ioBroker state changes in real-time using WebSocket communication with support for single states, wildcard patterns, multiple predefined states, and value change filtering.
+Subscribe to ioBroker state changes in real-time using WebSocket communication with support for single states, wildcard patterns, multiple predefined states, value change filtering, and configurable external triggering.
+
+## Configuration Interface
+
+The node configuration is organized into **4 tabs**:
+
+- **📡 Data Source**: Input Mode, State ID/Pattern, Multiple States, Server Connection
+- **🔍 Filtering**: Message Filtering (ACK Filter, Filter Mode), Initial Values  
+- **📤 Output**: Output Configuration (Output Property, Output Mode)
+- **⚙️ Advanced**: External Triggering (Enable/Disable, Trigger Group)
 
 ## Input Modes
 
@@ -172,40 +181,76 @@ Send only value changes (with baseline):
 
 ## External Triggering
 
-iob-in nodes automatically cache all received state values and can be triggered externally by Function nodes to resend their last cached values. This enables dashboard refresh scenarios without duplicating nodes.
+iob-in nodes automatically cache all received state values and can be triggered externally by Function nodes to resend their last cached values. This feature is **configurable** and **organized by trigger groups**.
+
+### Configuration (Advanced Tab)
+
+**Enable external triggering** (Checkbox)
+- Allows Function nodes to trigger cached state values
+- Enable only when needed to reduce memory overhead and improve performance
+
+**Trigger Group** (Text field)
+- Default: `iobroker_in_nodes`
+- Custom group name to organize triggerable nodes
+- Different groups for different purposes (dashboard, automation, debugging)
+- Example values: `dashboard_nodes`, `automation_triggers`, `debug_sensors`
 
 ### Usage in Function Nodes
 
-**Trigger all iob-in nodes:**
+**Access trigger group** (dynamic example based on configuration):
 ```javascript
-const flowContext = context.flow;
-const registeredNodes = flowContext.get('iobroker_in_nodes') || {};
+// Get nodes from configured trigger group
+const triggerableNodes = flow.get('your_trigger_group_name') || {};
 
-// Trigger all registered iob-in nodes
-Object.values(registeredNodes).forEach(nodeInfo => {
+// Trigger all nodes in the group
+Object.values(triggerableNodes).forEach(nodeInfo => {
     if (nodeInfo.triggerCached) {
         nodeInfo.triggerCached();
+        node.log(`Triggered: ${nodeInfo.name} (${nodeInfo.mode})`);
     }
 });
-
-return { payload: `Triggered ${Object.keys(registeredNodes).length} nodes` };
 ```
 
-**Filter by node name:**
+**Filter by node properties**:
 ```javascript
-const flowContext = context.flow;
-const registeredNodes = flowContext.get('iobroker_in_nodes') || {};
-
-// Only trigger dashboard-related nodes
-Object.values(registeredNodes)
-    .filter(node => node.name && node.name.toLowerCase().includes('dashboard'))
+// Get only dashboard-related nodes
+const dashboardNodes = flow.get('dashboard_nodes') || {};
+Object.values(dashboardNodes)
+    .filter(nodeInfo => nodeInfo.name?.includes('[Dashboard]'))
     .forEach(nodeInfo => {
-        if (nodeInfo.triggerCached) {
-            nodeInfo.triggerCached();
-        }
+        nodeInfo.triggerCached();
+        node.log(`Dashboard trigger: ${nodeInfo.name}`);
     });
 
-return { payload: "Dashboard nodes refreshed" };
+// Trigger only single-mode nodes
+Object.values(dashboardNodes)
+    .filter(nodeInfo => nodeInfo.mode === 'single')
+    .forEach(nodeInfo => nodeInfo.triggerCached());
+```
+
+**Organize by use case**:
+```javascript
+// Different trigger groups for different purposes
+const dashboardNodes = flow.get('dashboard_nodes') || {};
+const automationNodes = flow.get('automation_triggers') || {};
+const debugNodes = flow.get('debug_sensors') || {};
+
+// Selective triggering
+Object.values(dashboardNodes).forEach(node => node.triggerCached());
+```
+
+### Node Info Object Structure
+```javascript
+{
+    nodeRef: [Node Reference],
+    triggerCached: [Function],        // Function to trigger resend
+    states: ["state1", "state2"],     // Monitored states
+    mode: "single|multiple",          // Input mode
+    name: "Node Name",                // Node name
+    outputMode: "individual|grouped", // Output mode (multiple only)
+    stateId: "single.state.id",       // State ID (single mode only)
+    group: "custom_group_name"        // Configurable trigger group name
+}
 ```
 
 ### Behavior
@@ -215,9 +260,12 @@ return { payload: "Dashboard nodes refreshed" };
 - **All Modes Supported**: Single state, wildcard patterns, and multiple states (individual/grouped)
 
 ### Use Cases
-- **Dashboard Refresh**: Refresh dashboard displays on page load
-- **Manual State Sync**: Manually resync states without waiting for changes
-- **Multi-Device Updates**: Update multiple displays simultaneously
+- **Dashboard Refresh**: Create separate groups (`dashboard_nodes`) for dashboard vs. automation nodes - enable triggering only for dashboard nodes
+- **Startup Trigger**: Use different trigger groups (`startup_critical`, `startup_optional`) for different startup sequences  
+- **Conditional Refresh**: Organize nodes by function/area (`lights_control`, `sensors_monitoring`) for selective triggering
+- **Debugging**: Group test nodes separately (`debug_sensors`) for debugging purposes
+- **Performance**: Keep triggering disabled for most nodes to reduce memory overhead - enable only where needed
+- **Multi-Dashboard**: Different trigger groups for different dashboards or user interfaces
 
 ## Performance & Optimization
 

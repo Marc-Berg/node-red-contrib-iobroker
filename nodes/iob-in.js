@@ -43,6 +43,8 @@ module.exports = function (RED) {
             sendInitialValue: config.sendInitialValue && !isWildcardPattern,
             outputMode: config.outputMode || "individual",
             filterMode: config.filterMode || "all",
+            enableExternalTrigger: config.enableExternalTrigger === true, // Default false
+            triggerGroup: config.triggerGroup || "iobroker_in_nodes",
             serverId,
             nodeId: node.id,
             useWildcard: isWildcardPattern,
@@ -140,18 +142,22 @@ module.exports = function (RED) {
             }
         };
 
-        // Register node in flow context for external triggering
-        const flowContext = node.context().flow;
-        const existingNodes = flowContext.get('iobroker_in_nodes') || {};
-        existingNodes[node.id] = {
-            nodeRef: node,
-            triggerCached: node.sendCachedValues,
-            states: inputMode === 'single' ? [subscriptionPattern] : stateList,
-            mode: inputMode,
-            name: node.name || `iob-in-${node.id.substring(0, 8)}`,
-            outputMode: settings.outputMode
-        };
-        flowContext.set('iobroker_in_nodes', existingNodes);
+        // Register node in flow context for external triggering (only if enabled)
+        if (settings.enableExternalTrigger) {
+            const flowContext = node.context().flow;
+            const existingNodes = flowContext.get(settings.triggerGroup) || {};
+            existingNodes[node.id] = {
+                nodeRef: node,
+                triggerCached: node.sendCachedValues,
+                states: inputMode === 'single' ? [subscriptionPattern] : stateList,
+                mode: inputMode,
+                name: node.name || `iob-in-${node.id.substring(0, 8)}`,
+                outputMode: settings.outputMode,
+                stateId: inputMode === 'single' ? subscriptionPattern : undefined,
+                group: settings.triggerGroup
+            };
+            flowContext.set(settings.triggerGroup, existingNodes);
+        }
 
         node.currentConfig = connectionDetails;
         node.isInitialized = false;
@@ -726,11 +732,13 @@ module.exports = function (RED) {
             node.isInitialized = false;
             node.isSubscribed = false;
 
-            // Remove from flow context
-            const flowContext = node.context().flow;
-            const existingNodes = flowContext.get('iobroker_in_nodes') || {};
-            delete existingNodes[node.id];
-            flowContext.set('iobroker_in_nodes', existingNodes);
+            // Remove from flow context (only if external triggering was enabled)
+            if (settings.enableExternalTrigger) {
+                const flowContext = node.context().flow;
+                const existingNodes = flowContext.get(settings.triggerGroup) || {};
+                delete existingNodes[node.id];
+                flowContext.set(settings.triggerGroup, existingNodes);
+            }
 
             if (node.fallbackTimeout) {
                 clearTimeout(node.fallbackTimeout);
