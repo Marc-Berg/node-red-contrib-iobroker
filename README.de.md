@@ -11,6 +11,32 @@
 
 Externe Node-RED Integrations-Nodes für die ioBroker Kommunikation. **KEIN ioBroker Adapter** - eigenständiges Paket für externe Node-RED Instanzen zur Verbindung mit ioBroker über WebSocket.
 
+## 🤔 Welche Lösung ist für Sie richtig?
+
+### 📊 Entscheidungshilfe: ioBroker Node-RED Adapter vs. diese Nodes
+
+| **Szenario** | **ioBroker Node-RED Adapter verwenden** | **Diese externen Nodes verwenden** |
+|:-------------|:----------------------------------------:|:----------------------------------:|
+| **🏠 Einfache Heiminstallation** | ✅ **Empfohlen** | ❌ Überdimensioniert |
+| **🏭 Installation auf Appliances/PLCs** | ❌ Nicht möglich | ✅ **Empfohlen** |
+| **⚡ Hohe Performance-Anforderungen** | ❌ Geteilte Ressourcen | ⚠️ **Könnte vorteilhaft sein** |
+| **🔄 Node-RED Updates/Wartung** | ❌ An ioBroker gekoppelt | ✅ **Empfohlen** |
+| **📊 Erweiterte Funktionen** | ❌ Begrenzt | ✅ **Empfohlen** |
+
+### 🎯 **ioBroker Node-RED Adapter wählen wenn:**
+- **Einfache Hausautomatisierung** mit Grundanforderungen
+- **Ein-Klick-Installation** Priorität hat
+- **Minimaler Konfigurationsaufwand** gewünscht ist
+- **Geteiltes Hosting** akzeptabel ist
+
+### 🚀 **Diese externen Nodes wählen für:**
+- **Appliances und PLCs** (Wago, Beckhoff, etc.) mit Node-RED
+- **Hochperformante** Anwendungen (könnten von dedizierten Ressourcen profitieren)
+- **Spezialisierte Funktionen** wie Verlaufsdaten, Logs
+- **Neueste Node-RED Versionen** (ohne Adapter-Abhängigkeit)
+- **Vollständige Node-RED Konfiguration** (alle Einstellungen & Module)
+- **Dedizierte Ressourcen** und potentiell bessere Fehlerisolation
+
 ## 🚀 Schnellstart
 
 ### Installation
@@ -95,9 +121,7 @@ Falls du keine Admin Instanz verwenden möchtest:
 
 ## ⚠️ Wichtige Hinweise
 
-💡 Für eine einfachere Installation: In den meisten Fällen ist es einfacher, den ioBroker Node-RED Adapter zu verwenden, wenn Sie eine unkomplizierte Einrichtung bevorzugen.
-
-🔧 **Bekanntes Problem - Token Ablauf**: Es gibt derzeit ein bekanntes Problem mit der Authentifizierung und ablaufenden Tokens, das zu Verbindungsabbrüchen führen kann. **Verwenden Sie KEINE Anmelde-Session-Dauern kürzer als 3600 Sekunden** (1 Stunde) in Ihren ioBroker Adapter-Einstellungen!
+🔧 **Bekanntes Problem - Token Ablauf**: Es gibt derzeit ein bekanntes Problem mit der Authentifizierung und ablaufenden Tokens, das zu Verbindungsabbrüchen führen kann. **Verwenden Sie keine Anmelde-Session-Dauer kürzer als 3600 Sekunden** (1 Stunde) in Ihren ioBroker Adapter-Einstellungen!
 
 ## 📚 Zusätzliche Ressourcen
 

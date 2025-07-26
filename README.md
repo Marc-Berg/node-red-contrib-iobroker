@@ -11,6 +11,32 @@
 
 External Node-RED integration nodes for ioBroker communication. **NOT an ioBroker adapter** - standalone package for external Node-RED instances to connect with ioBroker via WebSocket.
 
+## 🤔 Which Solution is Right for You?
+
+### 📊 Decision Guide: ioBroker Node-RED Adapter vs. These Nodes
+
+| **Scenario** | **Use ioBroker Node-RED Adapter** | **Use These External Nodes** |
+|:-------------|:---------------------------------:|:----------------------------:|
+| **🏠 Simple Home Setup** | ✅ **Recommended** | ❌ Overkill |
+| **🏭 Installation on Appliances/PLCs** | ❌ Not possible | ✅ **Recommended** |
+| **⚡ High Performance Needs** | ❌ Shared resources | ⚠️ **May be beneficial** |
+| **🔄 Node-RED Updates/Maintenance** | ❌ Tied to ioBroker | ✅ **Recommended** |
+| **📊 Advanced Features** | ❌ Limited | ✅ **Recommended** |
+
+### 🎯 **Use ioBroker Node-RED Adapter for:**
+- **Simple home automation** with basic requirements
+- **One-click installation** is priority
+- **Minimal configuration** effort desired
+- **Shared hosting** is acceptable
+
+### 🚀 **Use These External Nodes for:**
+- **Appliances and PLCs** (Wago, Beckhoff, etc.) with Node-RED
+- **High-performance** applications (may benefit from dedicated resources)
+- **Specialized features** like history data, logs
+- **Latest Node-RED versions** immediately (no adapter dependency)
+- **Full Node-RED configuration** access (all settings & modules)
+- **Dedicated resources** and potential for better error isolation
+
 ## 🚀 Quick Start
 
 ### Installation
@@ -94,8 +120,6 @@ If you prefer not to use a Admin instance:
 - **WS ioB log node does not work** with WebSocket or Web adapter (requires Admin adapter)
 
 ## ⚠️ Important Notes
-
-💡 For simpler installation: In most cases, it's easier to use the ioBroker Node-RED adapter if you prefer a straightforward setup.
 
 🔧 **Known Issue - Authentication Token Expiry**: There is currently a known issue with authentication and expiring tokens that can cause connection drops. **Do not use login session durations shorter than 3600 seconds** (1 hour) in your ioBroker adapter settings!
 
