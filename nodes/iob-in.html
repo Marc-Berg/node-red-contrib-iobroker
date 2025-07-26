@@ -114,26 +114,54 @@ RED.nodes.registerType('iobin', {
             }
         }
         
-        // Wildcard detection - only for single mode
-        function checkForWildcard() {
+        // Unified wildcard detection using shared utilities
+        function checkWildcardPatterns() {
             const inputMode = $('#node-input-inputMode').val();
             
-            // Only check wildcards in single mode
-            if (inputMode !== 'single') {
-                return;
-            }
-            
-            const stateValue = $('#node-input-state').val() || '';
-            const hasWildcardChars = stateValue.includes('*');
-            
-            if (hasWildcardChars) {
-                $('#node-input-sendInitialValue').prop('checked', false).prop('disabled', true);
-                $('#initial-value-container').addClass('wildcard-disabled');
-                showWildcardInfo();
-            } else {
-                $('#node-input-sendInitialValue').prop('disabled', false);
-                $('#initial-value-container').removeClass('wildcard-disabled');
-                hideWildcardInfo();
+            if (inputMode === 'single') {
+                const stateValue = $('#node-input-state').val() || '';
+                
+                // Use shared wildcard utilities if available
+                if (window.ioBrokerSharedTreeView?.WildcardUtils) {
+                    const wildcardInfo = window.ioBrokerSharedTreeView.WildcardUtils.detect(stateValue);
+                    
+                    if (wildcardInfo.isWildcard) {
+                        $('#node-input-sendInitialValue').prop('checked', false).prop('disabled', true);
+                        $('#initial-value-container').addClass('wildcard-disabled');
+                        
+                        const warnings = ['This pattern will match multiple states', 'Initial values are automatically disabled'];
+                        if (wildcardInfo.warning) warnings.push(wildcardInfo.warning);
+                        
+                        window.ioBrokerSharedTreeView.WildcardUtils.showInfo('iobin', warnings);
+                    } else {
+                        $('#node-input-sendInitialValue').prop('disabled', false);
+                        $('#initial-value-container').removeClass('wildcard-disabled');
+                        window.ioBrokerSharedTreeView.WildcardUtils.hide('iobin');
+                    }
+                } else {
+                    // Fallback to local implementation
+                    const hasWildcardChars = stateValue.includes('*');
+                    
+                    if (hasWildcardChars) {
+                        $('#node-input-sendInitialValue').prop('checked', false).prop('disabled', true);
+                        $('#initial-value-container').addClass('wildcard-disabled');
+                        showWildcardInfo();
+                    } else {
+                        $('#node-input-sendInitialValue').prop('disabled', false);
+                        $('#initial-value-container').removeClass('wildcard-disabled');
+                        hideWildcardInfo();
+                    }
+                }
+            } else if (inputMode === 'multiple') {
+                const statesText = $('#node-input-multipleStates').val();
+                const states = statesText.split('\n').map(s => s.trim()).filter(s => s.length > 0);
+                const wildcardStates = states.filter(state => state.includes('*'));
+                
+                if (wildcardStates.length > 0) {
+                    showMultipleStatesWildcardWarning(wildcardStates);
+                } else {
+                    hideMultipleStatesWildcardWarning();
+                }
             }
         }
         
@@ -164,7 +192,7 @@ RED.nodes.registerType('iobin', {
                 $('#multiple-states-row').hide();
                 $('.tab-pane[data-tab="output"] #output-mode-row').hide();
                 hideMultipleStatesWildcardWarning(); // Hide multiple states wildcard warning
-                checkForWildcard();
+                checkWildcardPatterns();
             } else if (inputMode === 'multiple') {
                 $('#single-state-row').hide();
                 $('#multiple-states-row').show();
@@ -180,45 +208,32 @@ RED.nodes.registerType('iobin', {
             }
         }
         
+        // Generic function to update option descriptions
+        function updateOptionDescription(selectId, descriptionId, descriptions) {
+            const selectedValue = $(selectId).val();
+            const description = descriptions[selectedValue] || descriptions.default || '';
+            $(descriptionId).text(description);
+        }
+        
         // Setup output mode display
         function updateOutputModeDisplay() {
-            const outputMode = $('#node-input-outputMode').val();
-            let description = '';
-            
-            switch(outputMode) {
-                case 'individual':
-                    description = 'Each state change creates a separate message';
-                    break;
-                case 'grouped':
-                    description = 'All current values of subscribed states in one message object';
-                    break;
-                default:
-                    description = 'Each state change creates a separate message';
-            }
-            
-            $('#output-mode-description').text(description);
+            const descriptions = {
+                'individual': 'Each state change creates a separate message',
+                'grouped': 'All current values of subscribed states in one message object',
+                'default': 'Each state change creates a separate message'
+            };
+            updateOptionDescription('#node-input-outputMode', '#output-mode-description', descriptions);
         }
         
         // Setup filter mode display
         function updateFilterModeDisplay() {
-            const filterMode = $('#node-input-filterMode').val();
-            let description = '';
-            
-            switch(filterMode) {
-                case 'all':
-                    description = 'Sends every state update including duplicates (no filtering)';
-                    break;
-                case 'changes-only':
-                    description = 'Sends first value after restart, then only when value actually changes';
-                    break;
-                case 'changes-smart':
-                    description = 'Pre-loads baseline values at startup, then only sends changes';
-                    break;
-                default:
-                    description = 'Sends every state update including duplicates (no filtering)';
-            }
-            
-            $('#filter-mode-description').text(description);
+            const descriptions = {
+                'all': 'Sends every state update including duplicates (no filtering)',
+                'changes-only': 'Sends first value after restart, then only when value actually changes',
+                'changes-smart': 'Pre-loads baseline values at startup, then only sends changes',
+                'default': 'Sends every state update including duplicates (no filtering)'
+            };
+            updateOptionDescription('#node-input-filterMode', '#filter-mode-description', descriptions);
         }
         
         // Multiple states count helper
@@ -227,22 +242,11 @@ RED.nodes.registerType('iobin', {
             const states = statesText.split('\n').filter(s => s.trim()).length;
             $('#multiple-states-count').text(`${states} state(s) configured`);
             
-            // Check for wildcards in multiple states
-            checkMultipleStatesForWildcards(statesText);
+            // Check for wildcards in multiple states using unified function
+            checkWildcardPatterns();
         }
         
-        // Check for wildcards in multiple states and show warning
-        function checkMultipleStatesForWildcards(statesText) {
-            const states = statesText.split('\n').map(s => s.trim()).filter(s => s.length > 0);
-            const wildcardStates = states.filter(state => state.includes('*'));
-            
-            if (wildcardStates.length > 0) {
-                showMultipleStatesWildcardWarning(wildcardStates);
-            } else {
-                hideMultipleStatesWildcardWarning();
-            }
-        }
-        
+        // Wildcard warning functions
         function showMultipleStatesWildcardWarning(wildcardStates) {
             $('#multiple-states-wildcard-warning').show();
             const list = wildcardStates.map(state => `<li>${state}</li>`).join('');
@@ -283,9 +287,7 @@ RED.nodes.registerType('iobin', {
         }
         
         // Event handlers
-        $('#node-input-state').on('input', function() {
-            checkForWildcard(); // Only relevant in single mode
-        });
+        $('#node-input-state').on('input', checkWildcardPatterns);
         $('#node-input-inputMode').on('change', updateInputModeDisplay);
         $('#node-input-outputMode').on('change', updateOutputModeDisplay);
         $('#node-input-filterMode').on('change', updateFilterModeDisplay);

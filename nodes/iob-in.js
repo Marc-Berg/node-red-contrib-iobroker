@@ -1,5 +1,5 @@
 const connectionManager = require('../lib/manager/websocket-manager');
-const { NodeHelpers } = require('../lib/utils/node-helpers');
+const { NodeHelpers, NodePatterns } = require('../lib/utils/node-helpers');
 
 module.exports = function (RED) {
     function iobin(config) {
@@ -175,35 +175,9 @@ module.exports = function (RED) {
 
         node.previous = new Map();
 
-        function formatValueForStatus(value) {
-            let displayValue;
-
-            if (value === null) {
-                displayValue = "null";
-            } else if (value === undefined) {
-                displayValue = "undefined";
-            } else if (typeof value === 'boolean') {
-                displayValue = value ? "true" : "false";
-            } else if (typeof value === 'object') {
-                try {
-                    displayValue = JSON.stringify(value);
-                } catch (e) {
-                    displayValue = "[Object]";
-                }
-            } else {
-                displayValue = String(value);
-            }
-
-            if (displayValue.length > 20) {
-                return "..." + displayValue.slice(-20);
-            }
-
-            return displayValue;
-        }
-
         function updateStatusWithValue(isInitialValue = false) {
             if (isSingleState && node.hasReceivedValue && node.lastValue !== undefined) {
-                const formattedValue = formatValueForStatus(node.lastValue);
+                const formattedValue = NodeHelpers.formatValueForStatus(node.lastValue);
                 const filterLabel = (settings.filterMode === 'changes-only' || settings.filterMode === 'changes-smart') ? ' [Changes]' : '';
                 const timestamp = new Date().toLocaleTimeString(undefined, { hour12: false });
                 const initialLabel = isInitialValue ? ' (initial)' : '';
@@ -235,12 +209,9 @@ module.exports = function (RED) {
             }
         }
 
+        // Use NodeHelpers for standard validation and error handling
         function shouldSendMessage(ack, filter) {
-            switch (filter) {
-                case "ack": return ack === true;
-                case "noack": return ack === false;
-                default: return true;
-            }
+            return NodeHelpers.shouldSendByAck(ack, filter);
         }
 
         function shouldSendByValue(stateId, newValue, filterMode, isInitialValue = false) {
@@ -453,37 +424,30 @@ module.exports = function (RED) {
                     node.currentStateValues.set(stateId, state);
                 }
 
+                // Helper function to send message and update status
+                function sendMessageAndUpdateStatus(message, isInitial = false) {
+                    node.send(message);
+                    node.hasReceivedValue = true;
+                    updateStatusWithValue(isInitial);
+                }
+
                 if (isMultipleStates) {
                     if (settings.outputMode === 'grouped') {
                         if (node.currentStateValues.size < node.subscribedStates.size) {
                             ensureAllStatesLoaded().then(() => {
-                                const message = createGroupedMessage(stateId, state);
-                                node.send(message);
-                                node.hasReceivedValue = true;
-                                updateStatusWithValue();
+                                sendMessageAndUpdateStatus(createGroupedMessage(stateId, state));
                             }).catch(error => {
                                 node.warn(`Error loading all states: ${error.message}, sending available states`);
-                                const message = createGroupedMessage(stateId, state);
-                                node.send(message);
-                                node.hasReceivedValue = true;
-                                updateStatusWithValue();
+                                sendMessageAndUpdateStatus(createGroupedMessage(stateId, state));
                             });
                         } else {
-                            const message = createGroupedMessage(stateId, state);
-                            node.send(message);
-                            node.hasReceivedValue = true;
-                            updateStatusWithValue();
+                            sendMessageAndUpdateStatus(createGroupedMessage(stateId, state));
                         }
                     } else {
-                        const message = createMessage(stateId, state, isInitialValue);
-                        node.send(message);
-                        node.hasReceivedValue = true;
-                        updateStatusWithValue();
+                        sendMessageAndUpdateStatus(createMessage(stateId, state, isInitialValue));
                     }
                 } else {
-                    const message = createMessage(stateId, state, isInitialValue);
-                    node.send(message);
-                    updateStatusWithValue(isInitialValue);
+                    sendMessageAndUpdateStatus(createMessage(stateId, state, isInitialValue), isInitialValue);
                 }
 
             } catch (error) {
@@ -492,20 +456,14 @@ module.exports = function (RED) {
             }
         }
 
-        // WICHTIG: Funktion um subscribedStates vom NodeRegistry zu synchronisieren
-        function syncSubscribedStatesFromRegistry() {
-            try {
-                // Diese Funktion würde die subscribedStates vom NodeRegistry holen
-                // Da wir keinen direkten Zugriff haben, müssen wir das anders lösen
-                if (isMultipleStates) {
-                    const registryInfo = connectionManager.getMultipleStateInfo?.(settings.nodeId);
-                    if (registryInfo && registryInfo.subscribedStates) {
-                        node.subscribedStates = new Set(registryInfo.subscribedStates);
-                        node.debug(`Synced ${node.subscribedStates.size} subscribed states from registry`);
-                    }
-                }
-            } catch (error) {
-                node.debug(`Could not sync subscribed states from registry: ${error.message}`);
+        // Consolidated function to sync subscribedStates 
+        function syncSubscribedStates(stateArray) {
+            if (isMultipleStates && stateArray) {
+                node.subscribedStates.clear();
+                stateArray.forEach(stateId => {
+                    node.subscribedStates.add(stateId);
+                });
+                node.debug(`Synced ${node.subscribedStates.size} subscribed states`);
             }
         }
 
@@ -581,9 +539,9 @@ module.exports = function (RED) {
                 setStatus,
                 () => {
                     node.isSubscribed = true;
-                    // WICHTIG: Nach erfolgreicher Subscription subscribedStates synchronisieren
+                    // Sync subscribedStates after successful subscription
                     if (isMultipleStates) {
-                        syncSubscribedStatesFromRegistry();
+                        syncSubscribedStates(stateList);
                     }
                 },
                 statusTexts
@@ -591,24 +549,16 @@ module.exports = function (RED) {
 
             Object.assign(callback, baseCallback);
 
-            // KORREKTUR: onSubscribed erweitern um die subscribedStates zu synchronisieren
+            // Store original onSubscribed function before overriding
             const originalOnSubscribed = callback.onSubscribed;
             callback.onSubscribed = function() {
                 if (originalOnSubscribed) {
                     originalOnSubscribed();
                 }
                 
-                // WICHTIG: subscribedStates nach erfolgreicher Subscription synchronisieren
+                // Sync subscribedStates after successful subscription
                 if (isMultipleStates) {
-                    // Da wir die erfolgreichen States von subscribeMultiple bekommen haben,
-                    // sollten sie bereits in node.subscribedStates sein
-                    // Aber zur Sicherheit nochmals die ursprünglichen States setzen
-                    if (node.subscribedStates.size === 0) {
-                        stateList.forEach(stateId => {
-                            node.subscribedStates.add(stateId);
-                        });
-                        node.debug(`Restored ${node.subscribedStates.size} subscribed states in onSubscribed`);
-                    }
+                    syncSubscribedStates(stateList);
                 }
             };
 
@@ -624,15 +574,11 @@ module.exports = function (RED) {
                     node.fallbackTimeout = null;
                 }
                 
-                // KORREKTUR: subscribedStates mit ursprünglichen States wiederherstellen
+                // Reset and restore subscribedStates  
                 if (isMultipleStates) {
-                    node.subscribedStates.clear();
                     node.currentStateValues.clear();
-                    stateList.forEach(stateId => {
-                        node.subscribedStates.add(stateId);
-                    });
                     node.expectedInitialValues = stateList.length;
-                    node.debug(`Restored ${node.subscribedStates.size} subscribed states in onReconnect`);
+                    syncSubscribedStates(stateList);
                 }
                 
                 setStatus("yellow", "ring", "Resubscribing...");
@@ -658,13 +604,8 @@ module.exports = function (RED) {
                         globalConfig
                     );
 
-                    // WICHTIG: subscribedStates mit den tatsächlich erfolgreichen States setzen
-                    node.subscribedStates.clear();
-                    successfulStates.forEach(stateId => {
-                        node.subscribedStates.add(stateId);
-                    });
-                    
-                    node.debug(`Successfully subscribed to ${node.subscribedStates.size}/${stateList.length} states`);
+                    // Sync subscribedStates with actually successful states
+                    syncSubscribedStates(successfulStates);
 
                 } catch (error) {
                     node.error(`Failed to subscribe to multiple states: ${error.message}`);
@@ -746,6 +687,10 @@ module.exports = function (RED) {
             }
 
             try {
+                // Use helper for standard cleanup
+                await NodeHelpers.handleNodeClose(node, settings, 'subscription');
+                
+                // Custom cleanup for subscription
                 if (isMultipleStates) {
                     await connectionManager.unsubscribeMultiple(
                         settings.nodeId,
@@ -759,8 +704,6 @@ module.exports = function (RED) {
                         subscriptionPattern
                     );
                 }
-
-                node.status({});
 
             } catch (error) {
                 node.warn(`Cleanup error: ${error.message}`);
