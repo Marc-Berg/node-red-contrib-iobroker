@@ -107,24 +107,21 @@ module.exports = function (RED) {
             return { start, end };
         }
 
+        const TIME_MULTIPLIERS = {
+            'seconds': 1000,
+            'minutes': 60 * 1000,
+            'hours': 60 * 60 * 1000,
+            'days': 24 * 60 * 60 * 1000,
+            'weeks': 7 * 24 * 60 * 60 * 1000
+        };
+
         function convertDurationToMs(duration, unit) {
-            const multipliers = {
-                'seconds': 1000,
-                'minutes': 60 * 1000,
-                'hours': 60 * 60 * 1000,
-                'days': 24 * 60 * 60 * 1000,
-                'weeks': 7 * 24 * 60 * 60 * 1000
-            };
-            return duration * (multipliers[unit] || multipliers.hours);
+            return duration * (TIME_MULTIPLIERS[unit] || TIME_MULTIPLIERS.hours);
         }
 
         function convertStepToMs(step, unit) {
-            const multipliers = {
-                'seconds': 1000,
-                'minutes': 60 * 1000,
-                'hours': 60 * 60 * 1000
-            };
-            return step * (multipliers[unit] || multipliers.seconds);
+            // Step supports only seconds, minutes, hours (no days/weeks)
+            return step * (TIME_MULTIPLIERS[unit] || TIME_MULTIPLIERS.seconds);
         }
 
         function buildQueryOptions(msg, timeRange) {
@@ -246,16 +243,24 @@ module.exports = function (RED) {
             return processedData;
         }
 
+        function normalizeTimestamp(ts, forDisplay = false) {
+            if (!ts) return ts;
+            
+            if (typeof ts === 'string' && !ts.match(/^\d+$/)) {
+                return forDisplay ? ts : new Date(ts).getTime();
+            }
+            
+            const numericTs = typeof ts === 'string' ? parseInt(ts) : ts;
+            return forDisplay ? new Date(numericTs).toLocaleString() : numericTs;
+        }
+
         function formatForChart(data, stateId) {
             const labels = [];
             const values = [];
 
             data.forEach(point => {
                 if (point.ts && point.val !== undefined) {
-                    const timestamp = typeof point.ts === 'string' && !point.ts.match(/^\d+$/) 
-                        ? point.ts
-                        : new Date(point.ts).toLocaleString();
-                    labels.push(timestamp);
+                    labels.push(normalizeTimestamp(point.ts, true));
                     values.push(point.val);
                 }
             });
@@ -277,11 +282,8 @@ module.exports = function (RED) {
 
             data.forEach(point => {
                 if (point.ts && point.val !== undefined) {
-                    const timestamp = typeof point.ts === 'string' && !point.ts.match(/^\d+$/)
-                        ? new Date(point.ts).getTime()
-                        : typeof point.ts === 'string' ? parseInt(point.ts) : point.ts;
                     chartData.push({
-                        x: timestamp,
+                        x: normalizeTimestamp(point.ts, false),
                         y: point.val
                     });
                 }
@@ -504,12 +506,8 @@ module.exports = function (RED) {
             }
         }
 
-        const statusTexts = {
-            ready: getQueueStatusText()
-        };
-
         NodeHelpers.initializeConnection(
-            node, config, RED, settings, globalConfig, setStatus, statusTexts
+            node, config, RED, settings, globalConfig, setStatus, { ready: getQueueStatusText() }
         );
 
         node.on('input', function (msg, send, done) {

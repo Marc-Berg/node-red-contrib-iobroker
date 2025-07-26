@@ -77,12 +77,19 @@ RED.nodes.registerType('iobsendto', {
         $('#response-info').toggle(waitForResponseChecked);
         $('#no-response-info').toggle(!waitForResponseChecked);
         
-        function initializeAdapterDropdown() {
+        function cleanupAdapterDropdown() {
             adapterSelect.find('optgroup').remove();
             adapterSelect.find('option:contains("Loading")').remove();
+        }
+
+        function getEmptyOption() {
+            return adapterSelect.find('option[value=""]');
+        }
+        
+        function initializeAdapterDropdown() {
+            cleanupAdapterDropdown();
             
-            const emptyOption = adapterSelect.find('option[value=""]');
-            $('<option value="" disabled>Loading instances...</option>').insertAfter(emptyOption);
+            $('<option value="" disabled>Loading instances...</option>').insertAfter(getEmptyOption());
             
             setTimeout(() => {
                 loadAvailableInstances();
@@ -166,9 +173,7 @@ RED.nodes.registerType('iobsendto', {
             console.log('🔍 populateInstanceDropdown called with', instances.length, 'instances');
             
             adapterSelect.find('option:contains("Loading")').remove();
-            adapterSelect.find('optgroup').remove();
-            
-            const emptyOption = adapterSelect.find('option[value=""]');
+            cleanupAdapterDropdown();
             
             if (instances.length > 0) {
                 const instanceGroup = $('<optgroup label="📦 Available Instances"></optgroup>');
@@ -179,7 +184,7 @@ RED.nodes.registerType('iobsendto', {
                     instanceGroup.append($('<option></option>').attr('value', instance.name).text(displayName));
                 });
                 
-                instanceGroup.insertAfter(emptyOption);
+                instanceGroup.insertAfter(getEmptyOption());
                 console.log('✅ Added instance group with', instances.length, 'instances');
             }
             
@@ -190,8 +195,7 @@ RED.nodes.registerType('iobsendto', {
         }
         
         function showFallbackInstances() {
-            adapterSelect.find('option:contains("Loading")').remove();
-            adapterSelect.find('optgroup').remove();
+            cleanupAdapterDropdown();
             
             const fallbackGroup = $('<optgroup label="⚠️ Common Instances (not verified)"></optgroup>');
             const fallbackInstances = [
@@ -203,13 +207,11 @@ RED.nodes.registerType('iobsendto', {
                 fallbackGroup.append(`<option value="${instance}" style="color: #666;">🔴 ${instance}</option>`);
             });
             
-            const emptyOption = adapterSelect.find('option[value=""]');
-            fallbackGroup.insertAfter(emptyOption);
+            fallbackGroup.insertAfter(getEmptyOption());
         }
         
         serverInput.on('change', function() {
-            adapterSelect.find('optgroup').remove();
-            adapterSelect.find('option:contains("Loading")').remove();
+            cleanupAdapterDropdown();
             
             setTimeout(() => {
                 initializeAdapterDropdown();

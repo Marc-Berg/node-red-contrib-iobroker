@@ -1,5 +1,13 @@
 # Changelog
 
+## [0.15.1] - 2025-xx-xx
+
+### Changed
+- **UI improvements and code optimization**
+  - Tab-based configuration UI for iob-out node with conditional sections
+  - Object creation properties moved to separate tab
+  - Code optimization across multiple files
+
 ## [0.15.0] - 2025-07-25
 
 ### Added

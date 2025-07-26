@@ -61,7 +61,9 @@ module.exports = function(RED) {
                     return;
                 }
 
+                const trimmedAdapter = adapter.trim();
                 const command = msg.command !== undefined ? msg.command : settings.command;
+                const trimmedCommand = command ? command.trim() : null;
                 const messageContent = msg.message !== undefined ? msg.message : 
                                      (staticMessageParsed !== null ? staticMessageParsed : msg.payload);
                 const timeout = msg.timeout || settings.responseTimeout;
@@ -73,15 +75,20 @@ module.exports = function(RED) {
                     return;
                 }
 
-                setStatus("blue", "dot", `Sending to ${adapter}...`);
+                setStatus("blue", "dot", `Sending to ${trimmedAdapter}...`);
                 const startTime = Date.now();
+
+                function setReadyStatus() {
+                    const readyText = statusTexts.ready;
+                    setStatus("green", "dot", readyText);
+                }
 
                 try {
                     if (settings.waitForResponse) {
                         const response = await connectionManager.sendToAdapter(
                             settings.serverId,
-                            adapter.trim(),
-                            command ? command.trim() : null,
+                            trimmedAdapter,
+                            trimmedCommand,
                             messageContent,
                             timeout
                         );
@@ -90,35 +97,32 @@ module.exports = function(RED) {
                         
                         const responseMsg = {
                             payload: response,
-                            adapter: adapter.trim(),
-                            command: command ? command.trim() : null,
+                            adapter: trimmedAdapter,
+                            command: trimmedCommand,
                             originalMessage: messageContent,
                             responseTime: responseTime,
                             timestamp: Date.now()
                         };
 
-                        const readyText = statusTexts.ready;
-                        setStatus("green", "dot", readyText);
-                        
+                        setReadyStatus();
                         send(responseMsg);
                         done && done();
                     } else {
                         await connectionManager.sendToAdapter(
                             settings.serverId,
-                            adapter.trim(),
-                            command ? command.trim() : null,
+                            trimmedAdapter,
+                            trimmedCommand,
                             messageContent,
                             null
                         );
 
-                        const readyText = statusTexts.ready;
-                        setStatus("green", "dot", readyText);                        
+                        setReadyStatus();                     
                         done && done();
                     }
                     
                 } catch (sendError) {
                     setStatus("red", "ring", "SendTo failed");
-                    node.error(`SendTo failed for ${adapter}: ${sendError.message}`);
+                    node.error(`SendTo failed for ${trimmedAdapter}: ${sendError.message}`);
                     done && done(sendError);
                 }
                 

@@ -61,12 +61,12 @@ module.exports = function(RED) {
         }
 
         function updateStatusWithValue() {
+            const autoCreateStatus = settings.autoCreate ? " (auto-create)" : "";
+            
             if (node.hasSetValue && node.lastValue !== undefined) {
                 const formattedValue = formatValueForStatus(node.lastValue);
-                const autoCreateStatus = settings.autoCreate ? " (auto-create)" : "";
                 setStatus("green", "dot", formattedValue + autoCreateStatus);
             } else {
-                const autoCreateStatus = settings.autoCreate ? " (auto-create)" : "";
                 setStatus("green", "dot", "Ready" + autoCreateStatus);
             }
         }
@@ -150,20 +150,20 @@ module.exports = function(RED) {
                 return true;
             }
 
+            const objectProperties = getObjectProperties(msg, stateId, value);
+
             try {
                 const existingObject = await connectionManager.getObject(settings.serverId, stateId);
                 
                 if (existingObject) {
                     return true;
                 }
-                const objectProperties = getObjectProperties(msg, stateId, value);
-                await createObject(stateId, objectProperties);
                 
+                await createObject(stateId, objectProperties);
                 return true;
             } catch (error) {
                 if (error.message && error.message.includes('not found')) {
                     try {
-                        const objectProperties = getObjectProperties(msg, stateId, value);
                         await createObject(stateId, objectProperties);
                         return true;
                     } catch (createError) {

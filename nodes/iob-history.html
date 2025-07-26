@@ -91,9 +91,24 @@ RED.nodes.registerType('iobhistory', {
             $('.tab-content .tab-pane:first').addClass('active');
         }
         
+        // Unified adapter selection handler
+        function setupAdapterClickHandler() {
+            $('.adapter-list a').off('click').on('click', function(e) {
+                e.preventDefault();
+                const adapter = $(this).data('adapter');
+                $('#node-input-historyAdapter').val(adapter);
+                $(this).addClass('selected').siblings().removeClass('selected');
+                return false;
+            });
+        }
+
+        function showAdapterSuggestions() {
+            $('.adapter-suggestions').show();
+        }
+
         function showDefaultAdapterSuggestions() {
             $('.adapter-list').html('<span style="color: #6c757d; font-style: italic;">Loading available adapters...</span>');
-            $('.adapter-suggestions').show();
+            showAdapterSuggestions();
         }
         
         function loadHistoryAdapters() {
@@ -133,19 +148,12 @@ RED.nodes.registerType('iobhistory', {
                     ).join('');
                     
                     $('.adapter-list').html(adapterButtons + fallbacks);
-                    
-                    $('.adapter-list a').on('click', function(e) {
-                        e.preventDefault();
-                        const adapter = $(this).data('adapter');
-                        $('#node-input-historyAdapter').val(adapter);
-                        $(this).addClass('selected').siblings().removeClass('selected');
-                        return false;
-                    });
+                    setupAdapterClickHandler();
                     
                     const currentAdapter = $('#node-input-historyAdapter').val();
                     $(`.adapter-list a[data-adapter="${currentAdapter}"]`).addClass('selected');
                     
-                    $('.adapter-suggestions').show();
+                    showAdapterSuggestions();
                     console.log(`Found ${adapters.length} history adapters on ${serverId}`);
                 } else {
                     console.log('No history adapters found, keeping default suggestions');
@@ -161,13 +169,7 @@ RED.nodes.registerType('iobhistory', {
                     ).join('')
                 );
                 
-                $('.adapter-list a').on('click', function(e) {
-                    e.preventDefault();
-                    const adapter = $(this).data('adapter');
-                    $('#node-input-historyAdapter').val(adapter);
-                    $(this).addClass('selected').siblings().removeClass('selected');
-                    return false;
-                });
+                setupAdapterClickHandler();
             });
         }
         
@@ -216,19 +218,25 @@ RED.nodes.registerType('iobhistory', {
             }
         }
         
+        // Utility function for showing/hiding sections
+        function toggleSectionVisibility(className, activeSection) {
+            $(`.${className}`).hide();
+            if (activeSection) {
+                $(`.${className}.${activeSection}`).show();
+            }
+        }
+
         // Time range mode handlers
         $('input[name="timeRangeMode"]').on('change', function() {
             const mode = $(this).val();
-            $('.time-config-section').hide();
-            $(`.time-config-section.${mode}`).show();
+            toggleSectionVisibility('time-config-section', mode);
             $('#node-input-timeRange').val(mode);
         });
         
         // Initialize time range mode
         const currentMode = node.timeRange || 'duration';
         $(`input[name="timeRangeMode"][value="${currentMode}"]`).prop('checked', true);
-        $('.time-config-section').hide();
-        $(`.time-config-section.${currentMode}`).show();
+        toggleSectionVisibility('time-config-section', currentMode);
         
         // Aggregation change handler
         $('#node-input-aggregate').on('change', function() {
@@ -259,8 +267,7 @@ RED.nodes.registerType('iobhistory', {
         // Output format change handler
         $('#node-input-outputFormat').on('change', function() {
             const format = $(this).val();
-            $('.output-format-info').hide();
-            $(`.output-format-info.${format}`).show();
+            toggleSectionVisibility('output-format-info', format);
         });
         
         // Query mode change handler

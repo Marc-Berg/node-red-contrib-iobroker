@@ -32,19 +32,15 @@ module.exports = function(RED) {
         node.currentConfig = connectionDetails;
         node.isInitialized = false;
 
+        const createStatusText = (baseText) => {
+            const enumText = settings.includeEnums ? " +enums" : "";
+            const aliasText = settings.includeAliases ? " +aliases" : "";
+            return baseText + enumText + aliasText;
+        };
+
         const statusTexts = {
-            ready: (() => {
-                const baseText = isWildcardPattern ? "Ready (Pattern mode)" : "Ready";
-                const enumText = settings.includeEnums ? " +enums" : "";
-                const aliasText = settings.includeAliases ? " +aliases" : "";
-                return baseText + enumText + aliasText;
-            })(),
-            reconnected: (() => {
-                const baseText = isWildcardPattern ? "Reconnected (Pattern)" : "Reconnected";
-                const enumText = settings.includeEnums ? " +enums" : "";
-                const aliasText = settings.includeAliases ? " +aliases" : "";
-                return baseText + enumText + aliasText;
-            })()
+            ready: createStatusText(isWildcardPattern ? "Ready (Pattern mode)" : "Ready"),
+            reconnected: createStatusText(isWildcardPattern ? "Reconnected (Pattern)" : "Reconnected")
         };
 
         NodeHelpers.initializeConnection(
@@ -104,80 +100,11 @@ module.exports = function(RED) {
             }
         }
 
-        async function performanceTest(msg, send, done) {
-            const testCases = [
-                { name: 'States only', pattern: '*', type: 'state' },
-                { name: 'Enums only', pattern: '*', type: 'enum' },
-                { name: 'Adapters only', pattern: '*', type: 'adapter' },
-                { name: 'All types', pattern: '*', type: null },
-                { name: 'Aliases only', pattern: 'alias.*', type: null }
-            ];
-            
-            const results = [];
-            
-            for (const testCase of testCases) {
-                const startTime = Date.now();
-                
-                try {
-                    let result;
-                    if (testCase.type) {
-                        result = await connectionManager.getObjectView(settings.serverId, 'system', testCase.type, {});
-                    } else {
-                        result = await connectionManager.getObjects(settings.serverId, testCase.pattern, testCase.type);
-                    }
-                    
-                    const duration = Date.now() - startTime;
-                    const count = result?.rows ? result.rows.length : (Array.isArray(result) ? result.length : 0);
-                    
-                    results.push({
-                        test: testCase.name,
-                        pattern: testCase.pattern,
-                        type: testCase.type,
-                        duration: duration,
-                        count: count,
-                        success: true
-                    });
-                    
-                } catch (error) {
-                    results.push({
-                        test: testCase.name,
-                        pattern: testCase.pattern,
-                        type: testCase.type,
-                        duration: 0,
-                        count: 0,
-                        success: false,
-                        error: error.message
-                    });
-                }
-            }
-            
-            const summary = {
-                testResults: results,
-                totalTests: results.length,
-                successfulTests: results.filter(r => r.success).length,
-                fastestTest: results.filter(r => r.success).sort((a, b) => a.duration - b.duration)[0],
-                slowestTest: results.filter(r => r.success).sort((a, b) => b.duration - a.duration)[0]
-            };
-            
-            setStatus("green", "dot", `Test complete: ${summary.successfulTests}/${summary.totalTests} passed`);
-            
-            msg.payload = summary;
-            msg.performanceTestResults = summary;
-            
-            send(msg);
-            done && done();
-        }
-
         function processEnumData(enumResult) {
-            const enumsByType = {
-                rooms: [],
-                functions: [],
-                other: []
-            };
             const enumMemberMap = new Map();
             
             if (!enumResult || !enumResult.rows) {
-                return { enumsByType, enumMemberMap, totalEnums: 0 };
+                return { enumMemberMap, totalEnums: 0 };
             }
             
             const allEnums = [];
@@ -206,14 +133,6 @@ module.exports = function(RED) {
                     members: enumObj.common.members
                 };
 
-                if (enumType === 'rooms') {
-                    enumsByType.rooms.push(enumData);
-                } else if (enumType === 'functions') {
-                    enumsByType.functions.push(enumData);
-                } else {
-                    enumsByType.other.push(enumData);
-                }
-
                 enumObj.common.members.forEach(memberId => {
                     if (!enumMemberMap.has(memberId)) {
                         enumMemberMap.set(memberId, []);
@@ -223,7 +142,6 @@ module.exports = function(RED) {
             });
 
             return {
-                enumsByType,
                 enumMemberMap,
                 totalEnums: allEnums.length
             };
@@ -365,14 +283,8 @@ module.exports = function(RED) {
                 }
 
                 if (settings.aliasResolution === 'both' || settings.aliasResolution === 'reverse') {
-                    if (aliasData.reverseAliasMap.has(obj._id)) {
-                        const aliasObjects = aliasData.reverseAliasMap.get(obj._id);
-                        aliasObjects.forEach(aliasObj => {
-                            if (aliasObj._id && !existingObjectsMap.has(aliasObj._id)) {
-                                
-                            }
-                        });
-                    }
+                    // Note: Reverse aliases are already present in the original objects list
+                    // No additional loading needed for reverse lookup
                 }
             }
 
@@ -618,14 +530,12 @@ module.exports = function(RED) {
             }
 
             if (!Array.isArray(objects) && typeof objects === 'object') {
-                const result = {
+                return {
                     ...baseResult,
                     [settings.outputProperty]: objects,
                     objects: objects,
                     count: 1
                 };
-
-                return result;
             }
 
             const objectArray = Array.isArray(objects) ? objects : Object.values(objects);
@@ -714,11 +624,6 @@ module.exports = function(RED) {
 
         node.on('input', async function(msg, send, done) {
             try {
-                if (msg.topic === 'PERFORMANCE_TEST') {
-                    await performanceTest(msg, send, done);
-                    return;
-                }
-
                 if (NodeHelpers.handleStatusRequest(msg, send, done, settings)) {
                     return;
                 }
@@ -728,7 +633,6 @@ module.exports = function(RED) {
                     return;
                 }
 
-                const isCurrentWildcard = objectIdOrPattern.includes('*');
                 const currentOutputMode = msg.outputMode || settings.outputMode;
                 const currentObjectType = msg.objectType || settings.objectType;
                 
