@@ -1,5 +1,28 @@
 # Changelog
 
+## [1.0.0] - 2025-xx-xx
+
+### 🎉 **First Stable Release**
+This marks the first stable release of node-red-contrib-iobroker
+
+#### **Complete Feature Set**
+- 8 production-ready nodes covering all essential ioBroker integrations
+- Advanced WebSocket connection management with automatic recovery
+- Comprehensive error handling and logging integration
+
+#### **Production-Ready Architecture**
+- Robust connection management with graceful reconnection
+- Memory-efficient resource cleanup and management
+- Performance optimizations for large-scale deployments
+
+#### **Breaking Changes**
+- None - fully backward compatible with all 0.x versions
+
+#### **Migration from 0.x**
+- No configuration changes required
+- Automatic upgrade of existing flows
+- All existing features preserved and enhanced
+
 ## [0.15.1] - 2025-xx-xx
 
 ### Changed
