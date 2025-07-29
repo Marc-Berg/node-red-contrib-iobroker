@@ -174,6 +174,24 @@ module.exports = function(RED) {
                     msg.states = states;
                     msg.timestamp = Date.now();
                     
+                    // Include objects info if available (for compatibility with iob-getobject)
+                    // Filter objects to only include those with corresponding states
+                    if (msg.objects && typeof msg.objects === 'object') {
+                        const filteredObjects = {};
+                        const availableStateIds = new Set(Object.keys(stateResults));
+                        
+                        Object.entries(msg.objects).forEach(([objectId, obj]) => {
+                            if (availableStateIds.has(objectId)) {
+                                filteredObjects[objectId] = obj;
+                            }
+                        });
+                        
+                        // Only include objects if we have some to show
+                        if (Object.keys(filteredObjects).length > 0) {
+                            msg.objects = filteredObjects;
+                        }
+                    }
+                    
                     node.lastValue = `${Object.keys(values).length} states`;
                     node.hasRetrievedValue = true;
                     updateStatusWithValue();

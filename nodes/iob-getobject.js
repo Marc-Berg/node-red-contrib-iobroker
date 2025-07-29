@@ -51,17 +51,17 @@ module.exports = function(RED) {
             try {
                 const queries = [];
                 
-                if (currentObjectType) {
-                    const viewParams = {};
-                    if (objectIdOrPattern !== '*' && !objectIdOrPattern.includes('*')) {
-                        viewParams.key = objectIdOrPattern;
-                    }
+                // Use getObjectView only for exact matches (performance optimization)
+                // For wildcard patterns, always use getObjects to ensure proper pattern filtering
+                if (currentObjectType && objectIdOrPattern !== '*' && !objectIdOrPattern.includes('*')) {
+                    const viewParams = { key: objectIdOrPattern };
                     
                     queries.push({
                         name: 'objects',
                         promise: connectionManager.getObjectView(settings.serverId, 'system', currentObjectType, viewParams)
                     });
                 } else {
+                    // Use getObjects for wildcard patterns or when no type filter is set
                     queries.push({
                         name: 'objects',
                         promise: connectionManager.getObjects(settings.serverId, objectIdOrPattern, currentObjectType)
