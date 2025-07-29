@@ -122,6 +122,12 @@ RED.nodes.registerType('iobget', {
         <li><b>Output Property:</b> The message property to store the value (default: <code>payload</code>).</li>
         <li><b>Server:</b> The ioBroker server configuration.</li>
     </ul>
+    <h3>Input Formats</h3>
+    <ul>
+        <li><b>Single state:</b> <code>msg.topic = "state.id"</code></li>
+        <li><b>Multiple states:</b> <code>msg.topic = ["state1", "state2"]</code></li>
+        <li><b>Auto from getObject:</b> Automatically extracts state IDs from <code>msg.objects</code> including alias targets and reverse alias relationships</li>
+    </ul>
     <h3>State Selection</h3>
     <ul>
         <li><b>Manual input:</b> Type the state ID directly</li>
@@ -130,8 +136,8 @@ RED.nodes.registerType('iobget', {
     </ul>
     <h3>Output</h3>
     <ul>
-        <li>The value is stored in <code>msg.[outputProperty]</code> (default: <code>msg.payload</code>)</li>
-        <li>The complete state object is available in <code>msg.state</code></li>
-        <li>Timestamp information is included in the state object</li>
+        <li><b>Single state:</b> Value in <code>msg.[outputProperty]</code>, complete state in <code>msg.state</code></li>
+        <li><b>Multiple states:</b> Values object in <code>msg.[outputProperty]</code>, states object in <code>msg.states</code>, <code>msg.topic = "batch_states"</code></li>
+        <li>Timestamp information is included in all responses</li>
     </ul>
 </script>

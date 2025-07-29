@@ -25,6 +25,12 @@ This marks the first stable release of node-red-contrib-iobroker
 
 ## [0.15.1] - 2025-xx-xx
 
+#### **New Features**
+- **Batch State Retrieval**: iob-get node now supports batch processing of multiple states
+  - Auto-detection of input formats (single state, array, or getObject output)
+  - Alias support with automatic extraction of aliased states
+  - Compatible output format aligned with iob-in grouped messages
+
 ### Changed
 - **UI improvements and code optimization**
   - Tab-based configuration UI for iob-out node with conditional sections

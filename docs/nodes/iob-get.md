@@ -1,10 +1,10 @@
 # WS ioB get - State Getter
 
-Read current state values from ioBroker on demand without continuous subscription.
+Read current state values from ioBroker on demand with support for single states and batch processing.
 
 ## Purpose
 
-The WS ioB get node allows you to retrieve the current value of ioBroker states when triggered by an incoming message. Unlike `WS ioB in` which continuously monitors states, this node reads values only when requested.
+The WS ioB get node allows you to retrieve current values of ioBroker states when triggered by an incoming message. It supports both single state reading and batch processing of multiple states with automatic alias detection.
 
 ## Configuration
 
@@ -12,25 +12,71 @@ The WS ioB get node allows you to retrieve the current value of ioBroker states 
 
 **State**
 - Target state ID to read (e.g., `0_userdata.0.temperature`)
-- Leave empty to use `msg.topic` for dynamic state selection
-- Supports single state IDs only (no wildcards)
+- Leave empty to use `msg.topic` or `msg.objects` for dynamic state selection
+- Supports single state IDs only when configured (no wildcards)
 
 **Output Property**
-- Target message property for the retrieved value
+- Target message property for the retrieved value(s)
 - Default: `payload`
 - Can be set to any valid message property
+
+## Input Formats
+
+The node automatically detects different input formats:
+
+### 1. Single State (msg.topic)
+```javascript
+msg.topic = "0_userdata.0.temperature";
+```
+
+### 2. Multiple States (msg.topic array)
+```javascript
+msg.topic = [
+    "0_userdata.0.temperature",
+    "0_userdata.0.humidity",
+    "alias.0.livingroom.light"
+];
+```
+
+### 3. Batch Processing (msg.objects)
+Direct output from `iob-getobject` node:
+```javascript
+msg.objects = {
+    "0_userdata.0.temp": { type: "state", aliasInfo: {...} },
+    "0_userdata.0.folder": { type: "folder" },  // ignored
+    "alias.0.light": { type: "state" }
+};
+```
+
+## Batch Processing Features
+
+### Automatic Type Filtering
+- Processes only objects with `type: "state"`
+- Ignores folders, channels, and other non-state objects
+- Prevents errors when processing mixed getObject results
+
+### Alias Support
+Automatically extracts and includes:
+- **aliasedBy**: Alias states that reference the original state
+- **aliasTarget**: Target states referenced by alias objects
+- Both simple and complex alias configurations
 
 ## Usage Patterns
 
 ### Static State Reading
-Configure a specific state ID in the node and trigger with any message:
-
+Configure a specific state ID and trigger with any message:
 1. Set state to `system.adapter.admin.0.alive`
 2. Send any message to trigger reading
 3. Receive current value in `msg.payload`
 
 ### Dynamic State Reading
-Use `msg.topic` to specify which state to read at runtime:
+Use `msg.topic` to specify which state(s) to read at runtime
+
+### Batch State Processing
+Chain with `iob-getobject` for comprehensive state retrieval:
+1. `iob-getobject` → `iob-get` → Processing
+2. Automatically gets all states and their aliases
+3. Perfect for dashboard updates or bulk operations
 
 ### Triggered Readings
 Common trigger scenarios:
@@ -45,102 +91,118 @@ Common trigger scenarios:
 - Read current status before making decisions
 - Get baseline values for calculations
 
-## Output Message Format
-
-The node preserves the original message and adds the state information:
-
-**Retrieved Value**
-- Target property (default `payload`): The current state value
-- Original message properties are preserved
-
-**Additional Properties**
-- `topic`: The state ID that was read (if not already set)
-- `timestamp`: When the value was retrieved
-
-**State Information**
-Complete state object available in `msg.state`:
-- `val`: The actual value
-- `ack`: Acknowledgment flag
-- `ts`: State timestamp
-- `from`: Source that last changed the state
-- `lc`: Last change timestamp
-- `q`: Quality indicator
-
-**Example Output**
-```
+### Single State Mode
+```javascript
 {
-  // Original message properties preserved
-  payload: 23.5,
-  topic: "0_userdata.0.temperature",
-  timestamp: 1640995200000,
-  state: {
-    val: 23.5,
-    ack: true,
-    ts: 1640995150000,
-    from: "system.adapter.javascript.0",
-    lc: 1640995100000,
-    q: 0
-  }
+    "payload": 23.5,                    // State value
+    "state": {                          // Full state object
+        "val": 23.5,
+        "ack": true,
+        "ts": 1234567890,
+        "lc": 1234567890,
+        "from": "system.adapter.javascript.0"
+    },
+    "timestamp": 1234567890,            // Read timestamp
+    "topic": "Original topic preserved"
+}
+```
+
+### Batch Mode (Multiple States)
+Compatible with iob-in grouped message format:
+```javascript
+{
+    "topic": "batch_states",
+    "payload": {                        // State values only
+        "0_userdata.0.temperature": 23.5,
+        "0_userdata.0.humidity": 65,
+        "alias.0.livingroom.light": true
+    },
+    "states": {                         // Full state objects
+        "0_userdata.0.temperature": {
+            "val": 23.5,
+            "ack": true,
+            "ts": 1234567890
+        },
+        "0_userdata.0.humidity": {
+            "val": 65,
+            "ack": true,
+            "ts": 1234567890
+        }
+    },
+    "timestamp": 1234567890
 }
 ```
 
 ## Error Handling
 
-### Common Errors
-- **State not found**: The specified state ID doesn't exist
-- **Permission denied**: User lacks read permissions
-- **Connection error**: WebSocket connection is unavailable
-- **Timeout**: Request took too long to complete
+### Common Error Scenarios
+- **No valid state IDs found**: Check input format and state availability
+- **State not found**: Verify state ID exists in ioBroker
+- **Connection issues**: Node status shows connection problems
 
-### Error Response
-When an error occurs:
-- `msg.error` contains error information
-- `msg.payload` may be undefined or contain error details
-- Node status shows error state
-
-## Performance Considerations
-
-### Request Frequency
-- Avoid rapid successive requests to same state
-- Implement debouncing for user-triggered reads
-- Consider using `WS ioB in` for frequently changing values
-
-## Comparison with Other Nodes
-
-### vs WS ioB in
-- **WS ioB get**: On-demand reading, no continuous monitoring
-- **WS ioB in**: Continuous subscription, automatic updates
-
-### vs WS ioB history
-- **WS ioB get**: Current value only
-- **WS ioB history**: Historical data over time ranges
-
-### Use Cases for WS ioB get
-- One-time status checks
-- Initialization sequences
-- Manual refresh operations
-- Conditional reading based on events
-
+### Status Indicators
+- **Green dot**: Ready for operation
+- **Blue dot**: Reading state(s)
+- **Red ring**: Error occurred
+- **Yellow ring**: Connection issues
 
 ## Integration Examples
 
-### Dashboard Refresh
+### Dashboard Data Collection
 ```javascript
-// Manual refresh button
-[Inject] → [WS ioB get: "sensors.*.temperature"] → [Dashboard]
+// Flow: Timer → iob-getobject → iob-get → Dashboard
+// Collect all device states and their aliases for display
 ```
 
-### Status Check
+### System Status Monitoring
 ```javascript
-// Check adapter status before operation
-[Event] → [WS ioB get: "system.adapter.hue.0.alive"] → [Switch] → [Action]
+// Get multiple system states at once
+msg.topic = [
+    "system.adapter.admin.0.alive",
+    "system.adapter.javascript.0.alive",
+    "system.host.hostname.load"
+];
 ```
+
+### Alias-Aware Bulk Operations
+```javascript
+// Process getObject output including all aliases
+// Perfect for device management and synchronization
+```
+
+## Best Practices
+
+### Performance
+- Use batch mode for multiple states instead of multiple nodes
+- Leverage automatic alias detection for complete device coverage
+- Consider timing between requests to avoid overloading ioBroker
+
+### Reliability
+- Handle missing states gracefully in your flow logic
+- Use appropriate error handling after the node
+- Monitor connection status for critical applications
+
+### Architecture
+- Chain with iob-getobject for object discovery + state reading
+- Use with function nodes to filter/transform batch results
+- Integrate with dashboard nodes for real-time displays
+
+**Retrieved Value**
+- Target property (default `payload`): The current state value
+- Original message properties are preserved
+
+### Use Cases for WS ioB get
+- One-time status checks
+- Batch data collection for dashboards
+- Initialization sequences with complete device state
+- Manual refresh operations with alias support
+- Conditional reading based on events
 
 ## Related Nodes
 
 - **WS ioB in**: Continuous state monitoring
-- **WS ioB out**: Write values to states
-- **WS ioB getObject**: Read object definitions
+- **WS ioB out**: Write values to states  
+- **WS ioB getObject**: Read object definitions (perfect for chaining)
 
 ## Examples
 
