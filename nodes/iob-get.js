@@ -72,10 +72,8 @@ module.exports = function(RED) {
                 // Extract state IDs from different input formats
                 let stateIds = [];
                 
-                if (msg.topic !== undefined && msg.topic !== '') {
-                    // Explicit topic (single string or array)
-                    stateIds = Array.isArray(msg.topic) ? msg.topic : [msg.topic];
-                } else if (msg.objects && typeof msg.objects === 'object') {
+                // Priority: msg.objects takes precedence over msg.topic
+                if (msg.objects && typeof msg.objects === 'object') {
                     // Auto-extract from getObject output - only process objects with type "state"
                     const stateObjectIds = [];
                     const aliasIds = [];
@@ -112,6 +110,19 @@ module.exports = function(RED) {
                     });
                     
                     stateIds = [...stateObjectIds, ...aliasIds];
+                } else if (msg.topic !== undefined && msg.topic !== '') {
+                    // Explicit topic (single string or array) - only if no objects present
+                    const topicIds = Array.isArray(msg.topic) ? msg.topic : [msg.topic];
+                    
+                    // Check for wildcard patterns and reject them
+                    const hasWildcards = topicIds.some(id => typeof id === 'string' && id.includes('*'));
+                    if (hasWildcards) {
+                        setStatus("red", "ring", "Wildcards not supported");
+                        done && done(new Error("iob-get does not support wildcard patterns in msg.topic. Use iob-getobject for pattern matching, then chain to iob-get."));
+                        return;
+                    }
+                    
+                    stateIds = topicIds;
                 } else {
                     // Fallback to configured state
                     const configState = config.state?.trim();
