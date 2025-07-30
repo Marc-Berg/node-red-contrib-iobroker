@@ -121,6 +121,31 @@ module.exports = function(RED) {
                 }
                 
                 if (stateIds.length === 0) {
+                    // If we have msg.objects but no state objects were found, return graceful empty result
+                    if (msg.objects && typeof msg.objects === 'object') {
+                        setStatus("yellow", "ring", "No state objects found");
+                        
+                        // Return empty result in same format as batch mode
+                        msg.topic = "batch_states";
+                        msg[settings.outputProperty] = {};
+                        msg.states = {};
+                        msg.timestamp = Date.now();
+                        
+                        // Keep original objects if available
+                        if (Object.keys(msg.objects).length === 0) {
+                            msg.objects = {};
+                        }
+                        
+                        node.lastValue = "0 states";
+                        node.hasRetrievedValue = true;
+                        updateStatusWithValue();
+                        
+                        send(msg);
+                        done && done();
+                        return;
+                    }
+                    
+                    // Only validate required input if no msg.objects provided (original behavior)
                     if (!NodeHelpers.validateRequiredInput("", "State ID", setStatus, done)) {
                         return;
                     }

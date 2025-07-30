@@ -530,11 +530,13 @@ module.exports = function(RED) {
             }
 
             if (!Array.isArray(objects) && typeof objects === 'object') {
+                // Check if the object is empty (no properties with valid IDs)
+                const hasValidProperties = objects._id || Object.keys(objects).length > 0;
                 return {
                     ...baseResult,
                     [settings.outputProperty]: objects,
                     objects: objects,
-                    count: 1
+                    count: hasValidProperties ? 1 : 0
                 };
             }
 
