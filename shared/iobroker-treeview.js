@@ -567,7 +567,9 @@
         
         function showStatus(type, msg) {
             const icons = { success: 'fa-check-circle', info: 'fa-info-circle', error: 'fa-exclamation-triangle' };
-            elements.status.html(`<span class="iob-status ${type}"><i class="fa ${icons[type]}"></i> ${msg}</span>`).show();
+            // Escape HTML to prevent XSS
+            const escapedMsg = $('<div>').text(msg).html();
+            elements.status.html(`<span class="iob-status ${type}"><i class="fa ${icons[type]}"></i> ${escapedMsg}</span>`).show();
         }
         
         function toggleMode() {
