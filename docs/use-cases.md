@@ -1,21 +1,22 @@
-# Common Use Cases
+# Use Cases for Node-RED ioBroker Integration
 
 This guide provides practical examples of how to use the Node-RED ioBroker integration nodes in real-world scenarios.
 
-## Home Automation
+## 1. Home Automation
 
-### Lighting Control
+### 1.1 Lighting Control
 
-**Automatic Door-Based Lighting**
+#### Automatic Door-Based Lighting
 Monitor door sensors and automatically control room lighting based on door state changes.
 
 **Flow Setup:**
 1. Use **WS ioB in** with wildcard pattern `*.door.state`
 2. Connect to **Switch** node to check if door is opened
-3. Use **WS ioB out** to control lights with pattern `lights.*.state`
-4. Add **Delay** node to turn off lights after certain time
+3. Use **Function** node to determine specific light state ID
+4. Use **WS ioB out** to control specific lights like `lights.livingroom.state`
+5. Add **Delay** node to turn off lights after certain time
 
-**Motion-Activated Lighting**
+#### Motion-Activated Lighting
 Control lights based on motion sensor detection with automatic timeout.
 
 **Flow Setup:**
@@ -26,50 +27,54 @@ Control lights based on motion sensor detection with automatic timeout.
 5. **Delay** → Wait 10 minutes after motion stops
 6. **WS ioB out** → Send OFF to same light state
 
-### Climate Control
+### 1.2 Climate Control
 
-**Temperature-Based Heating Control**
+#### Temperature-Based Heating Control
 Monitor room temperatures and automatically adjust heating setpoints.
 
 **Flow Setup:**
 1. **WS ioB in** → Monitor `*.temperature` states
 2. **Function** → Calculate desired setpoint based on current temp
 3. **Range** → Limit setpoint to safe values (16-25°C)
-4. **WS ioB out** → Send to `heating.*.setpoint`
+4. **Function** → Determine specific heating zone ID from temperature sensor
+5. **WS ioB out** → Send to specific heating state like `heating.livingroom.setpoint`
 
-**Smart Thermostat Logic**
+#### Smart Thermostat Logic
 Create intelligent heating control with time schedules and presence detection.
 
 **Flow Setup:**
 1. **WS ioB in** → Multiple inputs: temperature, presence, time
 2. **Function** → Complex logic for comfort vs efficiency
-3. **WS ioB out** → Control heating valves and boiler
+3. **Split** → Send commands to multiple heating zones
+4. **WS ioB out** → Control specific heating valves like `heating.zone1.valve`
+5. **WS ioB out** → Control boiler state `heating.boiler.state`
 
-### Security Systems
+### 1.3 Security Systems
 
-**Intrusion Detection**
+#### Intrusion Detection
 Monitor door/window sensors and trigger alarms when security is breached.
 
 **Flow Setup:**
 1. **WS ioB in** → Subscribe to `security.*.contact`
 2. **Switch** → Filter only "open" states during armed periods
 3. **Change** → Set alarm state
-4. **WS ioB out** → Trigger sirens, notifications, lights
+4. **Split** → Send commands to multiple devices
+5. **WS ioB out** → Trigger specific devices like `alarm.siren.state`, `lights.all.flash`
 
-**Access Control**
+#### Access Control
 Control door locks based on user authentication and schedules.
 
 **Flow Setup:**
 1. **WS ioB in** → Monitor RFID/keypad inputs
 2. **Function** → Validate user credentials and time restrictions
-3. **WS ioB out** → Control door lock state
-4. **WS ioB out** → Log access events
+3. **WS ioB out** → Control door lock state `security.door.lock`
+4. **WS ioB out** → Log access events to `security.access.log`
 
-## System Monitoring
+## 2. System Monitoring
 
-### Adapter Health Monitoring
+### 2.1 Adapter Health Monitoring
 
-**Real-Time Status Dashboard**
+#### Real-Time Status Dashboard
 Create a comprehensive overview of all ioBroker adapter states.
 
 **Flow Setup:**
@@ -78,18 +83,18 @@ Create a comprehensive overview of all ioBroker adapter states.
 3. **Dashboard** → Display adapter health grid
 4. **Switch** → Filter only offline adapters for alerts
 
-**Automatic Restart Failed Adapters**
+#### Automatic Restart Failed Adapters
 Monitor adapter health and automatically restart failed instances.
 
 **Flow Setup:**
 1. **WS ioB in** → Monitor `system.adapter.*.alive`
 2. **Switch** → Detect false (offline) states
 3. **Delay** → Wait before restart to avoid false triggers
-4. **WS ioB out** → Send restart command to adapter
+4. **WS ioB out** → Send restart command to specific adapter like `system.adapter.hm-rpc.restart`
 
-### Performance Monitoring
+### 2.2 Performance Monitoring
 
-**Memory Usage Tracking**
+#### Memory Usage Tracking
 Monitor system memory consumption and alert on high usage.
 
 **Flow Setup:**
@@ -98,7 +103,7 @@ Monitor system memory consumption and alert on high usage.
 3. **Switch** → Alert when usage exceeds thresholds
 4. **Dashboard** → Display memory usage charts
 
-**CPU Load Monitoring**
+#### CPU Load Monitoring
 Track system performance and identify performance bottlenecks.
 
 **Flow Setup:**
@@ -107,9 +112,9 @@ Track system performance and identify performance bottlenecks.
 3. **Range** → Normalize load values for display
 4. **Chart** → Visualize load over time
 
-### Log Monitoring
+### 2.3 Log Monitoring
 
-**Error Alert System**
+#### Error Alert System
 Monitor ioBroker logs and send notifications for critical errors.
 
 **Flow Setup:**
@@ -118,7 +123,7 @@ Monitor ioBroker logs and send notifications for critical errors.
 3. **Template** → Format notification message
 4. **Email/Push** → Send alert notifications
 
-**Adapter Activity Monitoring**
+#### Adapter Activity Monitoring
 Track adapter startup, shutdown, and error events.
 
 **Flow Setup:**
@@ -127,11 +132,11 @@ Track adapter startup, shutdown, and error events.
 3. **Switch** → Route different message types
 4. **Dashboard** → Display activity timeline
 
-## Data Analysis
+## 3. Data Analysis
 
-### Energy Consumption Tracking
+### 3.1 Energy Consumption Tracking
 
-**Real-Time Energy Dashboard**
+#### Real-Time Energy Dashboard
 Monitor current power consumption across all devices.
 
 **Flow Setup:**
@@ -140,7 +145,7 @@ Monitor current power consumption across all devices.
 3. **Chart** → Display real-time power usage
 4. **Gauge** → Show current total consumption
 
-**Historical Energy Analysis**
+#### Historical Energy Analysis
 Analyze energy consumption patterns over time.
 
 **Flow Setup:**
@@ -149,9 +154,38 @@ Analyze energy consumption patterns over time.
 3. **Chart** → Display consumption trends
 4. **Table** → Show top energy consumers
 
-### Weather Data Analysis
+### 3.2 Dashboard Data Preparation
 
-**Weather Station Data Collection**
+#### Complete State Discovery for Dashboards
+Discover all relevant objects and retrieve their current states with aliases for comprehensive dashboard displays.
+
+**Flow Setup:**
+1. **WS ioB getObject** → Discover objects with pattern matching (e.g., `lights.*`, `sensors.*.temperature`)
+2. **WS ioB get** → Retrieve current states and values for all discovered objects
+3. **Function** → Process and format data for dashboard consumption
+4. **Dashboard/UI** → Display complete state information with names and values
+
+**Example Configuration:**
+- **Pattern**: `lights.*.level` to find all dimmer controls
+- **Type Filter**: `state` to get only state objects
+- **Output**: Complete object metadata with current values and alias definitions
+- **Result**: Ready-to-use data including object names, current values, units, and translations
+
+**Use Cases:**
+- **Smart Home Dashboard**: Show all lights with current brightness levels
+- **Sensor Overview**: Display all temperature sensors with current readings and aliases
+- **Device Status Board**: List all devices with their current states and friendly names
+- **System Monitoring**: Overview of all system states with descriptive names
+
+**Benefits:**
+- Automatic discovery of new objects when added to ioBroker
+- Complete alias information for user-friendly display names
+- Robust handling of missing or unavailable states
+- Single workflow to populate complex dashboards with live data
+
+### 3.3 Weather Data Analysis
+
+#### Weather Station Data Collection
 Collect and analyze data from multiple weather sensors.
 
 **Flow Setup:**
@@ -160,7 +194,7 @@ Collect and analyze data from multiple weather sensors.
 3. **WS ioB history** → Store processed data
 4. **Dashboard** → Display current conditions and forecasts
 
-**Climate Pattern Analysis**
+#### Climate Pattern Analysis
 Analyze long-term weather patterns and trends.
 
 **Flow Setup:**
@@ -169,9 +203,9 @@ Analyze long-term weather patterns and trends.
 3. **Chart** → Display seasonal patterns
 4. **Function** → Generate weather predictions
 
-### Device Usage Analytics
+### 3.4 Device Usage Analytics
 
-**Smart Device Usage Patterns**
+#### Smart Device Usage Patterns
 Analyze how smart home devices are used throughout the day.
 
 **Flow Setup:**
@@ -180,7 +214,7 @@ Analyze how smart home devices are used throughout the day.
 3. **Chart** → Display usage patterns by time of day
 4. **Table** → Show device usage statistics
 
-**Optimization Recommendations**
+#### Optimization Recommendations
 Generate recommendations for improving home automation efficiency.
 
 **Flow Setup:**
@@ -189,31 +223,32 @@ Generate recommendations for improving home automation efficiency.
 3. **Template** → Generate optimization suggestions
 4. **Dashboard** → Display recommendations
 
-## Integration Examples
+## 4. Integration Examples
 
-### Third-Party Service Integration
+### 4.1 Third-Party Service Integration
 
-**Weather API Integration**
+#### Weather API Integration
 Combine external weather data with local sensors.
 
 **Flow Setup:**
 1. **HTTP Request** → Get weather forecast from API
 2. **WS ioB in** → Get local temperature sensor data
 3. **Function** → Compare and validate data sources
-4. **WS ioB out** → Store combined weather data
+4. **WS ioB out** → Store combined weather data in `weather.combined.forecast`
 
-**Smart Speaker Integration**
+#### Smart Speaker Integration
 Control ioBroker devices through voice commands.
 
 **Flow Setup:**
 1. **HTTP In** → Receive voice command webhooks
 2. **Function** → Parse voice commands and extract device/action
 3. **Switch** → Route to appropriate device controls
-4. **WS ioB out** → Execute device commands
+4. **Function** → Map commands to specific device state IDs
+5. **WS ioB out** → Execute device commands like `lights.living.state` or `heating.setpoint`
 
-### Database Integration
+### 4.2 Database Integration
 
-**External Database Logging**
+#### External Database Logging
 Store ioBroker data in external databases for advanced analytics.
 
 **Flow Setup:**
@@ -222,31 +257,31 @@ Store ioBroker data in external databases for advanced analytics.
 3. **Database** → Insert/update records
 4. **Debug** → Monitor database operations
 
-**Data Synchronization**
+#### Data Synchronization
 Keep ioBroker states synchronized with external systems.
 
 **Flow Setup:**
 1. **WS ioB in** → Monitor state changes
 2. **HTTP Request** → Send updates to external API
-3. **WS ioB out** → Update acknowledgment states
+3. **WS ioB out** → Update acknowledgment states like `sync.status.lastUpdate`
 4. **Function** → Handle synchronization errors
 
-## Advanced Patterns
+## 5. Advanced Patterns
 
-### State Machine Implementation
+### 5.1 State Machine Implementation
 
-**Device State Management**
+#### Device State Management
 Implement complex state machines for device control logic.
 
 **Flow Setup:**
 1. **WS ioB in** → Monitor device inputs and current state
 2. **Function** → Implement state transition logic
 3. **Context** → Store current state information
-4. **WS ioB out** → Update device outputs based on new state
+4. **WS ioB out** → Update specific device outputs like `device.currentState` or `device.outputValue`
 
-### Data Validation and Filtering
+### 5.2 Data Validation and Filtering
 
-**Sensor Data Validation**
+#### Sensor Data Validation
 Implement data quality checks for sensor inputs.
 
 **Flow Setup:**
@@ -254,33 +289,13 @@ Implement data quality checks for sensor inputs.
 2. **Range** → Check values are within expected limits
 3. **Rate Limit** → Prevent rapid fluctuations
 4. **Switch** → Filter valid vs invalid readings
-5. **WS ioB out** → Store only validated data
+5. **WS ioB out** → Store validated data to specific states like `sensors.temperature.validated`
 
-### Backup and Recovery
+## 6. Performance Optimization
 
-**Configuration Backup**
-Automatically backup important ioBroker configurations.
+### 6.1 Efficient Wildcard Usage
 
-**Flow Setup:**
-1. **WS ioB getObject** → Get object configurations
-2. **Function** → Serialize and compress data
-3. **File** → Save backup files
-4. **Schedule** → Run backup on regular intervals
-
-**State Recovery**
-Restore device states after system restarts.
-
-**Flow Setup:**
-1. **Inject** → Trigger on Node-RED startup
-2. **File In** → Read last known state file
-3. **Function** → Parse saved states
-4. **WS ioB out** → Restore device states
-
-## Performance Optimization
-
-### Efficient Wildcard Usage
-
-**Smart Pattern Design**
+#### Smart Pattern Design
 Design wildcard patterns for optimal performance.
 
 **Best Practices:**
@@ -289,24 +304,13 @@ Design wildcard patterns for optimal performance.
 - Combine patterns: Multiple specific subscriptions vs one broad pattern
 - Monitor subscription count in node status
 
-### Message Flow Optimization
+### 6.2 Message Flow Optimization
 
-**Reduce Message Frequency**
+#### Reduce Message Frequency
 Implement strategies to reduce unnecessary message processing.
 
 **Flow Setup:**
 1. **WS ioB in** → Raw high-frequency data
 2. **Delay** → Batch messages over time window
 3. **Function** → Process batch and extract relevant changes
-4. **WS ioB out** → Send only significant changes
-
-### Resource Management
-
-**Connection Pooling**
-Optimize WebSocket connections across multiple nodes.
-
-**Configuration:**
-- Use same iob-config node across multiple flows
-- Monitor connection status in node configuration
-- Implement connection health checks
-- Plan for automatic reconnection scenarios
+4. **WS ioB out** → Send only significant changes to specific states
