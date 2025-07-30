@@ -16,7 +16,7 @@ This marks the first stable release of node-red-contrib-iobroker
 - Performance optimizations for large-scale deployments
 
 #### **Breaking Changes**
-- None - fully backward compatible with all 0.x versions
+- None - backward compatible with all versions > 0.13
 
 #### **Migration from 0.x**
 - No configuration changes required
