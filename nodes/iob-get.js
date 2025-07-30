@@ -130,6 +130,7 @@ module.exports = function(RED) {
                         msg[settings.outputProperty] = {};
                         msg.states = {};
                         msg.timestamp = Date.now();
+                        msg.count = 0; // Update count to reflect actual retrieved states
                         
                         // Keep original objects if available
                         if (Object.keys(msg.objects).length === 0) {
@@ -198,22 +199,35 @@ module.exports = function(RED) {
                     msg[settings.outputProperty] = values;
                     msg.states = states;
                     msg.timestamp = Date.now();
+                    msg.count = Object.keys(values).length; // Update count to reflect actual retrieved states
                     
                     // Include objects info if available (for compatibility with iob-getobject)
-                    // Filter objects to only include those with corresponding states
+                    // Include ALL objects for states that were retrieved (originals + aliases)
                     if (msg.objects && typeof msg.objects === 'object') {
-                        const filteredObjects = {};
-                        const availableStateIds = new Set(Object.keys(stateResults));
+                        const allObjects = {};
+                        const retrievedStateIds = new Set(Object.keys(stateResults));
                         
+                        // Add original objects that have corresponding states
                         Object.entries(msg.objects).forEach(([objectId, obj]) => {
-                            if (availableStateIds.has(objectId)) {
-                                filteredObjects[objectId] = obj;
+                            if (retrievedStateIds.has(objectId)) {
+                                allObjects[objectId] = obj;
+                            }
+                        });
+                        
+                        // Add alias objects for alias states that were retrieved
+                        Object.entries(msg.objects).forEach(([objectId, obj]) => {
+                            if (obj && obj.aliasInfo && obj.aliasInfo.aliasedBy) {
+                                obj.aliasInfo.aliasedBy.forEach(aliasObj => {
+                                    if (aliasObj && aliasObj._id && retrievedStateIds.has(aliasObj._id)) {
+                                        allObjects[aliasObj._id] = aliasObj;
+                                    }
+                                });
                             }
                         });
                         
                         // Only include objects if we have some to show
-                        if (Object.keys(filteredObjects).length > 0) {
-                            msg.objects = filteredObjects;
+                        if (Object.keys(allObjects).length > 0) {
+                            msg.objects = allObjects;
                         }
                     }
                     
