@@ -6,8 +6,8 @@
 This marks the first stable release of node-red-contrib-iobroker
 
 #### **Complete Feature Set**
-- 8 production-ready nodes covering all essential ioBroker integrations
-- Advanced WebSocket connection management with automatic recovery
+- 8 nodes covering all essential ioBroker integrations
+- WebSocket connection management with automatic recovery
 - Comprehensive error handling and logging integration
 
 #### **Production-Ready Architecture**
@@ -21,7 +21,7 @@ This marks the first stable release of node-red-contrib-iobroker
 #### **Migration from 0.x**
 - No configuration changes required
 - Automatic upgrade of existing flows
-- All existing features preserved and enhanced
+- All existing features preserved
 
 ## [0.15.2] - 2025-07-31
 
