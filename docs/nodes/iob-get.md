@@ -12,13 +12,29 @@ The WS ioB get node allows you to retrieve current values of ioBroker states whe
 
 **State**
 - Target state ID to read (e.g., `0_userdata.0.temperature`)
-- Leave empty to use `msg.topic` or `msg.objects` for dynamic state selection
+- Has highest priority over dynamic inputs (`msg.objects`, `msg.topic`)
 - Supports single state IDs only when configured (no wildcards)
 
 **Output Property**
 - Target message property for the retrieved value(s)
 - Default: `payload`
 - Can be set to any valid message property
+
+## Input Priority
+
+State selection follows this priority order:
+
+1. **Configured State ID** (highest priority)
+   - Always used when configured in the node
+   - Overrides any dynamic input
+   
+2. **msg.objects** (medium priority)  
+   - Auto-extracts from iob-getobject output
+   - Only used when no state is configured
+   
+3. **msg.topic** (lowest priority)
+   - Single state ID or array of state IDs
+   - Only used when no state configured and no msg.objects present
 
 ## Input Formats
 

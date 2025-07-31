@@ -118,10 +118,17 @@ RED.nodes.registerType('iobget', {
     <p>ioBroker state getter via WebSocket.</p>
     <h3>Configuration</h3>
     <ul>
-        <li><b>State:</b> The ioBroker state ID. If empty, <code>msg.topic</code> is used as the state ID.</li>
+        <li><b>State:</b> The ioBroker state ID. Has highest priority over dynamic inputs.</li>
         <li><b>Output Property:</b> The message property to store the value (default: <code>payload</code>).</li>
         <li><b>Server:</b> The ioBroker server configuration.</li>
     </ul>
+    <h3>Input Priority</h3>
+    <p>State selection follows this priority order:</p>
+    <ol>
+        <li><b>Configured State ID</b> (highest) - Always used when configured</li>
+        <li><b>msg.objects</b> - Auto-extracts state IDs from getObject output</li>
+        <li><b>msg.topic</b> (lowest) - Single state ID or array of state IDs</li>
+    </ol>
     <h3>Input Formats</h3>
     <ul>
         <li><b>Single state:</b> <code>msg.topic = "state.id"</code></li>
