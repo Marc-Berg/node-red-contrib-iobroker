@@ -1,10 +1,10 @@
-# WS ioB getObject - Object Getter with Enum Assignment Support
+# WS ioB getObject - Object Retrieval with Enum & Alias Support
 
-Retrieve ioBroker object definitions and metadata with support for wildcard patterns, multiple output formats, and automatic enum assignment integration.
+Retrieve ioBroker object definitions and metadata with support for wildcard patterns, enum assignments, and alias resolution.
 
 ## Purpose
 
-The WS ioB getObject node allows you to retrieve ioBroker object definitions, which contain metadata about states, devices, adapters, and other ioBroker entities. This is useful for discovering available states, reading device configurations, and understanding object structures. The node includes enum assignment features for automatic room and function categorization.
+The WS ioB getObject node retrieves ioBroker object definitions containing metadata about states, devices, adapters, and other entities. It supports automatic enum assignment integration for room/function categorization and alias resolution for comprehensive object relationships.
 
 ## Configuration
 
@@ -13,65 +13,45 @@ The WS ioB getObject node allows you to retrieve ioBroker object definitions, wh
 **Object ID / Pattern**
 - Single object ID (e.g., `system.adapter.admin.0`)
 - Wildcard pattern (e.g., `system.adapter.*`)
-- Leave empty to use `msg.topic` for dynamic selection
+- Leave empty to use `msg.topic` for dynamic input
 
 **Output Property**
-- Target message property for the retrieved object(s)
-- Default: `payload`
-- Can be set to any valid message property
+- Target message property (default: `payload`)
 
 **Output Mode**
-- **Single Object**: Returns object directly (for single matches)
-- **Array of Objects**: Returns array of objects (ideal for wildcards)
+- **Single Object**: Returns object directly
+- **Array of Objects**: Returns array (ideal for wildcards)
 - **Object Map**: Returns `{objectId: object}` mapping
 
 **Object Type Filter**
-- Filter objects by type (state, channel, device, etc.)
+- Filter by type (state, channel, device, etc.)
 
-### Enum Assignment Integration
+### Enhanced Features
 
 **Include assigned Enums**
-- Enriches objects with room and function assignments
-- Provides structured enum data for each object
+- Adds room and function assignments to objects
+- Configurable enum types (all, rooms only, functions only)
 
-**Enum Types**
-- **All Types**: Include rooms, functions, and custom enums
-- **Rooms only**: Only room assignments
-- **Functions only**: Only function assignments  
-- **Rooms and Functions**: Both rooms and functions, excluding custom enums
+**Include alias information**
+- Resolves alias relationships automatically
+- Supports simple and complex (read/write) aliases
+- Bidirectional resolution options
 
-## Enhanced Output with Enum Assignments
+## Enhanced Output Features
 
-When enum assignments are enabled, each object includes an `enumAssignments` property:
+### Enum Assignments
+
+When enabled, each object includes an `enumAssignments` property:
 
 ```javascript
 {
   _id: "hue.0.lights.1.state",
   type: "state",
-  common: {
-    name: "Living Room Light",
-    role: "switch.state"
-  },
+  common: { name: "Living Room Light", role: "switch.state" },
   native: {},
   enumAssignments: {
-    rooms: [
-      {
-        id: "enum.rooms.living_room",
-        name: "Living Room", 
-        type: "rooms",
-        icon: "home",
-        color: "#ff6600"
-      }
-    ],
-    functions: [
-      {
-        id: "enum.functions.lighting",
-        name: "Lighting",
-        type: "functions", 
-        icon: "lightbulb",
-        color: "#ffcc00"
-      }
-    ],
+    rooms: [{ id: "enum.rooms.living_room", name: "Living Room", type: "rooms" }],
+    functions: [{ id: "enum.functions.lighting", name: "Lighting", type: "functions" }],
     other: [],
     totalEnums: 2,
     hasRoom: true,
@@ -82,320 +62,192 @@ When enum assignments are enabled, each object includes an `enumAssignments` pro
 }
 ```
 
-### Enum Assignment Properties
+### Alias Information
 
-**Arrays by Type**
-- `rooms`: Array of assigned room enums
-- `functions`: Array of assigned function enums  
-- `other`: Array of custom enum assignments
+When enabled, each object includes an `aliasInfo` property:
 
-**Summary Information**
-- `totalEnums`: Total number of enum assignments
-- `hasRoom`: Boolean indicating room assignment
-- `hasFunction`: Boolean indicating function assignment
-
-**Convenience Properties**
-- `roomName`: Name of first assigned room (null if none)
-- `functionName`: Name of first assigned function (null if none)
-
-### Enhanced Message Properties
-
-**Standard Output Properties**
-- Target property (default `payload`): Object(s) with enum data
-- `objects`: Object map for compatibility
-- `objectId`: The object ID or pattern used
-- `count`: Number of objects returned
-- `timestamp`: When the data was retrieved
-
-**Enum-Specific Properties**
-- `includesEnums`: Boolean flag indicating enum data inclusion
-- `enumStatistics`: Summary statistics about enum coverage (for multiple objects)
-
-**Example Enum Statistics**
+**Simple Alias (single target):**
 ```javascript
 {
-  enumStatistics: {
-    objectsWithRooms: 15,
-    objectsWithFunctions: 12, 
-    objectsWithAnyEnum: 18,
-    totalEnumAssignments: 32
+  _id: "alias.0.Wohnzimmer.Licht",
+  aliasInfo: {
+    isAlias: true,
+    aliasTarget: {
+      type: "simple",
+      target: {
+        _id: "hue.0.lights.1.state",
+        type: "state",
+        common: {...}
+      }
+    },
+    aliasedBy: []
   }
 }
 ```
 
-## Object Types and Filtering
-
-### Supported Object Types
-- **state**: Data points with values
-- **channel**: Grouping of related states
-- **device**: Physical or logical devices  
-- **folder**: Organizational containers
-- **adapter**: Adapter instances
-- **instance**: Adapter instance configurations
-- **host**: System host information
-- **group**: User groups
-- **user**: User accounts
-- **config**: Configuration objects
-- **enum**: Enumeration objects
-
-### System Objects
-**Adapter Objects**
-- `system.adapter.admin.0` - Admin adapter instance
-- `system.adapter.*` - All adapter instances
-- `system.adapter.*.alive` - Adapter alive states
-
-**Host Objects**
-- `system.host.hostname` - Host system information
-- `system.host.versions` - Node versions
-
-**Configuration Objects**
-- `system.config` - System configuration
-- `system.certificates` - SSL certificates
-
-### Device Objects
-**Device Instances**
-- `hue.0.lights.1` - Philips Hue light device
-- `sonoff.0.DVES_123456` - Sonoff device
-- `zigbee.0.00158d00023a5b7c` - Zigbee device
-
-**Channel Objects**
-- `hue.0.lights` - Light device channel
-- `homematic.0.BidCos-RF.NEQ1234567` - HomeMatic channel
-
-### State Objects
-**Data Points**
-- `0_userdata.0.temperature` - User-defined state
-- `javascript.0.myScript` - JavaScript variable
-- `hue.0.lights.1.state` - Device state
-
-## Wildcard Pattern Examples
-
-### Discover Adapters
-```
-system.adapter.*          // All adapter instances
-system.adapter.*.alive    // Adapter status states
-system.adapter.hue.*      // All Hue adapter objects
+**Complex Alias (read/write targets):**
+```javascript
+{
+  _id: "alias.0.OG.Aktor",
+  aliasInfo: {
+    isAlias: true,
+    aliasTarget: {
+      type: "complex",
+      readId: "mqtt.0.z2m.FH_Actor_OG.state_l1",
+      writeId: "mqtt.0.z2m.FH_Actor_OG.set.state_l1",
+      targets: {
+        read: { _id: "mqtt.0.z2m.FH_Actor_OG.state_l1", ... },
+        write: { _id: "mqtt.0.z2m.FH_Actor_OG.set.state_l1", ... }
+      }
+    },
+    aliasedBy: []
+  }
+}
 ```
 
-### Find Device Objects with Room Context
-```
-*.lights.*                // All light objects (with room assignments)
-zigbee.0.*.available      // Zigbee device availability (with location info)
-hue.0.*                   // All Hue objects (with room/function data)
-```
-
-### Enum Discovery
-```
-enum.*                    // All enum objects
-enum.rooms.*              // All room definitions
-enum.functions.*          // All function definitions
-```
-
-### System Information
-```
-system.host.*             // Host information
-system.config             // System configuration
-system.certificates       // SSL certificates
-```
-
-## Output Formats
-
-### Single Object Format
-Returns the object directly when only one match is found:
-
+**Target Object (aliased by others):**
 ```javascript
 {
   _id: "hue.0.lights.1.state",
-  type: "state",
-  common: {
-    name: "Living Room Light",
-    role: "switch.state"
-  },
-  native: {},
-  enumAssignments: {
-    // ... enum data as shown above
+  aliasInfo: {
+    isAlias: false,
+    aliasTarget: null,
+    aliasedBy: [
+      { _id: "alias.0.Wohnzimmer.Licht.switch", type: "state", ... }
+    ]
   }
 }
 ```
 
-### Array Format
-Returns an array of objects with enum assignments:
+### Alias Resolution Modes
 
-```javascript
-[
-  {
-    _id: "hue.0.lights.1.state",
-    type: "state",
-    enumAssignments: { /* ... */ }
-  },
-  {
-    _id: "hue.0.lights.2.state", 
-    type: "state",
-    enumAssignments: { /* ... */ }
-  }
-]
-```
+- **Both directions**: Resolves alias targets AND finds aliases pointing to targets
+- **Target resolution only**: Only resolves alias → target relationships
+- **Reverse lookup only**: Only finds target → alias relationships
 
-### Object Map Format
-Returns a mapping of object IDs to enriched objects:
+### Message Properties
 
-```javascript
-{
-  "hue.0.lights.1.state": {
-    _id: "hue.0.lights.1.state",
-    type: "state",
-    enumAssignments: { /* ... */ }
-  },
-  "hue.0.lights.2.state": {
-    _id: "hue.0.lights.2.state",
-    type: "state", 
-    enumAssignments: { /* ... */ }
-  }
-}
-```
+When retrieving objects, the output message contains:
 
-## Object Structure
+- **Target property** (default `payload`): Retrieved object(s) with enriched data
+- **`objects`**: Object map for compatibility
+- **`objectId`**: The object ID or pattern used
+- **`count`**: Number of objects returned
+- **`timestamp`**: Retrieval timestamp
+- **`includesEnums`**: Boolean flag when enum data is included
+- **`includesAliases`**: Boolean flag when alias data is included
+- **`enumStatistics`**: Summary statistics for enum coverage (multiple objects)
+- **`aliasStatistics`**: Summary statistics for alias relationships (multiple objects)
 
-### Common Properties
-All objects contain these properties:
+## Object Types
 
-- `_id`: Unique object identifier
-- `type`: Object type (state, channel, device, instance, etc.)
-- `common`: Common metadata (name, role, type, etc.)
-- `native`: Adapter-specific configuration
-- `enumAssignments`: Room/function assignments (when enabled)
+**Supported Types:**
+- **state**: Data points with values
+- **channel**: Grouping of related states  
+- **device**: Physical or logical devices
+- **adapter**: Adapter instances
+- **enum**: Enumeration objects
+- **config**: Configuration objects
 
-### Common Metadata
-The `common` section contains:
-
-- `name`: Human-readable name
-- `role`: Functional role (e.g., "value.temperature")
-- `type`: Data type (number, string, boolean, object)
-- `read`/`write`: Access permissions
-- `unit`: Physical unit
-- `min`/`max`: Value ranges
-- `states`: Possible values for enums
+Use type filtering to narrow results and improve performance.
 
 ## Use Cases
 
-### Smart Home Dashboard Creation
-- Build room-based device lists automatically
-- Group devices by function (lighting, heating, security)
-- Generate navigation based on enum structure
-- Create responsive UIs that adapt to ioBroker configuration
+### Smart Home Management
+- **Room-based device lists**: Get all devices with room assignments automatically
+- **Function grouping**: Group devices by function (lighting, heating, security)
+- **Alias resolution**: Work with both aliases and targets seamlessly
+- **System audit**: Find uncategorized or orphaned objects
 
-### System Discovery with Context
-- Find all devices with their room assignments
-- Discover uncategorized objects (missing enum assignments)
-- Audit room and function assignments across the system
-- Generate device installation reports
+### Dashboard Creation
+- **Responsive UIs**: Build interfaces that adapt to ioBroker configuration
+- **Navigation menus**: Generate room/function navigation automatically
+- **Device discovery**: Find all available devices with context
+- **Alias management**: Display alias relationships in management interfaces
 
-### Dynamic Configuration
-- Build device lists for UIs with room/function context
-- Generate adapter monitoring with location awareness
-- Validate object structures and enum consistency
-- Create installation wizards based on existing room structure
+### Automation & Logic
+- **Scene control**: Find all lights in specific rooms for automation
+- **Bulk operations**: Group devices by function for mass control
+- **Voice control**: Build context-aware voice interfaces
+- **Installation wizards**: Create setup flows based on existing structure
 
-### Home Automation Logic
-- Find all lights in specific rooms for scene control
-- Group devices by function for bulk operations
-- Create location-aware automation rules
-- Build voice control interfaces with room context
+### Development & Maintenance
+- **Object exploration**: Discover object structures and relationships
+- **Configuration validation**: Verify enum and alias assignments
+- **System monitoring**: Track adapter and device status
+- **Documentation**: Generate system documentation automatically
 
-## Advanced Features
+## Examples & Patterns
 
-### Pattern and Mode Compatibility
-- **Single Mode + Pattern**: Returns only the first matching object (warning shown)
-- **Array/Object Mode + Single ID**: Wraps single result appropriately  
-- **Recommended**: Use Array/Object modes with wildcard patterns for best results
+### Basic Object Retrieval
+```javascript
+// Single object
+msg.topic = "hue.0.lights.1.state";
 
-### Performance Optimization
-- **Server-side filtering**: Type filtering applied at ioBroker level
-- **Efficient enum loading**: Enum data loaded once per request
-- **Optimized patterns**: Use specific patterns when possible
-- **Result caching**: Avoid repeated requests for same data
+// Wildcard patterns
+msg.topic = "*.lights.*";           // All light objects
+msg.topic = "system.adapter.*";     // All adapter instances
+msg.topic = "enum.*";               // All enum objects
+msg.topic = "alias.*";              // All alias objects
+msg.outputMode = "array";
+```
 
-## Error Handling
+### System Discovery
+```javascript
+// Adapter monitoring
+msg.topic = "system.adapter.*.alive";
+msg.objectType = "state";
 
-### Common Errors
-- **Object not found**: Specified object doesn't exist
-- **Permission denied**: User lacks read permissions  
-- **Connection error**: WebSocket unavailable
-- **Type mismatch**: Object exists but doesn't match type filter
-- **Enum loading failed**: Enum data unavailable (continues without enum assignments)
+// Host information
+msg.topic = "system.host.*";
 
-### Error Response
-Error information is included in the output message:
-- `error`: Error description
-- `errorType`: Error category (timeout, unknown, etc.)
-- Output still includes basic structure with null payload
+// Device patterns
+msg.topic = "hue.0.*";              // All Hue objects
+msg.topic = "zigbee.0.*.available"; // Zigbee availability
+```
 
-## Performance Considerations
+### With Enhanced Features
+```javascript
+// Objects with room/function context
+msg.topic = "*.lights.*";
+msg.includeEnums = true;
+msg.enumTypes = ["rooms", "functions"];
 
-### Enum Assignment Impact
-- Enum data loading adds minimal overhead
-- Enum assignments resolved for each matching object
-- May take longer for large result sets
-- Consider disabling for pure metadata queries
+// Alias resolution
+msg.topic = "alias.*";
+msg.includeAliases = true;
+msg.aliasResolution = "both";
+
+// Combined features
+msg.topic = "*";
+msg.includeEnums = true;
+msg.includeAliases = true;
+msg.objectType = "state";
+```
+
+## Performance & Best Practices
 
 ### Query Optimization
-- Use specific wildcard patterns: `lights.*` instead of `*`
-- Apply type filtering to reduce result sets
-- Limit scope for broad enum queries
-- Monitor response times with large object counts
+- **Use specific patterns**: `lights.*` instead of `*`
+- **Apply type filtering**: Reduces result sets significantly
+- **Limit scope**: Avoid broad queries when possible
+- **Monitor response times**: Large result sets may take longer
 
-## Troubleshooting
+### Feature Impact
+- **Enum assignments**: Minimal overhead, recommended for UI building
+- **Alias resolution**: Requires additional queries, use specific resolution modes
+- **Combined features**: Both can be used together efficiently
 
-### No Results
-1. Check object ID syntax and existence
-2. Verify wildcard pattern is correct
-3. Confirm read permissions
-4. Test with simpler patterns
-5. Check type filter settings
-
-### Missing Enum Assignments
-1. Verify enum objects exist in ioBroker
-2. Check object is actually assigned to rooms/functions
-3. Test enum types filter settings
-4. Confirm enum assignment in ioBroker admin interface
-
-### Too Many Results
-1. Narrow wildcard scope
-2. Add type filtering
-3. Use more specific patterns
-4. Implement result pagination
-5. Consider disabling enum assignments for discovery queries
+### Error Handling
+- **No results**: Check object ID syntax and permissions
+- **Missing enums/aliases**: Verify objects exist and are properly configured
+- **Timeouts**: Use more specific patterns or type filters
 
 ## Related Nodes
 
 - **WS ioB inObj**: Monitor object changes with enum context
-- **WS ioB get**: Read state values
+- **WS ioB get**: Read state values with alias support
 - **WS ioB in**: Subscribe to state changes
 - **WS ioB out**: Create objects with enum assignments
 
-## Examples
-
-### Room-Based Device Discovery
-```javascript
-// Get all lights with room assignments
-msg.topic = "*.lights.*";
-msg.objectType = "state";
-// Enable enum assignments to get room context
-```
-
-### Smart Home Dashboard Data
-```javascript
-// Get all devices grouped by room and function
-msg.topic = "*";
-msg.outputMode = "array";
-// Use enum assignments to build room/function navigation
-```
-
-### System Audit
-```javascript
-// Find objects without room assignments
-msg.topic = "*";
-// Filter results to find objects with enumAssignments.hasRoom = false
-```
-
-See [Common Use Cases](../use-cases.md) for practical implementation examples.
+See [Common Use Cases](../use-cases.md) for complete implementation examples.
