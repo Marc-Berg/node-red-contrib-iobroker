@@ -72,9 +72,12 @@ module.exports = function(RED) {
                 // Extract state IDs from different input formats
                 let stateIds = [];
                 
-                // Priority: msg.objects takes precedence over msg.topic
-                if (msg.objects && typeof msg.objects === 'object') {
-                    // Auto-extract from getObject output - only process objects with type "state"
+                // Priority 1: Configured state has highest priority
+                const configState = config.state?.trim();
+                if (configState && configState.length > 0) {
+                    stateIds = [configState];
+                } else if (msg.objects && typeof msg.objects === 'object') {
+                    // Priority 2: msg.objects - auto-extract from getObject output - only process objects with type "state"
                     const stateObjectIds = [];
                     const aliasIds = [];
                     
@@ -111,7 +114,7 @@ module.exports = function(RED) {
                     
                     stateIds = [...stateObjectIds, ...aliasIds];
                 } else if (msg.topic !== undefined && msg.topic !== '') {
-                    // Explicit topic (single string or array) - only if no objects present
+                    // Priority 3: Explicit topic (single string or array) - lowest priority
                     const topicIds = Array.isArray(msg.topic) ? msg.topic : [msg.topic];
                     
                     // Check for wildcard patterns and reject them
@@ -123,12 +126,6 @@ module.exports = function(RED) {
                     }
                     
                     stateIds = topicIds;
-                } else {
-                    // Fallback to configured state
-                    const configState = config.state?.trim();
-                    if (configState) {
-                        stateIds = [configState];
-                    }
                 }
                 
                 if (stateIds.length === 0) {

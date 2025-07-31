@@ -23,6 +23,13 @@ This marks the first stable release of node-red-contrib-iobroker
 - Automatic upgrade of existing flows
 - All existing features preserved and enhanced
 
+## [0.15.2] - 2025-07-31
+
+### **Changed**  
+- **Input priority for iob-get node**: Configured state ID now has highest priority
+  - Priority order: 1. Configured state ID, 2. msg.objects, 3. msg.topic
+  - Ensures consistent behavior when node configuration is set
+
 ## [0.15.1] - 2025-07-31
 
 ### **New**
