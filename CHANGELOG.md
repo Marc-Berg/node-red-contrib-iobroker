@@ -23,7 +23,7 @@ This marks the first stable release of node-red-contrib-iobroker
 - Automatic upgrade of existing flows
 - All existing features preserved and enhanced
 
-## [0.15.1] - 2025-xx-xx
+## [0.15.1] - 2025-07-31
 
 ### **New**
 - **Batch State Retrieval**: iob-get node now supports batch processing of multiple states
