@@ -1,6 +1,6 @@
 # Changelog
 
-## [1.0.0] - 2025-xx-xx
+## [1.0.0] - 2025-08-01
 
 ### 🎉 **First Stable Release**
 This marks the first stable release of node-red-contrib-iobroker
