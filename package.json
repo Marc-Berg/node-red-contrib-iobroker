@@ -68,5 +68,6 @@
       "examples/iob-out.json",
       "examples/iob-sendto.json"
     ]
-  }
+  },
+  "categories": ["smarthome"]
 }
