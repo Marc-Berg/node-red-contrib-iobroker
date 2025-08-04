@@ -1,5 +1,19 @@
 # Changelog
 
+## [1.0.1] - 2025-08-04
+
+### **Improved**
+- **Documentation consistency and external references**
+  - Standardized HTML formatting across all node documentation files
+  - Unified tag usage
+  - Added external documentation links:
+    - IANA timezone database for time zone references
+    - Day.js format documentation for timestamp formatting
+    - ioBroker object schema and adapter development guides
+    - Admin configuration and alias setup documentation
+    - State roles and data point type references
+  - Enhanced help sections with better formatting and structure
+
 ## [1.0.0] - 2025-08-01
 
 ### 🎉 **First Stable Release**

@@ -459,7 +459,7 @@
     <h3>Alias Information</h3>
     <p>When "Include alias information" is enabled, each object gets an <code>aliasInfo</code> property:</p>
     
-    <p><strong>Simple Alias (single target):</strong></p>
+    <p><b>Simple Alias (single target):</b></p>
     <pre>{
   "aliasInfo": {
     "isAlias": true,
@@ -476,7 +476,7 @@
   }
 }</pre>
 
-    <p><strong>Complex Alias (separate read/write targets):</strong></p>
+    <p><b>Complex Alias (separate read/write targets):</b></p>
     <pre>{
   "aliasInfo": {
     "isAlias": true,
@@ -493,7 +493,7 @@
   }
 }</pre>
 
-    <p><strong>Target Object (referenced by aliases):</strong></p>
+    <p><b>Target Object (referenced by aliases):</b></p>
     <pre>{
   "aliasInfo": {
     "isAlias": false,
@@ -549,4 +549,6 @@
         <li>Large alias networks may increase response time</li>
         <li>For state values: use separate getState() calls with target IDs as needed</li>
     </ul>
+    
+    <p>📖 <a href="https://www.iobroker.net/#en/documentation/config/aliases.md" target="_blank">ioBroker Alias Configuration</a></p>
 </script>
