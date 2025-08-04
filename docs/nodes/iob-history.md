@@ -81,12 +81,12 @@ The WS ioB history node allows you to retrieve historical data from ioBroker's h
 - **Status Display**: Shows "Queue: X" when queries are waiting
 
 ### Drop Mode
-- **Behavior**: New queries are discarded while one is running
-- **Advantages**: Always processes latest request, prevents queue buildup
-- **Disadvantages**: Some queries are lost
-- **Best for**: UI updates, dashboards where only latest data matters
-- **Status Display**: Shows "Running (dropping)" when discarding queries
-- **Output**: Dropped queries receive `msg.dropped = true` in error response
+- **Behavior**: While a query is running, any new incoming queries are immediately discarded.
+- **Advantages**: Prevents queue buildup and system overload.
+- **Disadvantages**: Queries may be lost if sent while another query is processing.
+- **Best for**: Scenarios where it is acceptable for intermediate or newer requests to be dropped if a request is already running (e.g., non-critical UI updates).
+- **Status Display**: Shows "Running (dropping)" when discarding queries.
+- **Output**: Dropped queries receive `msg.dropped = true` in the error response.
 
 ## Aggregation Types
 
