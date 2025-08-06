@@ -400,6 +400,7 @@ RED.nodes.registerType('iobout', {
         <li><b>Payload Type:</b> Data type - auto-detected if not specified</li>
         <li><b>Readonly:</b> Whether the state can be written to</li>
     </ul>
+    <p>📖 <a href="https://www.iobroker.net/#en/documentation/dev/stateroles.md" target="_blank">ioBroker State Roles Documentation</a></p>
     
     <h4>Value Constraints</h4>
     <ul>
@@ -475,5 +476,15 @@ RED.nodes.registerType('iobout', {
     stateMax: 100
 }</pre>
 
-    <p>📖 <a href="https://www.iobroker.net/#en/documentation/dev/stateroles.md" target="_blank">ioBroker State Roles Documentation</a></p>
+    <h3>Advanced Features</h3>
+    
+    <h4>Custom Timestamps</h4>
+    <p>Override the automatic timestamp with a custom value:</p>
+    <pre>msg = {
+    topic: "0_userdata.0.historical_data",
+    payload: 42,
+    ts: Date.now() - 3600000  // 1 hour ago
+}</pre>
+    <p><b>Note:</b> The timestamp (<code>msg.ts</code>) must be a number representing milliseconds since Unix epoch.</p>
+    <p><b>Behavior:</b> <code>ts</code> will be set to your custom timestamp, while <code>lc</code> (last changed) will always be set to the current time when the value is actually written.</p>
 </script>

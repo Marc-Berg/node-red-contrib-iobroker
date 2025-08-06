@@ -122,6 +122,8 @@ Override automatic timestamp:
 msg.ts = Date.now() - 3600000;  // 1 hour ago
 ```
 
+**Behavior:** The `ts` (timestamp) will be set to your custom value, while `lc` (last changed) will always be set to the current time when the value is actually written. This ensures proper tracking of when the value was last modified in the system.
+
 ### Creating Empty Objects
 Create ioBroker objects without setting a value by passing `null` as the payload. (Set payload type to JSON and value to null)
 

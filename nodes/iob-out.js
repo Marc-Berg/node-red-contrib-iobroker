@@ -210,9 +210,10 @@ module.exports = function(RED) {
                 }
 
                 const ack = settings.setMode === "value";
+                const customTimestamp = msg.ts && typeof msg.ts === 'number' ? msg.ts : null;
                 setStatus("blue", "dot", "Setting...");
                 
-                await connectionManager.setState(settings.serverId, stateId, value, ack);
+                await connectionManager.setState(settings.serverId, stateId, value, ack, customTimestamp);
                 
                 node.lastValue = value;
                 node.hasSetValue = true;

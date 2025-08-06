@@ -1,9 +1,21 @@
 # Changelog
 
+## [1.1.0] - 2025-xx-xx
+
+### **Added**
+- **Custom timestamps support for iob-out node**
+  - New `msg.ts` property allows setting custom timestamps for historical data
+  - Timestamp must be milliseconds since Unix epoch
+  - `ts` uses custom timestamp, `lc` (last changed) always uses current time
+  - Backward compatible - uses current time if not specified
+  - Updated documentation with examples and usage notes
+
 ## [1.0.2] - 2025-08-06
 
 ### **Fixed**
 - **Documentation link corrections**
+  - Removed incorrect/irrelevant external documentation link from iob-sendto node
+  - Maintained correct alias documentation link in iob-getobject node
 
 ## [1.0.1] - 2025-08-04
 
