@@ -26,7 +26,6 @@
   - Added external documentation links:
     - IANA timezone database for time zone references
     - Day.js format documentation for timestamp formatting
-    - ioBroker object schema and adapter development guides
     - Admin configuration and alias setup documentation
     - State roles and data point type references
   - Enhanced help sections with better formatting and structure
