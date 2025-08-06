@@ -10,6 +10,12 @@
   - Backward compatible - uses current time if not specified
   - Updated documentation with examples and usage notes
 
+### **Improved**
+- **Tree View UI/UX enhancements**
+  - **Auto-scroll to selected state**: Tree view automatically scrolls to show pre-selected states when opened
+  - **Optimized status positioning**: Status messages now display compactly next to action buttons instead of taking full width
+  - **Selected state display**: Currently selected state ID is now shown next to the "State ID/Pattern" label for better visibility
+
 ## [1.0.2] - 2025-08-06
 
 ### **Fixed**

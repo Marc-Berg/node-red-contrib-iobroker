@@ -14,10 +14,10 @@
     const cache = new Map();
     
     function injectStyles() {
-        if (document.getElementById('iob-shared-styles-v2')) return;
+        if (document.getElementById('iob-shared-styles-v2-1')) return;
         
         const style = document.createElement('style');
-        style.id = 'iob-shared-styles-v2';
+        style.id = 'iob-shared-styles-v2-1';
         style.textContent = `
             .iob-container { height: 320px; overflow-y: auto; border: 1px solid #ccc; border-radius: 4px; background: #fafafa; display: none; position: relative; }
             .iob-content { padding: 4px; }
@@ -33,10 +33,11 @@
             .iob-label mark { background-color: #ffeb3b; padding: 1px 3px; border-radius: 2px; font-weight: bold; color: #333; }
             .iob-search { width: 100%; padding: 8px 12px; border: 1px solid #ddd; border-radius: 4px; font-size: 14px; margin-bottom: 8px; }
             .iob-search:focus { outline: none; border-color: #4CAF50; box-shadow: 0 0 0 2px rgba(76, 175, 80, 0.2); }
-            .iob-info { display: inline-block; margin-left: 8px; padding: 2px 8px; background-color: #d1ecf1; border: 1px solid #bee5eb; border-radius: 3px; font-size: 12px; color: #0c5460; font-family: Monaco, monospace; max-width: 300px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; vertical-align: middle; }
+            .iob-info { display: inline; margin-left: 15px; padding: 2px 8px; background-color: #d1ecf1; border: 1px solid #bee5eb; border-radius: 3px; font-size: 12px; color: #0c5460; font-family: Monaco, monospace; max-width: 300px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; vertical-align: middle; }
             .iob-info.folder { background-color: #fff3cd; border-color: #ffeaa7; color: #856404; }
-            .iob-actions { display: flex; gap: 8px; margin-top: 8px; padding-top: 8px; border-top: 1px solid #dee2e6; justify-content: flex-end; }
-            .iob-status { padding: 6px 10px; border-radius: 3px; font-size: 12px; font-weight: 500; margin-top: 5px; display: inline-block; }
+            .iob-actions { display: flex; gap: 8px; margin-top: 8px; padding-top: 8px; border-top: 1px solid #dee2e6; justify-content: space-between; align-items: center; }
+            .iob-actions .iob-buttons-group { display: flex; gap: 8px; }
+            .iob-status { padding: 4px 8px; border-radius: 3px; font-size: 11px; font-weight: 500; display: inline-block; flex-shrink: 0; }
             .iob-status.success { background-color: #d4edda; color: #155724; border: 1px solid #c3e6cb; }
             .iob-status.info { background-color: #d1ecf1; color: #0c5460; border: 1px solid #bee5eb; }
             .iob-status.error { background-color: #f8d7da; color: #721c24; border: 1px solid #f5c6cb; }
@@ -323,6 +324,10 @@
             }
             
             this.content.innerHTML = nodes.map(node => this.createNodeHTML(node)).join('');
+            
+            if (this.selectedId) {
+                setTimeout(() => this.scrollToSelected(), 10);
+            }
         }
         
         createNodeHTML(node) {
@@ -360,6 +365,33 @@
             if (this.data.toggle(nodeId)) this.render();
         }
         
+        scrollToSelected() {
+            if (!this.selectedId) return;
+            
+            const selectedElement = this.container.querySelector(`[data-id="${this.selectedId}"]`);
+            if (!selectedElement) return;
+            
+            const elementTop = selectedElement.offsetTop;
+            const elementHeight = selectedElement.offsetHeight;
+            const containerHeight = this.container.clientHeight;
+            const containerScrollTop = this.container.scrollTop;
+            
+            const elementBottom = elementTop + elementHeight;
+            const visibleTop = containerScrollTop;
+            const visibleBottom = containerScrollTop + containerHeight;
+            
+            const isVisible = elementTop >= visibleTop && elementBottom <= visibleBottom;
+            
+            if (!isVisible) {
+                const targetScrollTop = elementTop - (containerHeight / 2) + (elementHeight / 2);
+                
+                this.container.scrollTo({
+                    top: Math.max(0, Math.min(targetScrollTop, this.container.scrollHeight - containerHeight)),
+                    behavior: 'smooth'
+                });
+            }
+        }
+        
         handleDoubleClick(e) {
             const item = e.target.closest('.iob-item');
             if (!item) return;
@@ -382,6 +414,7 @@
         setSelected(nodeId) {
             this.selectedId = nodeId;
             if (this.onChanged) this.onChanged(this.data.nodes.get(nodeId));
+            setTimeout(() => this.scrollToSelected(), 50);
         }
         
         getSelected() {
@@ -408,7 +441,7 @@
         const elements = {
             container: $('<div class="iob-container"></div>'),
             searchContainer: $(`<div style="display:none;"><input type="text" class="iob-search" placeholder="${searchPlaceholder}"></div>`),
-            actions: $(`<div class="iob-actions" style="display:none;"><button type="button" class="iob-btn success" disabled><i class="fa fa-check"></i> Use</button><button type="button" class="iob-btn"><i class="fa fa-times"></i> Cancel</button></div>`),
+            actions: $(`<div class="iob-actions" style="display:none;"><div class="iob-status-container"></div><div class="iob-buttons-group"><button type="button" class="iob-btn success" disabled><i class="fa fa-check"></i> Use</button><button type="button" class="iob-btn"><i class="fa fa-times"></i> Cancel</button></div></div>`),
             buttons: $(`<div class="iob-buttons"><button type="button" class="iob-btn primary">Tree View</button><button type="button" class="iob-btn refresh-btn"><i class="fa fa-refresh"></i> Refresh</button><button type="button" class="iob-btn clear-btn"><i class="fa fa-times"></i> Clear</button></div>`),
             status: $('<div class="iob-status"></div>'),
             stats: $('<div class="iob-stats"></div>')
@@ -490,6 +523,7 @@
             if (node) {
                 expandToNode(stateId);
                 treeView?.setSelected(stateId);
+                setTimeout(() => treeView?.scrollToSelected(), 100);
                 return true;
             }
             return false;
@@ -558,7 +592,10 @@
             };
             
             const existing = stateInput.val().trim();
-            if (existing) findAndSelect(existing);
+            if (existing) {
+                findAndSelect(existing);
+                updateLabel(existing, false);
+            }
             
             treeView.render();
             dataLoaded = true;
@@ -567,9 +604,18 @@
         
         function showStatus(type, msg) {
             const icons = { success: 'fa-check-circle', info: 'fa-info-circle', error: 'fa-exclamation-triangle' };
-            // Escape HTML to prevent XSS
             const escapedMsg = $('<div>').text(msg).html();
-            elements.status.html(`<span class="iob-status ${type}"><i class="fa ${icons[type]}"></i> ${escapedMsg}</span>`).show();
+            const statusContainer = elements.container.is(':visible') ? 
+                elements.actions.find('.iob-status-container') : 
+                elements.status;
+                
+            statusContainer.html(`<span class="iob-status ${type}"><i class="fa ${icons[type]}"></i> ${escapedMsg}</span>`);
+            
+            if (elements.container.is(':visible')) {
+                elements.status.hide();
+            } else {
+                elements.status.show();
+            }
         }
         
         function toggleMode() {
@@ -579,15 +625,19 @@
             elements.searchContainer.toggle(isManual);
             elements.actions.toggle(isManual);
             
-            // Show refresh and clear buttons only when tree is active
             refreshBtn.toggle(isManual);
             clearBtn.toggle(isManual);
             
             if (!isManual) {
+                // Tree-View wird geschlossen - normales Layout wiederherstellen
+                stateLabel.css('white-space', 'normal');
                 elements.status.hide();
+                elements.actions.find('.iob-status-container').empty();
                 elements.stats.hide();
                 updateSelection(null);
             } else {
+                // Tree-View wird geöffnet - Layout für bessere Darstellung anpassen
+                stateLabel.css('white-space', 'nowrap');
                 const existing = stateInput.val().trim();
                 if (existing && dataLoaded) {
                     setTimeout(() => {
@@ -672,6 +722,12 @@
             if (currentServerId) loadData();
         });
         
+        // Initialize label if there's already a value in the input
+        const initialValue = stateInput.val().trim();
+        if (initialValue) {
+            updateLabel(initialValue, false);
+        }
+        
         return {
             cleanup: () => {
                 if (treeView) treeView.destroy();
@@ -686,7 +742,7 @@
     }
     
     global.ioBrokerSharedTreeView = {
-        version: '1.5.0',
+        version: '1.5.6',
         setup: createTreeView,
         TreeData, TreeView, CacheManager, WildcardUtils,
         initialized: true
