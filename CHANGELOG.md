@@ -10,11 +10,26 @@
   - Backward compatible - uses current time if not specified
   - Updated documentation with examples and usage notes
 
+- **History automation for iob-out node**
+  - **Automatic history configuration**: Enable history logging for created objects via new History tab
+  - **Template-based setup**: Pre-configured templates for sensors, switches, energy meters, and temperature sensors
+  - **Message-based override**: Dynamic history configuration via `msg.historyConfig`
+  - **Multiple adapter support**: Configure multiple history adapters per object
+  - **Built-in validation**: JSON validation and configuration preview
+
 ### **Improved**
 - **Tree View UI/UX enhancements**
   - **Auto-scroll to selected state**: Tree view automatically scrolls to show pre-selected states when opened
   - **Optimized status positioning**: Status messages now display compactly next to action buttons instead of taking full width
   - **Selected state display**: Currently selected state ID is now shown next to the "State ID/Pattern" label for better visibility
+  - **Dynamic layout handling**: Label text wrapping adjusts automatically between tree view and manual input modes
+  - **Improved spacing**: Better visual separation between UI elements for enhanced usability
+
+- **Enhanced iob-out node configuration**
+  - **Three-tab interface**: Basic, Object Creation, and History Configuration tabs for better organization
+  - **Live configuration preview**: Real-time preview of history settings with JSON validation
+  - **Comprehensive help**: Built-in documentation for all history adapter settings
+  - **Status indicators**: Node status now shows active features (auto-create, history)
 
 ## [1.0.2] - 2025-08-06
 

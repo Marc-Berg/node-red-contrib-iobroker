@@ -45,6 +45,10 @@ RED.nodes.registerType('iobout', {
         stateUnit: { value: "" },
         stateMin: { value: "" },
         stateMax: { value: "" },
+        enableHistory: { value: false },
+        historyAdapter: { value: "" },
+        historyTemplate: { value: "" },
+        historySettings: { value: "" },
         server: { value: "", type: "iob-config" }
     },
     inputs: 1,
@@ -90,20 +94,35 @@ RED.nodes.registerType('iobout', {
         $('#node-input-autoCreate').on('change', function() {
             const isChecked = $(this).prop('checked');
             updateAutoCreateVisibility(isChecked);
+            updateHistoryTabVisibility(isChecked);
         });
         
         // Initialize tabs
         initializeTabs();
         
-        // Auto-create checkbox change handler
-        $('#node-input-autoCreate').on('change', function() {
-            const isChecked = $(this).prop('checked');
-            updateAutoCreateVisibility(isChecked);
-        });
+        // Initialize History tab
+        initializeHistoryTab(this);
+        
+        // Function to update history tab visibility
+        function updateHistoryTabVisibility(autoCreateEnabled) {
+            const historyTab = $('li[data-tab="history"]');
+            const historyPane = $('.tab-pane[data-tab="history"]');
+            
+            if (autoCreateEnabled) {
+                historyTab.show();
+            } else {
+                historyTab.hide();
+                // Switch to basic tab if history tab is currently active
+                if (historyTab.hasClass('active')) {
+                    showTab('basic');
+                }
+            }
+        }
         
         // Initialize visibility based on current state
         const autoCreateChecked = $('#node-input-autoCreate').prop('checked');
         updateAutoCreateVisibility(autoCreateChecked);
+        updateHistoryTabVisibility(autoCreateChecked);
         
         // Initialize tab system
         function initializeTabs() {
@@ -123,6 +142,116 @@ RED.nodes.registerType('iobout', {
                 $('.tab-pane').removeClass('active');
                 $(`.tab-pane[data-tab="${targetTab}"]`).addClass('active');
             });
+        }
+        
+        // Initialize History tab functionality
+        function initializeHistoryTab(node) {
+            const historyTemplates = {
+                sensor: {
+                    adapter: "influxdb.1",
+                    settings: {
+                        changesOnly: true,
+                        debounce: 1000,
+                        changesMinDelta: 0.1
+                    }
+                },
+                switch: {
+                    adapter: "history.0",
+                    settings: {
+                        changesOnly: false,
+                        debounce: 0
+                    }
+                },
+                energy: {
+                    adapter: "influxdb.1", 
+                    settings: {
+                        changesOnly: true,
+                        debounce: 5000,
+                        changesMinDelta: 0.1,
+                        storageType: ""
+                    }
+                },
+                temperature: {
+                    adapter: "influxdb.1",
+                    settings: {
+                        changesOnly: true,
+                        debounce: 30000,
+                        changesMinDelta: 0.5
+                    }
+                },
+                minimal: {
+                    adapter: "influxdb.1",
+                    settings: {
+                        changesOnly: true,
+                        debounce: 0
+                    }
+                }
+            };
+            
+            // History Enable/Disable
+            $("#node-input-enableHistory").change(function() {
+                if ($(this).is(":checked")) {
+                    $("#history-config-panel").slideDown();
+                } else {
+                    $("#history-config-panel").slideUp();
+                }
+                updateHistoryPreview();
+            });
+            
+            // Template selection
+            $("#node-input-historyTemplate").change(function() {
+                const templateName = $(this).val();
+                if (templateName && historyTemplates[templateName]) {
+                    const template = historyTemplates[templateName];
+                    $("#node-input-historyAdapter").val(template.adapter);
+                    $("#node-input-historySettings").val(JSON.stringify(template.settings, null, 2));
+                }
+                updateHistoryPreview();
+            });
+            
+            // Live update of preview
+            $("#node-input-historyAdapter, #node-input-historySettings").on('input change', updateHistoryPreview);
+            
+            // Preview update function
+            function updateHistoryPreview() {
+                if (!$("#node-input-enableHistory").is(":checked")) {
+                    $("#history-config-preview").text("History disabled");
+                    return;
+                }
+                
+                const adapter = $("#node-input-historyAdapter").val().trim();
+                const settingsText = $("#node-input-historySettings").val().trim();
+                
+                if (!adapter) {
+                    $("#history-config-preview").text("No adapter specified");
+                    return;
+                }
+                
+                try {
+                    let settings = {};
+                    if (settingsText) {
+                        settings = JSON.parse(settingsText);
+                    }
+                    
+                    const preview = {
+                        adapter: adapter,
+                        enabled: true,
+                        ...settings
+                    };
+                    
+                    $("#history-config-preview").text(JSON.stringify(preview, null, 2));
+                } catch (e) {
+                    $("#history-config-preview").text("Invalid JSON: " + e.message);
+                }
+            }
+            
+            // Initial state
+            if (node.enableHistory) {
+                $("#node-input-enableHistory").prop("checked", true);
+                $("#history-config-panel").show();
+            }
+            
+            updateHistoryPreview();
         }
         
         // Load and initialize TreeView component
@@ -153,6 +282,27 @@ RED.nodes.registerType('iobout', {
         if (this.treeController) {
             this.treeController.cleanup();
         }
+        
+        // Validate History configuration
+        if ($("#node-input-enableHistory").is(":checked")) {
+            const adapter = $("#node-input-historyAdapter").val().trim();
+            if (!adapter) {
+                RED.notify("Please specify a history adapter when history is enabled.", "error");
+                return false;
+            }
+            
+            // JSON validation
+            const settings = $("#node-input-historySettings").val().trim();
+            if (settings) {
+                try {
+                    JSON.parse(settings);
+                } catch (e) {
+                    RED.notify("Invalid JSON in history settings: " + e.message, "error");
+                    return false;
+                }
+            }
+        }
+        return true;
     }
 });
 </script>
@@ -249,6 +399,7 @@ RED.nodes.registerType('iobout', {
     <ul class="node-config-tabs">
         <li data-tab="basic">⚙️ Basic Configuration</li>
         <li data-tab="objectcreation">🏗️ Object Creation</li>
+        <li data-tab="history">📊 History Configuration</li>
     </ul>
 
     <div class="tab-content">
@@ -352,6 +503,95 @@ RED.nodes.registerType('iobout', {
                 <div class="form-row">
                     <label for="node-input-stateMax"><i class="icon-tag"></i> Max</label>
                     <input type="number" id="node-input-stateMax" placeholder="Maximum value - Leave empty to use msg.stateMax">
+                </div>
+            </div>
+        </div>
+
+        <div class="tab-pane" data-tab="history">
+            <div class="tab-section">
+                <h4>Automatic History Configuration</h4>
+                <p class="form-tips">Configure automatic history logging for created objects</p>
+                
+                <div class="form-row">
+                    <label for="node-input-enableHistory" style="width: auto;">
+                        <input type="checkbox" id="node-input-enableHistory" style="width: auto; margin-right: 5px;">
+                        <i class="fa fa-history"></i> Enable automatic history logging
+                    </label>
+                </div>
+
+                <div id="history-config-panel" style="display: none; border: 1px solid #ddd; padding: 15px; border-radius: 5px; margin-top: 10px; background: #f9f9f9;">
+                    
+                    <div class="form-row">
+                        <label for="node-input-historyAdapter"><i class="fa fa-database"></i> History Adapter</label>
+                        <input type="text" id="node-input-historyAdapter" placeholder="e.g. influxdb.1, history.0, sql.0">
+                        <div class="form-tips">Specify the history adapter instance (with instance number)</div>
+                    </div>
+
+                    <div class="form-row">
+                        <label for="node-input-historyTemplate"><i class="fa fa-copy"></i> Configuration Template</label>
+                        <select id="node-input-historyTemplate" style="width: 100%;">
+                            <option value="">Custom Configuration</option>
+                            <option value="sensor">Sensor (changes only, 1s debounce)</option>
+                            <option value="switch">Switch (all values, no debounce)</option>
+                            <option value="energy">Energy Meter (min delta 0.1, 5s debounce)</option>
+                            <option value="temperature">Temperature (min delta 0.5°C, 30s debounce)</option>
+                            <option value="minimal">Minimal (changes only, no debounce)</option>
+                        </select>
+                    </div>
+
+                    <div class="form-row">
+                        <label for="node-input-historySettings"><i class="fa fa-cog"></i> Custom Settings (JSON)</label>
+                        <textarea id="node-input-historySettings" rows="6" style="width: 100%; font-family: monospace; font-size: 12px;" placeholder='{\n  "changesOnly": true,\n  "debounce": 1000,\n  "changesMinDelta": 0.1\n}'></textarea>
+                        <div class="form-tips">JSON object with history settings. Leave empty to use template defaults.</div>
+                    </div>
+
+                    <div class="form-row">
+                        <details>
+                            <summary style="cursor: pointer; font-weight: bold;">
+                                <i class="fa fa-question-circle"></i> Available Settings
+                            </summary>
+                            <div style="margin-top: 10px; padding: 10px; background: #f8f9fa; border-radius: 3px; font-size: 12px;">
+                                <h5>Common Settings (all adapters):</h5>
+                                <ul style="margin: 5px 0; padding-left: 20px;">
+                                    <li><code>changesOnly</code> (boolean) - Log only on value changes</li>
+                                    <li><code>debounce</code> (number) - Debounce time in milliseconds</li>
+                                </ul>
+                                
+                                <h5>InfluxDB specific:</h5>
+                                <ul style="margin: 5px 0; padding-left: 20px;">
+                                    <li><code>changesMinDelta</code> (number) - Minimum change to log</li>
+                                    <li><code>storageType</code> (string) - Storage type override</li>
+                                    <li><code>aliasId</code> (string) - Alternative ID for logging</li>
+                                    <li><code>debounceTime</code> (number) - Alternative debounce setting</li>
+                                </ul>
+                                
+                                <h5>History adapter specific:</h5>
+                                <ul style="margin: 5px 0; padding-left: 20px;">
+                                    <li><code>maxLength</code> (number) - Maximum values per day</li>
+                                    <li><code>retention</code> (number) - Retention time in days</li>
+                                </ul>
+                                
+                                <h5>SQL adapter specific:</h5>
+                                <ul style="margin: 5px 0; padding-left: 20px;">
+                                    <li><code>storageType</code> (string) - "Number", "String", "Boolean"</li>
+                                    <li><code>retention</code> (number) - Retention time in days</li>
+                                </ul>
+                            </div>
+                        </details>
+                    </div>
+
+                    <div class="form-row">
+                        <label><i class="fa fa-eye"></i> Configuration Preview</label>
+                        <pre id="history-config-preview" style="background: #f8f9fa; padding: 10px; border-radius: 3px; font-size: 11px; max-height: 150px; overflow-y: auto; border: 1px solid #dee2e6;">History disabled</pre>
+                    </div>
+                </div>
+
+                <div class="info-box" style="margin-top: 15px;">
+                    <i class="fa fa-info-circle" style="color: #17a2b8; margin-right: 5px;"></i>
+                    <strong>Message-based Override:</strong><br>
+                    Message parameters have higher priority and override these static settings.<br>
+                    History is applied only during object creation.<br>
+                    Example: <code>msg.historyConfig = { adapter: "influxdb.1", changesMinDelta: 2 }</code>
                 </div>
             </div>
         </div>
@@ -475,6 +715,50 @@ RED.nodes.registerType('iobout', {
     stateMin: -50,
     stateMax: 100
 }</pre>
+
+    <h3>📊 History Configuration</h3>
+    <p>When enabled, this node can automatically configure history logging for newly created objects.</p>
+    
+    <h4>Configuration Methods</h4>
+    <ul>
+        <li><b>Static Configuration:</b> Set default history settings in the History Configuration tab</li>
+        <li><b>Dynamic via Message:</b> Override settings using <code>msg.historyConfig</code> (higher priority)</li>
+    </ul>
+    
+    <p><strong>Important:</strong> History configuration is only applied when creating new objects. Auto-Create must be enabled.</p>
+    
+    <h4>History Settings</h4>
+    <ul>
+        <li><b>History Adapter:</b> The adapter instance (e.g., "influxdb.1", "history.0")</li>
+        <li><b>Templates:</b> Pre-configured settings for common use cases:
+            <ul>
+                <li><b>Sensor:</b> Changes only, 1s debounce, 0.1 min delta</li>
+                <li><b>Switch:</b> All values, no debounce</li>
+                <li><b>Energy:</b> Changes only, 5s debounce, 0.1 min delta</li>
+                <li><b>Temperature:</b> Changes only, 30s debounce, 0.5°C min delta</li>
+            </ul>
+        </li>
+        <li><b>Custom Settings:</b> JSON object with adapter-specific configuration</li>
+    </ul>
+    
+    <h4>Message-based History Configuration</h4>
+    <p>Override node configuration per message:</p>
+    <pre>msg = {
+    topic: "0_userdata.0.sensor1",
+    payload: 23.5,
+    historyConfig: {
+        adapter: "influxdb.1",
+        changesOnly: true,
+        debounce: 2000,
+        changesMinDelta: 0.5
+    }
+}</pre>
+    
+    <p>Multiple history adapters:</p>
+    <pre>msg.historyConfig = [
+    { adapter: "influxdb.1", changesMinDelta: 1 },
+    { adapter: "history.0", changesOnly: false }
+]</pre>
 
     <h3>Advanced Features</h3>
     
