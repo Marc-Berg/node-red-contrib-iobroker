@@ -629,14 +629,12 @@
             clearBtn.toggle(isManual);
             
             if (!isManual) {
-                // Tree-View wird geschlossen - normales Layout wiederherstellen
                 stateLabel.css('white-space', 'normal');
                 elements.status.hide();
                 elements.actions.find('.iob-status-container').empty();
                 elements.stats.hide();
                 updateSelection(null);
             } else {
-                // Tree-View wird geöffnet - Layout für bessere Darstellung anpassen
                 stateLabel.css('white-space', 'nowrap');
                 const existing = stateInput.val().trim();
                 if (existing && dataLoaded) {
@@ -721,9 +719,7 @@
             updateSelection(null);
             if (currentServerId) loadData();
         });
-        
-        // Note: Label initialization removed to prevent display when TreeView is closed
-        
+                
         return {
             cleanup: () => {
                 if (treeView) treeView.destroy();

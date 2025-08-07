@@ -34,22 +34,22 @@ When enabled, automatically creates missing ioBroker objects with proper metadat
 - **Unit**: Physical unit (e.g., `°C`, `%`, `W`)
 - **Min/Max**: Value range limits
 
-### History Configuration
+### Custom Settings Configuration
 
-**Enable History** (requires Auto-Create)
-Automatically configure history logging when creating new objects.
+**Enable Custom Settings** (requires Auto-Create)
+Automatically configure custom adapter settings when creating new objects.
 
-**History Adapter**
-Target adapter instance (e.g., `influxdb.0`, `history.0`, `sql.0`)
+**Custom Settings Adapter**
+Target adapter instance (e.g., `influxdb.0`, `history.0`, `sql.0`, `mqtt-client.0`)
 
-**History Template**
+**Custom Settings Template**
 - **Sensor**: Basic logging (changesOnly: true)
 - **Switch**: Optimized for boolean states  
 - **Energy**: High precision logging
 - **Temperature**: Balanced settings
 - **Custom**: JSON configuration
 
-*Note: History is only configured during object creation, not for existing objects.*
+*Note: Custom settings are only configured during object creation, not for existing objects.*
 
 ## Dynamic Configuration
 
@@ -71,11 +71,11 @@ msg.stateMin = -20;
 msg.stateMax = 50;
 ```
 
-### Dynamic History Configuration
+### Dynamic Custom Settings Configuration
 ```javascript
-// Enable history for new objects only (requires Auto-Create)
-msg.historyConfig = "influxdb.0";  // Simple
-msg.historyConfig = {              // Advanced
+// Enable custom settings for new objects only (requires Auto-Create)
+msg.customSettings = "influxdb.0";  // Simple
+msg.customSettings = {              // Advanced
     adapter: "influxdb.0",
     changesOnly: true,
     debounceTime: 1000
@@ -128,16 +128,16 @@ The node automatically converts between JavaScript and ioBroker types:
 
 ## Advanced Features
 
-### History Logging
+### Custom Settings Logging
 
-Configure automatic history logging during object creation:
+Configure automatic custom adapter settings during object creation:
 
 ```javascript
-// History applied only when creating new objects
-msg.historyConfig = "influxdb.0";
+// Custom settings applied only when creating new objects
+msg.customSettings = "influxdb.0";
 ```
 
-**Supported Adapters:** InfluxDB, History, SQL  
+**Supported Adapters:** InfluxDB, History, SQL, MQTT-Client, and others  
 **Requirement:** Auto-Create must be enabled
 
 ### Batch Operations

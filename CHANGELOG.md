@@ -10,11 +10,11 @@
   - Backward compatible - uses current time if not specified
   - Updated documentation with examples and usage notes
 
-- **History automation for iob-out node**
-  - **Automatic history configuration**: Enable history logging for created objects via new History tab
+- **Custom settings automation for iob-out node**
+  - **Automatic custom settings configuration**: Enable adapter-specific configuration for created objects via new Custom Settings tab
   - **Template-based setup**: Pre-configured templates for sensors, switches, energy meters, and temperature sensors
-  - **Message-based override**: Dynamic history configuration via `msg.historyConfig`
-  - **Multiple adapter support**: Configure multiple history adapters per object
+  - **Message-based override**: Dynamic custom settings configuration via `msg.customSettings`
+  - **Multiple adapter support**: Configure multiple adapters (history, influxdb, sql, mqtt-client, etc.) per object
   - **Built-in validation**: JSON validation and configuration preview
 
 ### **Improved**
@@ -26,9 +26,9 @@
   - **Improved spacing**: Better visual separation between UI elements for enhanced usability
 
 - **Enhanced iob-out node configuration**
-  - **Three-tab interface**: Basic, Object Creation, and History Configuration tabs for better organization
-  - **Live configuration preview**: Real-time preview of history settings with JSON validation
-  - **Comprehensive help**: Built-in documentation for all history adapter settings
+  - **Three-tab interface**: Basic, Object Creation, and Custom Settings Configuration tabs for better organization
+  - **Live configuration preview**: Real-time preview of custom settings with JSON validation
+  - **Comprehensive help**: Built-in documentation for all adapter custom settings
   - **Status indicators**: Node status now shows active features (auto-create, history)
 
 ## [1.0.2] - 2025-08-06

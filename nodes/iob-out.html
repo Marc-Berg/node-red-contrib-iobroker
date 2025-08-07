@@ -100,10 +100,10 @@ RED.nodes.registerType('iobout', {
         // Initialize tabs
         initializeTabs();
         
-        // Initialize History tab
+        // Initialize Custom Settings tab
         initializeHistoryTab(this);
         
-        // Function to update history tab visibility
+        // Function to update custom settings tab visibility
         function updateHistoryTabVisibility(autoCreateEnabled) {
             const historyTab = $('li[data-tab="history"]');
             const historyPane = $('.tab-pane[data-tab="history"]');
@@ -112,7 +112,7 @@ RED.nodes.registerType('iobout', {
                 historyTab.show();
             } else {
                 historyTab.hide();
-                // Switch to basic tab if history tab is currently active
+                // Switch to basic tab if custom settings tab is currently active
                 if (historyTab.hasClass('active')) {
                     showTab('basic');
                 }
@@ -144,7 +144,7 @@ RED.nodes.registerType('iobout', {
             });
         }
         
-        // Initialize History tab functionality
+        // Initialize Custom Settings tab functionality
         function initializeHistoryTab(node) {
             const historyTemplates = {
                 sensor: {
@@ -215,7 +215,7 @@ RED.nodes.registerType('iobout', {
             // Preview update function
             function updateHistoryPreview() {
                 if (!$("#node-input-enableHistory").is(":checked")) {
-                    $("#history-config-preview").text("History disabled");
+                    $("#history-config-preview").text("Custom settings disabled");
                     return;
                 }
                 
@@ -283,11 +283,11 @@ RED.nodes.registerType('iobout', {
             this.treeController.cleanup();
         }
         
-        // Validate History configuration
+        // Validate Custom Settings configuration
         if ($("#node-input-enableHistory").is(":checked")) {
             const adapter = $("#node-input-historyAdapter").val().trim();
             if (!adapter) {
-                RED.notify("Please specify a history adapter when history is enabled.", "error");
+                RED.notify("Please specify a target adapter when custom settings are enabled.", "error");
                 return false;
             }
             
@@ -297,7 +297,7 @@ RED.nodes.registerType('iobout', {
                 try {
                     JSON.parse(settings);
                 } catch (e) {
-                    RED.notify("Invalid JSON in history settings: " + e.message, "error");
+                    RED.notify("Invalid JSON in custom settings: " + e.message, "error");
                     return false;
                 }
             }
@@ -399,7 +399,7 @@ RED.nodes.registerType('iobout', {
     <ul class="node-config-tabs">
         <li data-tab="basic">⚙️ Basic Configuration</li>
         <li data-tab="objectcreation">🏗️ Object Creation</li>
-        <li data-tab="history">📊 History Configuration</li>
+        <li data-tab="history">� Custom Settings</li>
     </ul>
 
     <div class="tab-content">
@@ -509,22 +509,22 @@ RED.nodes.registerType('iobout', {
 
         <div class="tab-pane" data-tab="history">
             <div class="tab-section">
-                <h4>Automatic History Configuration</h4>
-                <p class="form-tips">Configure automatic history logging for created objects</p>
+                <h4>Automatic Custom Settings Configuration</h4>
+                <p class="form-tips">Configure automatic custom settings for created objects</p>
                 
                 <div class="form-row">
                     <label for="node-input-enableHistory" style="width: auto;">
                         <input type="checkbox" id="node-input-enableHistory" style="width: auto; margin-right: 5px;">
-                        <i class="fa fa-history"></i> Enable automatic history logging
+                        <i class="fa fa-cog"></i> Enable automatic custom settings configuration
                     </label>
                 </div>
 
                 <div id="history-config-panel" style="display: none; border: 1px solid #ddd; padding: 15px; border-radius: 5px; margin-top: 10px; background: #f9f9f9;">
                     
                     <div class="form-row">
-                        <label for="node-input-historyAdapter"><i class="fa fa-database"></i> History Adapter</label>
+                        <label for="node-input-historyAdapter"><i class="fa fa-database"></i> Target Adapter</label>
                         <input type="text" id="node-input-historyAdapter" placeholder="e.g. influxdb.1, history.0, sql.0">
-                        <div class="form-tips">Specify the history adapter instance (with instance number)</div>
+                        <div class="form-tips">Specify the target adapter instance (with instance number)</div>
                     </div>
 
                     <div class="form-row">
@@ -542,7 +542,7 @@ RED.nodes.registerType('iobout', {
                     <div class="form-row">
                         <label for="node-input-historySettings"><i class="fa fa-cog"></i> Custom Settings (JSON)</label>
                         <textarea id="node-input-historySettings" rows="6" style="width: 100%; font-family: monospace; font-size: 12px;" placeholder='{\n  "changesOnly": true,\n  "debounce": 1000,\n  "changesMinDelta": 0.1\n}'></textarea>
-                        <div class="form-tips">JSON object with history settings. Leave empty to use template defaults.</div>
+                        <div class="form-tips">JSON object with custom adapter settings. Leave empty to use template defaults.</div>
                     </div>
 
                     <div class="form-row">
@@ -565,7 +565,7 @@ RED.nodes.registerType('iobout', {
                                     <li><code>debounceTime</code> (number) - Alternative debounce setting</li>
                                 </ul>
                                 
-                                <h5>History adapter specific:</h5>
+                                <h5>History/InfluxDB adapter specific:</h5>
                                 <ul style="margin: 5px 0; padding-left: 20px;">
                                     <li><code>maxLength</code> (number) - Maximum values per day</li>
                                     <li><code>retention</code> (number) - Retention time in days</li>
@@ -582,7 +582,7 @@ RED.nodes.registerType('iobout', {
 
                     <div class="form-row">
                         <label><i class="fa fa-eye"></i> Configuration Preview</label>
-                        <pre id="history-config-preview" style="background: #f8f9fa; padding: 10px; border-radius: 3px; font-size: 11px; max-height: 150px; overflow-y: auto; border: 1px solid #dee2e6;">History disabled</pre>
+                        <pre id="history-config-preview" style="background: #f8f9fa; padding: 10px; border-radius: 3px; font-size: 11px; max-height: 150px; overflow-y: auto; border: 1px solid #dee2e6;">Custom settings disabled</pre>
                     </div>
                 </div>
 
@@ -590,8 +590,8 @@ RED.nodes.registerType('iobout', {
                     <i class="fa fa-info-circle" style="color: #17a2b8; margin-right: 5px;"></i>
                     <strong>Message-based Override:</strong><br>
                     Message parameters have higher priority and override these static settings.<br>
-                    History is applied only during object creation.<br>
-                    Example: <code>msg.historyConfig = { adapter: "influxdb.1", changesMinDelta: 2 }</code>
+                    Custom settings are applied only during object creation.<br>
+                    Example: <code>msg.customSettings = { adapter: "influxdb.1", changesMinDelta: 2 }</code>
                 </div>
             </div>
         </div>
@@ -716,20 +716,20 @@ RED.nodes.registerType('iobout', {
     stateMax: 100
 }</pre>
 
-    <h3>📊 History Configuration</h3>
-    <p>When enabled, this node can automatically configure history logging for newly created objects.</p>
+    <h3>� Custom Settings Configuration</h3>
+    <p>When enabled, this node can automatically configure custom adapter settings for newly created objects.</p>
     
     <h4>Configuration Methods</h4>
     <ul>
-        <li><b>Static Configuration:</b> Set default history settings in the History Configuration tab</li>
-        <li><b>Dynamic via Message:</b> Override settings using <code>msg.historyConfig</code> (higher priority)</li>
+        <li><b>Static Configuration:</b> Set default custom settings in the Custom Settings tab</li>
+        <li><b>Dynamic via Message:</b> Override settings using <code>msg.customSettings</code> (higher priority)</li>
     </ul>
     
-    <p><strong>Important:</strong> History configuration is only applied when creating new objects. Auto-Create must be enabled.</p>
+    <p><strong>Important:</strong> Custom settings configuration is only applied when creating new objects. Auto-Create must be enabled.</p>
     
-    <h4>History Settings</h4>
+    <h4>Custom Settings</h4>
     <ul>
-        <li><b>History Adapter:</b> The adapter instance (e.g., "influxdb.1", "history.0")</li>
+        <li><b>Target Adapter:</b> The adapter instance (e.g., "influxdb.1", "history.0", "sql.0", "mqtt-client.0")</li>
         <li><b>Templates:</b> Pre-configured settings for common use cases:
             <ul>
                 <li><b>Sensor:</b> Changes only, 1s debounce, 0.1 min delta</li>
@@ -741,12 +741,12 @@ RED.nodes.registerType('iobout', {
         <li><b>Custom Settings:</b> JSON object with adapter-specific configuration</li>
     </ul>
     
-    <h4>Message-based History Configuration</h4>
+    <h4>Message-based Custom Settings Configuration</h4>
     <p>Override node configuration per message:</p>
     <pre>msg = {
     topic: "0_userdata.0.sensor1",
     payload: 23.5,
-    historyConfig: {
+    customSettings: {
         adapter: "influxdb.1",
         changesOnly: true,
         debounce: 2000,
@@ -754,8 +754,8 @@ RED.nodes.registerType('iobout', {
     }
 }</pre>
     
-    <p>Multiple history adapters:</p>
-    <pre>msg.historyConfig = [
+    <p>Multiple custom settings adapters:</p>
+    <pre>msg.customSettings = [
     { adapter: "influxdb.1", changesMinDelta: 1 },
     { adapter: "history.0", changesOnly: false }
 ]</pre>

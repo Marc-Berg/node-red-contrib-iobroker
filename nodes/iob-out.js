@@ -196,13 +196,13 @@ module.exports = function(RED) {
             return defaults[adapterType] || {};
         }
 
-        function getHistoryConfig(msg) {
-            // Priority 1: Message-based configuration
-            if (msg.historyConfig) {
-                return msg.historyConfig;
+        function getCustomSettingsConfig(msg) {
+            // Check if history configuration is provided via message (overrides node config)
+            if (msg.customSettings) {
+                return msg.customSettings;
             }
             
-            // Priority 2: Node configuration
+            // Use node configuration if enabled
             if (settings.enableHistory && settings.historyAdapter) {
                 return {
                     adapter: settings.historyAdapter,
@@ -213,11 +213,11 @@ module.exports = function(RED) {
             return null;
         }
 
-        async function applyHistoryConfig(stateId, historyConfig) {
+        async function applyCustomSettingsConfig(stateId, customSettingsConfig) {
             try {
-                const historyConfigs = Array.isArray(historyConfig) ? historyConfig : [historyConfig];
+                const customSettingsConfigs = Array.isArray(customSettingsConfig) ? customSettingsConfig : [customSettingsConfig];
                 
-                for (const config of historyConfigs) {
+                for (const config of customSettingsConfigs) {
                     // Simple string format: just adapter name
                     const finalConfig = typeof config === 'string' ? { adapter: config } : config;
                     
@@ -298,10 +298,10 @@ module.exports = function(RED) {
                 await createObject(stateId, objectProperties);
                 
                 // Apply history configuration only when creating new objects
-                const historyConfig = getHistoryConfig(msg);
-                if (historyConfig) {
+                const customSettingsConfig = getCustomSettingsConfig(msg);
+                if (customSettingsConfig) {
                     try {
-                        await applyHistoryConfig(stateId, historyConfig);
+                        await applyCustomSettingsConfig(stateId, customSettingsConfig);
                     } catch (historyError) {
                         node.warn(`History configuration failed for new object ${stateId}: ${historyError.message}`);
                         // Don't fail object creation if history config fails
@@ -315,10 +315,10 @@ module.exports = function(RED) {
                         await createObject(stateId, objectProperties);
                         
                         // Apply history configuration only when creating new objects
-                        const historyConfig = getHistoryConfig(msg);
-                        if (historyConfig) {
+                        const customSettingsConfig = getCustomSettingsConfig(msg);
+                        if (customSettingsConfig) {
                             try {
-                                await applyHistoryConfig(stateId, historyConfig);
+                                await applyCustomSettingsConfig(stateId, customSettingsConfig);
                             } catch (historyError) {
                                 node.warn(`History configuration failed for new object ${stateId}: ${historyError.message}`);
                                 // Don't fail object creation if history config fails
