@@ -722,11 +722,7 @@
             if (currentServerId) loadData();
         });
         
-        // Initialize label if there's already a value in the input
-        const initialValue = stateInput.val().trim();
-        if (initialValue) {
-            updateLabel(initialValue, false);
-        }
+        // Note: Label initialization removed to prevent display when TreeView is closed
         
         return {
             cleanup: () => {

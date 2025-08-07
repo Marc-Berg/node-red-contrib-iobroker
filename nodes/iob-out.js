@@ -17,6 +17,10 @@ module.exports = function(RED) {
             inputProperty: config.inputProperty?.trim() || "payload",
             setMode: config.setMode || "value",
             autoCreate: config.autoCreate || false,
+            enableHistory: config.enableHistory || false,
+            historyAdapter: config.historyAdapter?.trim() || "",
+            historyTemplate: config.historyTemplate?.trim() || "",
+            historySettings: {},
             serverId,
             nodeId: node.id,
             stateName: config.stateName?.trim() || "",
@@ -27,6 +31,15 @@ module.exports = function(RED) {
             stateMin: config.stateMin !== "" ? parseFloat(config.stateMin) : undefined,
             stateMax: config.stateMax !== "" ? parseFloat(config.stateMax) : undefined
         };
+
+        // Parse History Settings
+        try {
+            settings.historySettings = config.historySettings ? 
+                JSON.parse(config.historySettings) : {};
+        } catch (e) {
+            node.warn("Invalid history settings JSON, using defaults");
+            settings.historySettings = {};
+        }
 
         const configState = config.state?.trim();
         node.currentConfig = connectionDetails;
@@ -62,18 +75,21 @@ module.exports = function(RED) {
 
         function updateStatusWithValue() {
             const autoCreateStatus = settings.autoCreate ? " (auto-create)" : "";
+            const historyStatus = settings.enableHistory ? " (history)" : "";
             
             if (node.hasSetValue && node.lastValue !== undefined) {
                 const formattedValue = formatValueForStatus(node.lastValue);
-                setStatus("green", "dot", formattedValue + autoCreateStatus);
+                setStatus("green", "dot", formattedValue + autoCreateStatus + historyStatus);
             } else {
-                setStatus("green", "dot", "Ready" + autoCreateStatus);
+                setStatus("green", "dot", "Ready" + autoCreateStatus + historyStatus);
             }
         }
 
         const statusTexts = {
-            ready: settings.autoCreate ? "Ready (Auto-create enabled)" : "Ready",
-            reconnected: settings.autoCreate ? "Reconnected (Auto-create)" : "Reconnected"
+            ready: (settings.autoCreate ? "Ready (Auto-create enabled)" : "Ready") + 
+                   (settings.enableHistory ? " (History enabled)" : ""),
+            reconnected: (settings.autoCreate ? "Reconnected (Auto-create)" : "Reconnected") + 
+                        (settings.enableHistory ? " (History)" : "")
         };
 
         NodeHelpers.initializeConnection(
@@ -145,6 +161,126 @@ module.exports = function(RED) {
             }
         }
 
+        function getHistoryDefaults(adapterType) {
+            const defaults = {
+                history: {
+                    changesOnly: true,
+                    maxLength: 960,
+                    retention: 365,
+                    debounce: 0
+                },
+                influxdb: {
+                    storageType: "",
+                    aliasId: "",
+                    debounceTime: 0,
+                    blockTime: 0,
+                    changesOnly: true,
+                    changesRelogInterval: 0,
+                    changesMinDelta: 0,
+                    debounce: 0,
+                    ignoreBelowNumber: "",
+                    disableSkippedValueLogging: false,
+                    enableDebugLogs: false,
+                    round: "",
+                    ignoreZero: false,
+                    ignoreAboveNumber: ""
+                },
+                sql: {
+                    storageType: "Number",
+                    changesOnly: true,
+                    debounce: 0,
+                    retention: 365
+                }
+            };
+            
+            return defaults[adapterType] || {};
+        }
+
+        function getHistoryConfig(msg) {
+            // Priority 1: Message-based configuration
+            if (msg.historyConfig) {
+                return msg.historyConfig;
+            }
+            
+            // Priority 2: Node configuration
+            if (settings.enableHistory && settings.historyAdapter) {
+                return {
+                    adapter: settings.historyAdapter,
+                    ...settings.historySettings
+                };
+            }
+            
+            return null;
+        }
+
+        async function applyHistoryConfig(stateId, historyConfig) {
+            try {
+                const historyConfigs = Array.isArray(historyConfig) ? historyConfig : [historyConfig];
+                
+                for (const config of historyConfigs) {
+                    // Simple string format: just adapter name
+                    const finalConfig = typeof config === 'string' ? { adapter: config } : config;
+                    
+                    if (!finalConfig.adapter) {
+                        throw new Error("History adapter not specified");
+                    }
+                    
+                    // Get existing object
+                    const obj = await connectionManager.getObject(settings.serverId, stateId);
+                    if (!obj) {
+                        throw new Error(`Object ${stateId} not found`);
+                    }
+                    
+                    // Check if history is already configured correctly
+                    if (obj.common.custom && obj.common.custom[finalConfig.adapter]) {
+                        const existing = obj.common.custom[finalConfig.adapter];
+                        if (existing.enabled) {
+                            // History already configured - check if update needed
+                            const adapterType = finalConfig.adapter.split('.')[0];
+                            const defaults = getHistoryDefaults(adapterType);
+                            const expectedConfig = {
+                                enabled: true,
+                                ...defaults,
+                                ...finalConfig,
+                                adapter: undefined
+                            };
+                            
+                            // Compare configurations (simple check)
+                            if (JSON.stringify(existing) === JSON.stringify(expectedConfig)) {
+                                node.log(`History already configured for ${stateId} on ${finalConfig.adapter}`);
+                                continue; // Skip this adapter, already configured correctly
+                            }
+                        }
+                    }
+                    
+                    // Initialize custom section
+                    if (!obj.common.custom) {
+                        obj.common.custom = {};
+                    }
+                    
+                    // Get adapter type and defaults
+                    const adapterType = finalConfig.adapter.split('.')[0];
+                    const defaults = getHistoryDefaults(adapterType);
+                    
+                    // Apply history configuration
+                    obj.common.custom[finalConfig.adapter] = {
+                        enabled: true,
+                        ...defaults,
+                        ...finalConfig,
+                        adapter: undefined // Remove adapter key from config
+                    };
+                    
+                    // Save object
+                    await connectionManager.setObject(settings.serverId, stateId, obj);
+                    
+                    node.log(`History enabled for ${stateId} on ${finalConfig.adapter}`);
+                }
+                
+            } catch (error) {
+                throw new Error(`Failed to apply history config: ${error.message}`);
+            }
+        }
+
         async function ensureObjectExists(stateId, msg, value) {
             if (!settings.autoCreate) {
                 return true;
@@ -160,11 +296,35 @@ module.exports = function(RED) {
                 }
                 
                 await createObject(stateId, objectProperties);
+                
+                // Apply history configuration only when creating new objects
+                const historyConfig = getHistoryConfig(msg);
+                if (historyConfig) {
+                    try {
+                        await applyHistoryConfig(stateId, historyConfig);
+                    } catch (historyError) {
+                        node.warn(`History configuration failed for new object ${stateId}: ${historyError.message}`);
+                        // Don't fail object creation if history config fails
+                    }
+                }
+                
                 return true;
             } catch (error) {
                 if (error.message && error.message.includes('not found')) {
                     try {
                         await createObject(stateId, objectProperties);
+                        
+                        // Apply history configuration only when creating new objects
+                        const historyConfig = getHistoryConfig(msg);
+                        if (historyConfig) {
+                            try {
+                                await applyHistoryConfig(stateId, historyConfig);
+                            } catch (historyError) {
+                                node.warn(`History configuration failed for new object ${stateId}: ${historyError.message}`);
+                                // Don't fail object creation if history config fails
+                            }
+                        }
+                        
                         return true;
                     } catch (createError) {
                         node.error(`Failed to create missing object ${stateId}: ${createError.message}`);
