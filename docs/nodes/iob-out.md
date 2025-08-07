@@ -128,18 +128,6 @@ The node automatically converts between JavaScript and ioBroker types:
 
 ## Advanced Features
 
-### Custom Settings Logging
-
-Configure automatic custom adapter settings during object creation:
-
-```javascript
-// Custom settings applied only when creating new objects
-msg.customSettings = "influxdb.0";
-```
-
-**Supported Adapters:** InfluxDB, History, SQL, MQTT-Client, and others  
-**Requirement:** Auto-Create must be enabled
-
 ### Batch Operations
 Write multiple states from single message:
 
@@ -154,6 +142,7 @@ const states = [
 states.forEach(state => {
     node.send({ ...msg, ...state });
 });
+node.done();
 ```
 
 ### Custom Timestamps
