@@ -24,7 +24,7 @@ Externe Node-RED Integrations-Nodes für die ioBroker Kommunikation. **KEIN ioBr
 | **📊 Erweiterte Funktionen** | ❓ Begrenzt | ✅ **Empfohlen** |
 
 ### 🎯 **ioBroker Node-RED Adapter wählen wenn:**
-- **Einfache Hausautomatisierung** mit Grundanforderungen
+- **Einfache Hausautomatisierung** mit Grundanforderungen ausreicht
 - **Ein-Klick-Installation** Priorität hat
 - **Minimaler Konfigurationsaufwand** gewünscht ist
 - **Geteiltes Hosting** akzeptabel ist
@@ -62,7 +62,7 @@ Installiere die Nodes über den Node-RED Palette Manager:
 
 ![Node-RED zu ioBroker Architektur](images/iobroker_architecture_diagram.svg)
 
-Das Diagramm zeigt die empfohlene Architektur mit einer dedizierten Admin Adapter Instanz für Node-RED Verbindungen, getrennt von der Haupt-Admin Oberfläche für normale Benutzer.
+Das Diagramm zeigt die empfohlene Architektur mit einer dedizierten Admin Adapter Instanz für Node-RED Verbindungen, getrennt von der Admin Oberfläche für normale Benutzer.
 
 ## 📦 Verfügbare Nodes
 
@@ -73,7 +73,7 @@ Das Diagramm zeigt die empfohlene Architektur mit einer dedizierten Admin Adapte
 | **WS ioB get** | Aktuelle State-Werte lesen | Sensormesswerte bei Bedarf abrufen | [📖 Details](docs/nodes/iob-get.md) |
 | **WS ioB getObj** | Objektdefinitionen abrufen | Geräte-Metadaten zugreifen | [📖 Details](docs/nodes/iob-getobject.md) |
 | **WS ioB inObj** | Objektänderungen überwachen | Adapter-Installationen verfolgen | [📖 Details](docs/nodes/iob-inobj.md) |
-| **WS ioB history** | Historische Daten zugreifen | Energieverbrauchsanalyse | [📖 Details](docs/nodes/iob-history.md) |
+| **WS ioB history** | Auf historische Daten zugreifen | Energieverbrauchsanalyse | [📖 Details](docs/nodes/iob-history.md) |
 | **WS ioB log** | Live-Log Überwachung | Systemzustand überwachen | [📖 Details](docs/nodes/iob-log.md) |
 | **WS ioB sendTo** | Befehle an ioBroker Adapter senden | Telegram-Benachrichtigungen, Datenbankabfragen | [📖 Details](docs/nodes/iob-sendto.md) |
 
@@ -121,7 +121,7 @@ Falls du keine Admin Instanz verwenden möchtest:
 
 ## ⚠️ Wichtige Hinweise
 
-🔧 **Bekanntes Problem - Token Ablauf**: Es gibt derzeit ein bekanntes Problem mit der Authentifizierung und ablaufenden Tokens, das zu Verbindungsabbrüchen führen kann. **Verwenden Sie keine Anmelde-Session-Dauer kürzer als 3600 Sekunden** (1 Stunde) in Ihren ioBroker Adapter-Einstellungen!
+🔧 **Bekanntes Problem: Token Ablauf**: Es gibt derzeit ein bekanntes Problem mit der Authentifizierung und ablaufenden Tokens, das zu Verbindungsabbrüchen führen kann. **Verwenden Sie keine Anmelde-Session-Dauer kürzer als 3600 Sekunden** (1 Stunde) in Ihren ioBroker Adapter-/Instanz-Einstellungen!
 
 ## 📚 Zusätzliche Ressourcen
 
