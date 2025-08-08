@@ -19,9 +19,9 @@ Externe Node-RED Integrations-Nodes für die ioBroker Kommunikation. **KEIN ioBr
 |:-------------|:----------------------------------------:|:----------------------------------:|
 | **🏠 Einfache Heiminstallation** | ✅ **Empfohlen** | ❌ Überdimensioniert |
 | **🏭 Installation auf Appliances/PLCs** | ❌ Nicht möglich | ✅ **Empfohlen** |
-| **⚡ Hohe Performance-Anforderungen** | ❌ Geteilte Ressourcen | ⚠️ **Könnte vorteilhaft sein** |
-| **🔄 Node-RED Updates/Wartung** | ❌ An ioBroker gekoppelt | ✅ **Empfohlen** |
-| **📊 Erweiterte Funktionen** | ❌ Begrenzt | ✅ **Empfohlen** |
+| **⚡ Hohe Performance-Anforderungen** | ❓ Geteilte Ressourcen | ⚠️ **Könnte vorteilhaft sein** |
+| **🔄 Node-RED Updates/Wartung** | ❓ An ioBroker gekoppelt | ✅ **Empfohlen** |
+| **📊 Erweiterte Funktionen** | ❓ Begrenzt | ✅ **Empfohlen** |
 
 ### 🎯 **ioBroker Node-RED Adapter wählen wenn:**
 - **Einfache Hausautomatisierung** mit Grundanforderungen
