@@ -20,9 +20,9 @@ External Node-RED integration nodes for ioBroker communication. **NOT an ioBroke
 |:-------------|:---------------------------------:|:----------------------------:|
 | **🏠 Simple Home Setup** | ✅ **Recommended** | ❌ Overkill |
 | **🏭 Installation on Appliances/PLCs** | ❌ Not possible | ✅ **Recommended** |
-| **⚡ High Performance Needs** | ❌ Shared resources | ⚠️ **May be beneficial** |
-| **🔄 Node-RED Updates/Maintenance** | ❌ Tied to ioBroker | ✅ **Recommended** |
-| **📊 Advanced Features** | ❌ Limited | ✅ **Recommended** |
+| **⚡ High Performance Needs** | ❓ Shared resources | ⚠️ **May be beneficial** |
+| **🔄 Node-RED Updates/Maintenance** | ❓ Tied to ioBroker | ✅ **Recommended** |
+| **📊 Advanced Features** | ❓ Limited | ✅ **Recommended** |
 
 ### 🎯 **Use ioBroker Node-RED Adapter for:**
 - **Simple home automation** with basic requirements
