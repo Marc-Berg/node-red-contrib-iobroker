@@ -1,5 +1,5 @@
 const connectionManager = require('../lib/manager/websocket-manager');
-const { NodeHelpers, NodePatterns } = require('../lib/utils/node-helpers');
+const { NodeHelpers } = require('../lib/utils/node-helpers');
 
 module.exports = function(RED) {
     function iobget(config) {
@@ -24,35 +24,9 @@ module.exports = function(RED) {
         node.lastValue = undefined;
         node.hasRetrievedValue = false;
 
-        function formatValueForStatus(value) {
-            let displayValue;
-            
-            if (value === null) {
-                displayValue = "null";
-            } else if (value === undefined) {
-                displayValue = "undefined";
-            } else if (typeof value === 'boolean') {
-                displayValue = value ? "true" : "false";
-            } else if (typeof value === 'object') {
-                try {
-                    displayValue = JSON.stringify(value);
-                } catch (e) {
-                    displayValue = "[Object]";
-                }
-            } else {
-                displayValue = String(value);
-            }
-            
-            if (displayValue.length > 20) {
-                return "..." + displayValue.slice(-20);
-            }
-            
-            return displayValue;
-        }
-
         function updateStatusWithValue() {
             if (node.hasRetrievedValue && node.lastValue !== undefined) {
-                const formattedValue = formatValueForStatus(node.lastValue);
+                const formattedValue = NodeHelpers.formatValueForStatus(node.lastValue);
                 setStatus("green", "dot", formattedValue);
             } else {
                 setStatus("green", "dot", "Ready");

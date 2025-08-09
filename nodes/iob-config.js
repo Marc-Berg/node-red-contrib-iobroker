@@ -14,13 +14,13 @@ function setupStaticResources(RED) {
         const sharedPath = path.join(__dirname, '..', 'shared');
 
         if (!fs.existsSync(sharedPath)) {
-            console.warn('[ioBroker] Shared directory not found:', sharedPath);
+            new Logger('iob-config').warn(`Shared directory not found: ${sharedPath}`);
             return false;
         }
 
         const treeViewPath = path.join(sharedPath, 'iobroker-treeview.js');
         if (!fs.existsSync(treeViewPath)) {
-            console.warn('[ioBroker] TreeView component not found:', treeViewPath);
+            new Logger('iob-config').warn(`TreeView component not found: ${treeViewPath}`);
             return false;
         }
 
@@ -43,7 +43,7 @@ function setupStaticResources(RED) {
         return true;
 
     } catch (error) {
-        console.error('[ioBroker] Failed to setup static resources:', error.message);
+        new Logger('iob-config').error(`Failed to setup static resources: ${error.message}`);
         return false;
     }
 }
@@ -63,7 +63,7 @@ function setupAPIEndpoints(RED) {
                 res.json(states);
 
             } catch (error) {
-                console.error('[ioBroker] States API error:', error.message);
+                new Logger('iob-config').error(`States API error: ${error.message}`);
                 res.status(500).json({
                     error: 'Failed to retrieve states',
                     details: error.message
@@ -82,7 +82,7 @@ function setupAPIEndpoints(RED) {
                 });
 
             } catch (error) {
-                console.error('[ioBroker] Status API error:', error.message);
+                new Logger('iob-config').error(`Status API error: ${error.message}`);
                 res.status(500).json({
                     error: 'Failed to get connection status',
                     details: error.message
@@ -165,7 +165,7 @@ function setupAPIEndpoints(RED) {
                 });
 
             } catch (error) {
-                console.error('[ioBroker] Adapters API error:', error.message);
+                new Logger('iob-config').error(`Adapters API error: ${error.message}`);
                 res.status(500).json({
                     error: 'Failed to retrieve adapters',
                     details: error.message,
@@ -178,7 +178,7 @@ function setupAPIEndpoints(RED) {
         return true;
 
     } catch (error) {
-        console.error('[ioBroker] Failed to setup API endpoints:', error.message);
+        new Logger('iob-config').error(`Failed to setup API endpoints: ${error.message}`);
         return false;
     }
 }
@@ -195,9 +195,9 @@ module.exports = function (RED) {
         this.password = this.credentials.password;
         this.usessl = n.usessl || false;
 
-        const sslInfo = this.usessl ? ' (SSL enabled)' : '';
-        const authInfo = this.user ? ' (with authentication)' : '';
-        RED.log.debug(`ioBroker config created: ${this.iobhost}:${this.iobport}${sslInfo}${authInfo}`);
+    const sslInfo = this.usessl ? ' (SSL enabled)' : '';
+    const authInfo = this.user ? ' (with authentication)' : '';
+    new Logger('iob-config').debug(`ioBroker config created: ${this.iobhost}:${this.iobport}${sslInfo}${authInfo}`);
     }
 
     RED.nodes.registerType("iob-config", ioBConfig, {

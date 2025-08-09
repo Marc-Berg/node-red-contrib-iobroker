@@ -47,38 +47,12 @@ module.exports = function(RED) {
         node.lastValue = undefined;
         node.hasSetValue = false;
 
-        function formatValueForStatus(value) {
-            let displayValue;
-            
-            if (value === null) {
-                displayValue = "null";
-            } else if (value === undefined) {
-                displayValue = "undefined";
-            } else if (typeof value === 'boolean') {
-                displayValue = value ? "true" : "false";
-            } else if (typeof value === 'object') {
-                try {
-                    displayValue = JSON.stringify(value);
-                } catch (e) {
-                    displayValue = "[Object]";
-                }
-            } else {
-                displayValue = String(value);
-            }
-            
-            if (displayValue.length > 20) {
-                return "..." + displayValue.slice(-20);
-            }
-            
-            return displayValue;
-        }
-
         function updateStatusWithValue() {
             const autoCreateStatus = settings.autoCreate ? " (auto-create)" : "";
             const historyStatus = settings.enableHistory ? " (history)" : "";
             
             if (node.hasSetValue && node.lastValue !== undefined) {
-                const formattedValue = formatValueForStatus(node.lastValue);
+                const formattedValue = NodeHelpers.formatValueForStatus(node.lastValue);
                 setStatus("green", "dot", formattedValue + autoCreateStatus + historyStatus);
             } else {
                 setStatus("green", "dot", "Ready" + autoCreateStatus + historyStatus);

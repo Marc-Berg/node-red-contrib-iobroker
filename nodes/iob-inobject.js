@@ -160,19 +160,12 @@ module.exports = function (RED) {
             node.isSubscribed = false;
 
             try {
+                await NodeHelpers.handleNodeClose(node, settings, 'object-subscription');
                 await connectionManager.unsubscribeObjects(
                     settings.nodeId,
                     settings.serverId,
                     objectPattern
                 );
-
-                node.status({});
-
-                const patternInfo = isWildcardPattern
-                    ? `wildcard pattern ${objectPattern}`
-                    : `single object ${objectPattern}`;
-
-
             } catch (error) {
                 node.warn(`Cleanup error: ${error.message}`);
             } finally {
