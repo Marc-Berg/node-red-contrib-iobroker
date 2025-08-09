@@ -23,12 +23,17 @@ The WS ioB log node allows you to monitor ioBroker's live log stream in real-tim
 - Can be set to any valid message property
 
 ### Message Properties
-- **payload**: The actual log message text
-- **level**: Log level (error, warn, info, debug, silly)
-- **source**: Full source identifier
-- **timestamp**: ISO timestamp string
-- **severity**: Numeric severity (1=error, 2=warn, 3=info, 4=debug, 5=silly)
-- **from**: Short source name
+- <outputProperty> (default `payload`): The log message text
+- level: Log level (error, warn, info, debug, silly)
+- raw: The original log object from ioBroker
+- log: Structured details
+	- severity: Log level string
+	- message: Message text
+	- from: Source
+	- ts: Timestamp (number)
+	- level: Numeric level (silly=0, debug=1, info=2, warn=3, error=4)
+- source: Full source identifier (when enabled)
+- timestamp: ISO timestamp string (when enabled)
 
 ## Filtering and Processing
 

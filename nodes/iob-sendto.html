@@ -249,7 +249,7 @@ RED.nodes.registerType('iobsendto', {
             <option value="">-- Select instance or use msg.instance --</option>
         </select>
         <div style="margin-top: 5px; font-size: 12px; color: #666;">
-            If no instance is selected, <code>msg.instance</code> will be used
+            If no instance is selected, <code>msg.instance</code> will be used.
         </div>
     </div>
     
@@ -299,7 +299,7 @@ RED.nodes.registerType('iobsendto', {
     
     <h3>Configuration</h3>
     <ul>
-        <li><b>Target Instance:</b> Select from dropdown. If empty, <code>msg.instance</code> is used.</li>
+    <li><b>Target Instance:</b> Select from dropdown. If empty, <code>msg.instance</code> is used.</li>
         <li><b>Command:</b> Optional command parameter. Some instances require this, others don't.</li>
         <li><b>Static Message:</b> Optional JSON message to send. If empty, <code>msg.payload</code> is used.</li>
         <li><b>Wait for Response:</b> Enable to receive instance response as output message.</li>
@@ -363,7 +363,7 @@ msg.payload = {
     <p>When "Wait for Response" is enabled:</p>
     <ul>
         <li><code>msg.payload</code> - Instance response data</li>
-        <li><code>msg.instance</code> - Target instance that was called</li>
+    <li><code>msg.instance</code> - Target instance that was called</li>
         <li><code>msg.command</code> - Command that was sent</li>
         <li><code>msg.originalMessage</code> - Original message sent to instance</li>
         <li><code>msg.responseTime</code> - Time taken for response (ms)</li>

@@ -37,11 +37,19 @@
   - iob-config now uses Logger utility instead of console/RED.log
   - Removed minor import/duplication leftovers
  
+### **Changed**
+- **Terminology standardization: “instance” over “adapter”**
+  - UI labels and documentation now consistently use “instance” when referring to ioBroker adapter instances
+ 
 ### **Fixed**
 - Subscription management for iob-in
   - Consolidates overlapping patterns to minimize WS subscriptions
   - Prevents duplicate subscribe calls via per-server active tracking
   - Unsubscribes obsolete consolidated patterns when broader ones arrive
+
+- iob-sendto and iob-history no longer accept or emit `msg.adapter`.
+  - Use `msg.instance` exclusively for specifying/returning the target adapter instance
+  - Replace all flow usages of `msg.adapter` with `msg.instance`
  
 ## [1.0.2] - 2025-08-06
 

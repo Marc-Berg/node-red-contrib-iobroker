@@ -256,7 +256,7 @@ Object.values(dashboardNodes).forEach(node => node.triggerCached());
 ### Behavior
 - **Cached Values**: All received state values (initial and runtime) are automatically cached
 - **Triggering**: Only works if node has received at least one value (initial value or state change)
-- **Message Format**: Triggered messages include `cached: true` and `initial: true` flags
+- **Message Format**: Triggered messages include `cached: true` and `initial: true` flags. In multiple-states grouped mode, the resend uses `topic: "cached_states"` and sets `isInitial: true`.
 - **All Modes Supported**: Single state, wildcard patterns, and multiple states (individual/grouped)
 
 ### Use Cases

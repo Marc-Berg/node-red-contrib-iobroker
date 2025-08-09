@@ -676,6 +676,7 @@ RED.nodes.registerType('iobout', {
     "from": "system.adapter.node-red",
     "ts": [timestamp]
 }</pre>
+    <p><strong>Note:</strong> <code>ack</code> is determined by the selected Set Mode (Value = true, Command = false). Any <code>msg.ack</code> provided in the input is ignored.</p>
     
     <h3>Created Object Structure</h3>
     <p>When creating objects (with auto-create enabled), the node creates a complete ioBroker object definition:</p>

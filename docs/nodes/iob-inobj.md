@@ -77,43 +77,34 @@ system.config                 // System configuration
 system.certificates           // SSL certificates
 ```
 
-## Output Message Format
+**Output Message Format**
 
 ### Standard Properties
-- **payload**: The complete object definition
-- **topic**: The object ID that changed
-- **timestamp**: When the change occurred
+- `object`: The complete object definition (or `{ _id, deleted: true }` on deletion)
+- `topic`: The object ID that changed
+- `operation`: "update" or "delete"
+- `timestamp`: When the change occurred (ms)
+- `pattern`: Present when subscribed via wildcard pattern
 
 ### Object Information
-Complete object data in payload:
+Complete object data is provided under `object`:
 - `_id`: Object identifier
 - `type`: Object type (state, channel, device, etc.)
 - `common`: Common metadata
 - `native`: Adapter-specific configuration
 
-### Change Information
-Additional properties describing the change:
-- `changeType`: "update" or "delete"
-
 **Example Output:**
 ```
 {
-  payload: {
+  object: {
     _id: "system.adapter.hue.0",
     type: "instance",
-    common: {
-      name: "hue",
-      version: "3.7.0",
-      enabled: true
-    },
-    native: {
-      bridge: "192.168.1.100",
-      user: "newuser123"
-    }
+    common: { name: "hue", version: "3.7.0", enabled: true },
+    native: { bridge: "192.168.1.100", user: "newuser123" }
   },
   topic: "system.adapter.hue.0",
   timestamp: 1640995200000,
-  changeType: "update",
+  operation: "update"
 }
 ```
 

@@ -21,6 +21,8 @@ The WS ioB out node allows you to write values to ioBroker states. It can automa
 **Set Mode**
 - **Value (ack=true)**: Confirmed value from device/sensor
 - **Command (ack=false)**: Command to be executed by device
+  
+Note: ack is determined by the selected Set Mode. A msg.ack value does not override this.
 
 ### Auto-Create Objects
 
@@ -146,12 +148,12 @@ node.done();
 ```
 
 ### Custom Timestamps
-Override automatic timestamp:
+Override automatic timestamp used for the state write:
 ```
 msg.ts = Date.now() - 3600000;  // 1 hour ago
 ```
 
-**Behavior:** The `ts` (timestamp) will be set to your custom value, while `lc` (last changed) will always be set to the current time when the value is actually written. This ensures proper tracking of when the value was last modified in the system.
+Behavior: When msg.ts is a number, the state write uses it as ts. The lc (last changed) is set to the write time.
 
 ### Creating Empty Objects
 Create ioBroker objects without setting a value by passing `null` as the payload. (Set payload type to JSON and value to null)

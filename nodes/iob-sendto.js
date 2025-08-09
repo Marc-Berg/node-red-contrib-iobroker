@@ -53,15 +53,15 @@ module.exports = function(RED) {
                     return;
                 }
 
-                const adapter = msg.adapter || settings.adapter;
-                if (!adapter || !adapter.trim()) {
-                    setStatus("red", "ring", "Adapter missing");
-                    const error = new Error("Target adapter missing (neither configured nor in msg.adapter)");
+                const instance = msg.instance || settings.adapter;
+                if (!instance || !instance.trim()) {
+                    setStatus("red", "ring", "Instance missing");
+                    const error = new Error("Target instance missing (neither configured nor in msg.instance)");
                     done && done(error);
                     return;
                 }
 
-                const trimmedAdapter = adapter.trim();
+                const trimmedInstance = instance.trim();
                 const command = msg.command !== undefined ? msg.command : settings.command;
                 const trimmedCommand = command ? command.trim() : null;
                 const messageContent = msg.message !== undefined ? msg.message : 
@@ -74,8 +74,7 @@ module.exports = function(RED) {
                     done && done(error);
                     return;
                 }
-
-                setStatus("blue", "dot", `Sending to ${trimmedAdapter}...`);
+                setStatus("blue", "dot", `Sending to ${trimmedInstance}...`);
                 const startTime = Date.now();
 
                 function setReadyStatus() {
@@ -87,7 +86,7 @@ module.exports = function(RED) {
                     if (settings.waitForResponse) {
                         const response = await connectionManager.sendToAdapter(
                             settings.serverId,
-                            trimmedAdapter,
+                            trimmedInstance,
                             trimmedCommand,
                             messageContent,
                             timeout
@@ -97,7 +96,7 @@ module.exports = function(RED) {
                         
                         const responseMsg = {
                             payload: response,
-                            adapter: trimmedAdapter,
+                            instance: trimmedInstance,
                             command: trimmedCommand,
                             originalMessage: messageContent,
                             responseTime: responseTime,
@@ -110,7 +109,7 @@ module.exports = function(RED) {
                     } else {
                         await connectionManager.sendToAdapter(
                             settings.serverId,
-                            trimmedAdapter,
+                            trimmedInstance,
                             trimmedCommand,
                             messageContent,
                             null
@@ -122,7 +121,7 @@ module.exports = function(RED) {
                     
                 } catch (sendError) {
                     setStatus("red", "ring", "SendTo failed");
-                    node.error(`SendTo failed for ${trimmedAdapter}: ${sendError.message}`);
+                    node.error(`SendTo failed for ${trimmedInstance}: ${sendError.message}`);
                     done && done(sendError);
                 }
                 

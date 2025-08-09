@@ -129,15 +129,16 @@ When enabled, each object includes an `aliasInfo` property:
 
 When retrieving objects, the output message contains:
 
-- **Target property** (default `payload`): Retrieved object(s) with enriched data
-- **`objects`**: Object map for compatibility
-- **`objectId`**: The object ID or pattern used
-- **`count`**: Number of objects returned
-- **`timestamp`**: Retrieval timestamp
-- **`includesEnums`**: Boolean flag when enum data is included
-- **`includesAliases`**: Boolean flag when alias data is included
-- **`enumStatistics`**: Summary statistics for enum coverage (multiple objects)
-- **`aliasStatistics`**: Summary statistics for alias relationships (multiple objects)
+- Target property (default `payload`): Retrieved object(s) with enriched data
+- `objects`: Object map `{ objectId: object }`
+- `count`: Number of objects returned
+- `timestamp`: Retrieval timestamp (ms)
+- `pattern`: Present when a wildcard pattern was used
+- `appliedFilter`: Present when an object type filter was applied (e.g., `state`)
+- `includesEnums`: Boolean flag when enum data is included
+- `includesAliases`: Boolean flag when alias data is included
+- `enumStatistics`: Summary statistics for enum coverage (multiple objects)
+- `aliasStatistics`: Summary statistics for alias relationships (multiple objects)
 
 ## Object Types
 

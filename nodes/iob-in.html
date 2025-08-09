@@ -684,6 +684,12 @@ Object.values(triggerableNodes)
     .filter(nodeInfo => nodeInfo.mode === 'single')
     .forEach(nodeInfo => nodeInfo.triggerCached());
     </pre>
+
+    <h4>Resend Behavior</h4>
+    <ul>
+        <li>Single mode: sends the last cached state for the configured state ID</li>
+        <li>Multiple states (grouped output): sends all current values in one message with <code>msg.topic = "cached_states"</code> and sets <code>msg.isInitial = true</code></li>
+    </ul>
     
     <h4>Node Info Object Structure</h4>
     <pre>

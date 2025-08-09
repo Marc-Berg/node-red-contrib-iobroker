@@ -13,7 +13,7 @@ The WS ioB history node allows you to retrieve historical data from ioBroker's h
 **State ID**
 - Target state for historical data retrieval
 - Single state ID only (no wildcards)
-- Can be overridden by `msg.stateId`
+- If empty in the node config, it is taken from `msg.topic`
 
 **History Adapter**
 - Auto-detected from available history adapters
@@ -29,7 +29,7 @@ The WS ioB history node allows you to retrieve historical data from ioBroker's h
 
 **Duration Settings** (for Duration type)
 - **Duration**: Numeric value (e.g., 24)
-- **Duration Unit**: hours, days, weeks, months, years
+- **Duration Unit**: minutes, hours, days, weeks
 - **End Time**: Now or custom timestamp
 
 **Absolute Settings** (for Absolute type)
@@ -46,17 +46,22 @@ The WS ioB history node allows you to retrieve historical data from ioBroker's h
 ### Data Processing
 
 **Aggregation**
-- **None**: Raw data points
-- **OnChange**: Only values that changed
-- **Average**: Average values over time intervals
-- **Min**: Minimum values over intervals
-- **Max**: Maximum values over intervals
-- **Total**: Sum of values over intervals
-- **Count**: Number of data points per interval
+- `none`: Raw data points
+- `onchange`: Only values that changed
+- `average`: Average values over time intervals
+- `min`: Minimum values over intervals
+- `max`: Maximum values over intervals
+- `minmax`: Min/Max pairs
+- `total`: Sum of values over intervals
+- `count`: Number of data points per interval
+- `percentile`: Percentile value per interval (requires `percentile` option)
+- `quantile`: Quantile per interval (requires `quantile` option)
+- `integral`: Time integral per interval (requires `integralUnit`)
 
-**Step Size** (for aggregation)
-- Time interval for aggregation in seconds
-- Common values: 300 (5min), 3600 (1h), 86400 (1d)
+**Step Interval** (for aggregation)
+- Time interval for aggregation
+- Units: seconds, minutes, hours
+- Common values: 300s (5min), 3600s (1h)
 
 **Output Format**
 - **Array**: Simple array of data points
@@ -153,7 +158,7 @@ Formatted for Node-RED Dashboard 2.0 ui-chart components:
   {x: 1640995500000, y: 23.7},
   {x: 1640995800000, y: 23.3}
 ]
-// msg.topic = "Temperature" (series name)
+// msg.topic = "<stateId>" (series name)
 ```
 
 ### Statistics Format
@@ -161,9 +166,10 @@ Summary statistics:
 ```javascript
 {
   count: 288,
+  numericCount: 288,
   min: 18.2,
   max: 26.8,
-  average: 22.5,
+  avg: 22.5,
   sum: 6480.0,
   first: { ts: 1640995200000, val: 23.5 },
   last: { ts: 1641081600000, val: 22.1 }
@@ -178,7 +184,9 @@ All queries include additional metadata:
 - `msg.queryTime` - Time taken to execute the query (ms)
 - `msg.dropped` - True if query was dropped (drop mode only)
 - `msg.stateId` - The queried state ID
-- `msg.adapter` - History adapter instance used
+- `msg.instance` - History adapter instance used
+- `msg.queryOptions` - Options sent to the adapter (start/end, aggregate, step, etc.)
+- `msg.formatOptions` - Formatting settings (timestamp format, data format, removeBorderValues, timezone)
 
 ## Performance Optimization
 

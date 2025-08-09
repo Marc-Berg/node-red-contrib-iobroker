@@ -54,6 +54,8 @@ msg.topic = [
 ];
 ```
 
+Note: Wildcards in msg.topic are not supported by this node. Resolve patterns first using WS ioB getObject and pass the resulting objects via msg.objects.
+
 ### 3. Batch Processing (msg.objects)
 Direct output from `iob-getobject` node:
 ```javascript
@@ -72,10 +74,11 @@ msg.objects = {
 - Prevents errors when processing mixed getObject results
 
 ### Alias Support
-Automatically extracts and includes:
-- **aliasedBy**: Alias states that reference the original state
-- **aliasTarget**: Target states referenced by alias objects
-- Both simple and complex alias configurations
+When msg.objects comes from WS ioB getObject and includes aliasInfo, the node also reads:
+- Alias target IDs referenced by alias objects
+- Alias state IDs (aliasedBy) that reference a target
+
+Both simple and complex alias configurations are supported, so batch results may include original states plus their alias targets and aliasedBy states.
 
 ## Usage Patterns
 
@@ -124,7 +127,7 @@ Common trigger scenarios:
 ```
 
 ### Batch Mode (Multiple States)
-Compatible with iob-in grouped message format:
+Compatible with iob-in grouped message format. The node also adds a count field with the number of retrieved states.
 ```javascript
 {
     "topic": "batch_states",

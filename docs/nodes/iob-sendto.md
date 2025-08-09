@@ -72,6 +72,20 @@ msg.command = "query";
 msg.timeout = 30000; // 30 seconds for complex database queries
 ```
 
+## Output (Response Mode)
+
+When "Wait for Response" is enabled, the node outputs a structured response:
+```javascript
+{
+  payload: <adapter response>,
+  instance: "telegram.0",
+  command: "send",
+  originalMessage: { text: "Hello!", user: "admin" },
+  responseTime: 42,            // in ms
+  timestamp: 1690000000000
+}
+```
+
 ## Error Handling
 
 ### Common Error Scenarios
@@ -86,7 +100,7 @@ When an error occurs, the output includes:
 ```javascript
 {
     error: "Timeout waiting for response from telegram.0",
-    instance: "telegram.0",
+  instance: "telegram.0",
     command: "send",
     originalMessage: { text: "Test message" },
     timestamp: 1640995200000

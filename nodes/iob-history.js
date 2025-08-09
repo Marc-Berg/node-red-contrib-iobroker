@@ -334,7 +334,7 @@ module.exports = function (RED) {
                 return {
                     [settings.outputProperty]: null,
                     stateId: stateId,
-                    adapter: settings.historyAdapter,
+                    instance: settings.historyAdapter,
                     queryOptions: queryOptions,
                     queryTime: queryTime,
                     count: 0,
@@ -364,7 +364,7 @@ module.exports = function (RED) {
             return {
                 [settings.outputProperty]: output,
                 stateId: stateId,
-                adapter: settings.historyAdapter,
+                instance: settings.historyAdapter,
                 queryOptions: queryOptions,
                 queryTime: queryTime,
                 count: processedData.length,
@@ -485,7 +485,7 @@ module.exports = function (RED) {
                 msg.error = queryError.message;
                 msg[settings.outputProperty] = null;
                 msg.stateId = stateId;
-                msg.adapter = settings.historyAdapter;
+                msg.instance = settings.historyAdapter;
                 msg.queryTime = Date.now() - queryStartTime;
                 msg.queryId = id;
                 msg.queryMode = settings.queryMode;
@@ -557,7 +557,7 @@ module.exports = function (RED) {
                     msg.error = queryError.message;
                     msg[settings.outputProperty] = null;
                     msg.stateId = stateId;
-                    msg.adapter = settings.historyAdapter;
+                    msg.instance = settings.historyAdapter;
                     msg.queryTime = 0;
 
                     send(msg);
