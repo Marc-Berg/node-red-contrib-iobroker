@@ -30,7 +30,20 @@
   - **Live configuration preview**: Real-time preview of custom settings with JSON validation
   - **Comprehensive help**: Built-in documentation for all adapter custom settings
   - **Status indicators**: Node status now shows active features (auto-create, history)
-
+ 
+- **Consistent use of utils/helpers across nodes**
+  - Unified value formatting via NodeHelpers.formatValueForStatus (iob-get, iob-out)
+  - Standardized cleanup via NodeHelpers.handleNodeClose (iob-inobject)
+  - iob-config now uses Logger utility instead of console/RED.log
+  - Removed minor import/duplication leftovers
+ 
+### **Fixed**
+- Robust subscription management for iob-in
+  - Consolidates overlapping patterns to minimize WS subscriptions
+  - Prevents duplicate subscribe calls via per-server active tracking
+  - Unsubscribes obsolete consolidated patterns when broader ones arrive
+  - Reference-counted unsubscribe across single and multiple-state nodes
+  - Resets tracking on reconnect to ensure clean resubscription
 ## [1.0.2] - 2025-08-06
 
 ### **Fixed**
