@@ -38,12 +38,11 @@
   - Removed minor import/duplication leftovers
  
 ### **Fixed**
-- Robust subscription management for iob-in
+- Subscription management for iob-in
   - Consolidates overlapping patterns to minimize WS subscriptions
   - Prevents duplicate subscribe calls via per-server active tracking
   - Unsubscribes obsolete consolidated patterns when broader ones arrive
-  - Reference-counted unsubscribe across single and multiple-state nodes
-  - Resets tracking on reconnect to ensure clean resubscription
+ 
 ## [1.0.2] - 2025-08-06
 
 ### **Fixed**
