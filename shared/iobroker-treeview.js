@@ -2,8 +2,35 @@
     'use strict';
     
     if (typeof global.ioBrokerSharedTreeView !== 'undefined' && global.ioBrokerSharedTreeView.initialized) {
+        try {
+            const cs = document.currentScript;
+            // Debug: script was loaded but initialization already done
+            console.debug('[TreeView] Script load skipped: already initialized', {
+                existingVersion: global.ioBrokerSharedTreeView.version,
+                src: cs && cs.src
+            });
+        } catch (e) { /* no-op */ }
         return;
     }
+    
+    const SCRIPT_INFO = (() => {
+        try {
+            const s = document.currentScript;
+            const src = (s && s.src) || '';
+            const vm = src.match(/[?&]v=([^&]+)/);
+            return { src, v: vm ? vm[1] : null, loadedAt: new Date().toISOString() };
+        } catch (e) {
+            return { src: '', v: null, loadedAt: new Date().toISOString() };
+        }
+    })();
+    
+    try {
+        console.info('[TreeView] Loaded shared script', {
+            scriptSrc: SCRIPT_INFO.src,
+            queryVersion: SCRIPT_INFO.v,
+            loadedAt: SCRIPT_INFO.loadedAt
+        });
+    } catch (e) { /* no-op */ }
     
     const CONFIG = {
         ITEM_HEIGHT: 24,
@@ -62,10 +89,27 @@
     const CacheManager = {
         get: (serverId) => {
             const entry = cache.get(serverId);
-            return (entry && (Date.now() - entry.timestamp) < CONFIG.CACHE_DURATION) ? entry.data : null;
+            const hit = (entry && (Date.now() - entry.timestamp) < CONFIG.CACHE_DURATION) ? entry.data : null;
+            if (hit) {
+                try {
+                    const count = Array.isArray(hit?.objects) ? hit.objects.length : (hit ? Object.keys(hit).length : 0);
+                    console.debug('[TreeView] Cache hit', { serverId, count });
+                } catch (e) { /* no-op */ }
+            }
+            return hit;
         },
-        set: (serverId, data) => cache.set(serverId, { data, timestamp: Date.now() }),
-        clear: (serverId) => serverId ? cache.delete(serverId) : cache.clear(),
+        set: (serverId, data) => {
+            cache.set(serverId, { data, timestamp: Date.now() });
+            try {
+                const count = Array.isArray(data?.objects) ? data.objects.length : (data ? Object.keys(data).length : 0);
+                console.debug('[TreeView] Cache set', { serverId, count });
+            } catch (e) { /* no-op */ }
+        },
+        clear: (serverId) => {
+            const had = serverId ? cache.has(serverId) : cache.size > 0;
+            serverId ? cache.delete(serverId) : cache.clear();
+            try { console.debug('[TreeView] Cache clear', { scope: serverId || 'all', had }); } catch (e) { /* no-op */ }
+        },
         getCacheBreaker: () => `cb=${Date.now()}`
     };
     
@@ -117,6 +161,20 @@
                 if (i % (CONFIG.CHUNK_SIZE * 5) === 0) await new Promise(r => setTimeout(r, 0));
             }
             
+            this.buildHierarchy();
+            this.buildSearchIndex();
+            this.updateFiltered();
+        }
+
+        async buildFromObjects(objects) {
+            this.clear();
+            const ids = Array.isArray(objects) ? objects.map(o => o && (o._id || o.id || o.objectId)).filter(Boolean) : [];
+
+            for (let i = 0; i < ids.length; i += CONFIG.CHUNK_SIZE) {
+                this.processChunk(ids.slice(i, i + CONFIG.CHUNK_SIZE));
+                if (i % (CONFIG.CHUNK_SIZE * 5) === 0) await new Promise(r => setTimeout(r, 0));
+            }
+
             this.buildHierarchy();
             this.buildSearchIndex();
             this.updateFiltered();
@@ -427,7 +485,7 @@
     }
     
     function createTreeView(config) {
-        const { nodeType, inputId, serverInputId, searchPlaceholder = "Search...", itemType = "items", dataEndpoint = "/iobroker/ws/states", enableWildcardDetection = false, wildcardInputId = null } = config;
+        const { nodeType, inputId, serverInputId, searchPlaceholder = "Search...", itemType = "items", dataEndpoint = "/iobroker/ws/objects", enableWildcardDetection = false, wildcardInputId = null } = config;
         
         injectStyles();
         
@@ -554,7 +612,12 @@
             
             if (!forceRefresh) {
                 const cached = CacheManager.get(serverId);
-                if (cached) return renderData(cached, true);
+                if (cached) {
+                    try {
+                        console.debug('[TreeView] Using cached data', { serverId });
+                    } catch (e) { /* no-op */ }
+                    return renderData(cached, true);
+                }
             }
             
             if (forceRefresh) CacheManager.clear(serverId);
@@ -564,23 +627,57 @@
                 elements.container.html(`<div style="padding:20px;text-align:center"><i class="fa fa-spinner fa-spin"></i> Loading...</div>`);
                 
                 let url = `${dataEndpoint}/${encodeURIComponent(serverId)}`;
-                if (forceRefresh) url += `?${CacheManager.getCacheBreaker()}`;
+                if (dataEndpoint.endsWith('/objects') && !/\?/.test(url)) {
+                    url += `?pattern=*`;
+                    if (itemType === 'states') {
+                        url += `&type=state`;
+                    }
+                }
+                if (forceRefresh) url += `${url.includes('?') ? '&' : '?'}${CacheManager.getCacheBreaker()}`;
+                try {
+                    console.debug('[TreeView] Requesting data', { url, serverId, dataEndpoint, forceRefresh });
+                } catch (e) { /* no-op */ }
                 
-                const data = await $.ajax({
-                    url, method: 'GET', timeout: 20000, dataType: 'json', cache: false,
+                const fetchData = async (u) => $.ajax({
+                    url: u, method: 'GET', timeout: 20000, dataType: 'json', cache: false,
                     headers: { 'Cache-Control': 'no-cache', 'Pragma': 'no-cache', 'Expires': '0' }
                 });
+                let data;
+                try {
+                    data = await fetchData(url);
+                } catch (err) {
+                    // Fallback to legacy states endpoint if objects endpoint not available
+                    if (dataEndpoint.endsWith('/objects')) {
+                        const legacyUrl = `/iobroker/ws/states/${encodeURIComponent(serverId)}`;
+                        try { console.warn('[TreeView] Objects endpoint failed, falling back to states', { error: err && err.message }); } catch (e) { /* no-op */ }
+                        data = await fetchData(legacyUrl);
+                    } else {
+                        throw err;
+                    }
+                }
                 
-                if (!Object.keys(data).length) throw new Error(`No ${itemType} received`);
+                const hasObjects = data && Array.isArray(data.objects);
+                const isStatesMap = data && typeof data === 'object' && !Array.isArray(data);
+                if (!hasObjects && !isStatesMap) throw new Error(`No ${itemType} received`);
                 CacheManager.set(serverId, data);
                 renderData(data, false);
+                try {
+                    const count = hasObjects ? data.objects.length : Object.keys(data || {}).length;
+                    console.debug('[TreeView] Data loaded', { format: hasObjects ? 'objects' : 'states', count });
+                } catch (e) { /* no-op */ }
             } catch (error) {
                 showStatus('error', `Error: ${error.message}`);
+                try { console.error('[TreeView] Load error', { message: error && error.message, stack: error && error.stack }); } catch (e) { /* no-op */ }
             }
         }
         
         async function renderData(data, cached) {
-            await treeData.buildFromStates(data);
+            // Support both new objects endpoint and legacy states map
+            if (data && Array.isArray(data.objects)) {
+                await treeData.buildFromObjects(data.objects);
+            } else {
+                await treeData.buildFromStates(data || {});
+            }
             if (treeView) treeView.destroy();
             
             treeView = new TreeView(elements.container[0], treeData);
@@ -599,7 +696,11 @@
             
             treeView.render();
             dataLoaded = true;
-            showStatus('success', `Loaded ${Object.keys(data).length} ${itemType} ${cached ? '(cached)' : ''}`);
+            const itemCount = Array.isArray(data?.objects) ? data.objects.length : Object.keys(data || {}).length;
+            showStatus('success', `Loaded ${itemCount} ${itemType} ${cached ? '(cached)' : ''}`);
+            try {
+                console.debug('[TreeView] Rendered', { format: Array.isArray(data?.objects) ? 'objects' : 'states', itemCount, cached });
+            } catch (e) { /* no-op */ }
         }
         
         function showStatus(type, msg) {
@@ -711,6 +812,7 @@
         });
         
         serverInput.on('change', () => {
+            try { console.debug('[TreeView] Server changed, clearing view'); } catch (e) { /* no-op */ }
             treeData.clear();
             if (treeView) { treeView.destroy(); treeView = null; }
             dataLoaded = false;
@@ -734,7 +836,7 @@
     }
     
     global.ioBrokerSharedTreeView = {
-        version: '1.5.6',
+        version: '1.5.8',
         setup: createTreeView,
         TreeData, TreeView, CacheManager, WildcardUtils,
         initialized: true

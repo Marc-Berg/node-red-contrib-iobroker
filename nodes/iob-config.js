@@ -24,7 +24,12 @@ function setupStaticResources(RED) {
             return false;
         }
 
-        RED.httpAdmin.use('/iobroker/shared', express.static(sharedPath, {
+        RED.httpAdmin.use('/iobroker/shared', (req, res, next) => {
+            try {
+                new Logger('iob-config').debug(`Shared request: ${req.method} ${req.originalUrl}`);
+            } catch (e) { /* no-op */ }
+            next();
+        }, express.static(sharedPath, {
             maxAge: 0,
             etag: false,
             lastModified: false,
@@ -57,6 +62,7 @@ function setupAPIEndpoints(RED) {
         RED.httpAdmin.get('/iobroker/ws/states/:serverId', async (req, res) => {
             try {
                 const serverId = decodeURIComponent(req.params.serverId);
+                new Logger('iob-config').debug(`GET /ws/states for ${serverId}`);
                 const states = await connectionManager.getStates(serverId);
 
                 res.setHeader('Cache-Control', 'public, max-age=300');
@@ -71,9 +77,41 @@ function setupAPIEndpoints(RED) {
             }
         });
 
+        // Objects endpoint using getObjectView under the hood via OperationManager
+        // Usage: /iobroker/ws/objects/:serverId?pattern=adapter.*&type=state
+        RED.httpAdmin.get('/iobroker/ws/objects/:serverId', async (req, res) => {
+            try {
+                const serverId = decodeURIComponent(req.params.serverId);
+                const pattern = (req.query.pattern || '*').toString();
+                const type = req.query.type ? req.query.type.toString() : null;
+                new Logger('iob-config').debug(`GET /ws/objects for ${serverId} pattern=${pattern} type=${type || 'any'}`);
+
+                const allowedTypes = new Set(['state', 'channel', 'device', 'folder', 'adapter', 'instance', 'host', 'group', 'user', 'config', 'enum']);
+                const objectType = type && allowedTypes.has(type) ? type : null;
+
+                const objects = await connectionManager.getObjects(serverId, pattern, objectType);
+
+                res.setHeader('Cache-Control', 'public, max-age=120');
+                res.json({
+                    pattern,
+                    type: objectType,
+                    count: Array.isArray(objects) ? objects.length : 0,
+                    objects: Array.isArray(objects) ? objects : []
+                });
+            } catch (error) {
+                new Logger('iob-config').error(`Objects API error: ${error.message}`);
+                res.status(500).json({
+                    error: 'Failed to retrieve objects',
+                    details: error.message,
+                    objects: []
+                });
+            }
+        });
+
         RED.httpAdmin.get('/iobroker/ws/status/:serverId', (req, res) => {
             try {
                 const serverId = decodeURIComponent(req.params.serverId);
+                new Logger('iob-config').debug(`GET /ws/status for ${serverId}`);
                 const status = connectionManager.getConnectionStatus(serverId);
 
                 res.json({
@@ -94,6 +132,7 @@ function setupAPIEndpoints(RED) {
             try {
                 const serverId = decodeURIComponent(req.params.serverId);
                 const connectionManager = require('../lib/manager/websocket-manager');
+                new Logger('iob-config').debug(`GET /ws/adapters for ${serverId}`);
 
                 const states = await connectionManager.getStates(serverId);
                 const historyAdapters = [];
@@ -195,9 +234,9 @@ module.exports = function (RED) {
         this.password = this.credentials.password;
         this.usessl = n.usessl || false;
 
-    const sslInfo = this.usessl ? ' (SSL enabled)' : '';
-    const authInfo = this.user ? ' (with authentication)' : '';
-    new Logger('iob-config').debug(`ioBroker config created: ${this.iobhost}:${this.iobport}${sslInfo}${authInfo}`);
+        const sslInfo = this.usessl ? ' (SSL enabled)' : '';
+        const authInfo = this.user ? ' (with authentication)' : '';
+        new Logger('iob-config').debug(`ioBroker config created: ${this.iobhost}:${this.iobport}${sslInfo}${authInfo}`);
     }
 
     RED.nodes.registerType("iob-config", ioBConfig, {

@@ -7,8 +7,8 @@ function loadSharedTreeView() {
             return;
         }
         
-        const script = document.createElement('script');
-        script.src = 'iobroker/shared/iobroker-treeview.js?v=1.0.0';
+    const script = document.createElement('script');
+    script.src = 'iobroker/shared/iobroker-treeview.js?v=1.1.0';
         script.async = true;
         
         script.onload = () => {
@@ -90,7 +90,7 @@ RED.nodes.registerType('iobinobject', {
                 serverInputId: 'node-input-server',
                 searchPlaceholder: 'Search objects (supports wildcards)...',
                 itemType: 'objects',
-                dataEndpoint: '/iobroker/ws/states', // Same endpoint, different context
+                dataEndpoint: '/iobroker/ws/objects', // Optimized objects endpoint
                 enableWildcardDetection: true,
                 wildcardInputId: null // No initial value checkbox for objects
             });

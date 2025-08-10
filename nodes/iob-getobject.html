@@ -8,7 +8,7 @@
             }
 
             const script = document.createElement('script');
-            script.src = 'iobroker/shared/iobroker-treeview.js?v=1.0.0';
+            script.src = 'iobroker/shared/iobroker-treeview.js?v=1.1.0';
             script.async = true;
 
             script.onload = () => {
@@ -232,7 +232,7 @@
                     serverInputId: 'node-input-server',
                     searchPlaceholder: 'Search objects (supports wildcards)...',
                     itemType: 'objects',
-                    dataEndpoint: '/iobroker/ws/states',
+                    dataEndpoint: '/iobroker/ws/objects',
                     enableWildcardDetection: true,
                     wildcardInputId: null
                 });

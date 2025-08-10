@@ -1,61 +1,61 @@
 <script type="text/javascript">
-RED.nodes.registerType('iob-config', {
-    category: 'config',
-    defaults: {
-        name:     { value: "config1", required: true },
-        iobhost:  { value: "iobroker.local", required: true },
-        iobport:  { value: 8082, required: true, validate: RED.validators.number() },
-        usessl:   { value: false }
-    },
-    credentials: {
-        user:     { type: "text" },
-        password: { type: "password" }
-    },
-    label: function() {
-        return this.name;
-    },
-    oneditprepare: function() {
-        var node = this;
-        
-        // Function to toggle the token expiry warning
-        function toggleTokenWarning() {
-            var username = $("#node-config-input-user").val().trim();
-            var warningDiv = $("#token-expiry-warning");
-            
-            if (username) {
-                warningDiv.show();
-            } else {
-                warningDiv.hide();
+    RED.nodes.registerType('iob-config', {
+        category: 'config',
+        defaults: {
+            name: { value: "config1", required: true },
+            iobhost: { value: "iobroker.local", required: true },
+            iobport: { value: 8082, required: true, validate: RED.validators.number() },
+            usessl: { value: false }
+        },
+        credentials: {
+            user: { type: "text" },
+            password: { type: "password" }
+        },
+        label: function () {
+            return this.name;
+        },
+        oneditprepare: function () {
+            var node = this;
+
+            // Function to toggle the token expiry warning
+            function toggleTokenWarning() {
+                var username = $("#node-config-input-user").val().trim();
+                var warningDiv = $("#token-expiry-warning");
+
+                if (username) {
+                    warningDiv.show();
+                } else {
+                    warningDiv.hide();
+                }
             }
-        }
-        
-        // Function to show SSL info based on current settings
-        function updateSSLInfo() {
-            var useSSL = $("#node-config-input-usessl").prop('checked');
-            var sslInfoDiv = $("#ssl-info");
-            
-            if (useSSL) {
-                sslInfoDiv.show();
-            } else {
-                sslInfoDiv.hide();
+
+            // Function to show SSL info based on current settings
+            function updateSSLInfo() {
+                var useSSL = $("#node-config-input-usessl").prop('checked');
+                var sslInfoDiv = $("#ssl-info");
+
+                if (useSSL) {
+                    sslInfoDiv.show();
+                } else {
+                    sslInfoDiv.hide();
+                }
             }
-        }
-        
-        // Initial checks
-        toggleTokenWarning();
-        updateSSLInfo();
-        
-        // Watch for changes in the username field
-        $("#node-config-input-user").on('input keyup change', function() {
+
+            // Initial checks
             toggleTokenWarning();
-        });
-        
-        // Watch for changes in SSL checkbox
-        $("#node-config-input-usessl").on('change', function() {
             updateSSLInfo();
-        });
-    }
-});
+
+            // Watch for changes in the username field
+            $("#node-config-input-user").on('input keyup change', function () {
+                toggleTokenWarning();
+            });
+
+            // Watch for changes in SSL checkbox
+            $("#node-config-input-usessl").on('change', function () {
+                updateSSLInfo();
+            });
+        }
+    });
 </script>
 
 <script type="text/html" data-template-name="iob-config">
@@ -130,5 +130,5 @@ RED.nodes.registerType('iob-config', {
         <li>Self-signed certificates are accepted</li>
     </ul>
     
-    <p>📖 <a href="https://www.iobroker.net/#en/documentation/config/admin.md" target="_blank">ioBroker Admin Configuration</a></p>
+    <p>📖 <a href="https://github.com/Marc-Berg/node-red-contrib-iobroker/blob/main/README.md" target="_blank">Project README</a></p>
 </script>
