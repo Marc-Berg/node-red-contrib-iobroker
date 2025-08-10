@@ -155,17 +155,19 @@ module.exports = function (RED) {
             }
         }
 
-        node.on("close", async function (removed, done) {
+    node.on("close", async function (removed, done) {
             node.isInitialized = false;
             node.isSubscribed = false;
 
             try {
-                await NodeHelpers.handleNodeClose(node, settings, 'object-subscription');
-                await connectionManager.unsubscribeObjects(
+        // 1) Unsubscribe first while connection is still open
+        await connectionManager.unsubscribeObjects(
                     settings.nodeId,
                     settings.serverId,
                     objectPattern
                 );
+        // 2) Then unregister from events and clear status
+        await NodeHelpers.handleNodeClose(node, settings, 'object-subscription');
             } catch (error) {
                 node.warn(`Cleanup error: ${error.message}`);
             } finally {

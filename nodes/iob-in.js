@@ -669,7 +669,7 @@ module.exports = function (RED) {
             }
         }
 
-        node.on("close", async function (removed, done) {
+    node.on("close", async function (removed, done) {
             node.isInitialized = false;
             node.isSubscribed = false;
 
@@ -687,10 +687,7 @@ module.exports = function (RED) {
             }
 
             try {
-                // Use helper for standard cleanup
-                await NodeHelpers.handleNodeClose(node, settings, 'subscription');
-                
-                // Custom cleanup for subscription
+        // 1) Unsubscribe first while connection is still open
                 if (isMultipleStates) {
                     await connectionManager.unsubscribeMultiple(
                         settings.nodeId,
@@ -704,6 +701,9 @@ module.exports = function (RED) {
                         subscriptionPattern
                     );
                 }
+
+        // 2) Now unregister from events and clear status
+        await NodeHelpers.handleNodeClose(node, settings, 'subscription');
 
             } catch (error) {
                 node.warn(`Cleanup error: ${error.message}`);
