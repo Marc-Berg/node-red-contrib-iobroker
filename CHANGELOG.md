@@ -50,6 +50,8 @@
 - iob-sendto and iob-history no longer accept or emit `msg.adapter`.
   - Use `msg.instance` exclusively for specifying/returning the target adapter instance
   - Replace all flow usages of `msg.adapter` with `msg.instance`
+
+- Ignore benign unsubscribe errors during shutdown; hardened cleanup.
  
 ## [1.0.2] - 2025-08-06
 
