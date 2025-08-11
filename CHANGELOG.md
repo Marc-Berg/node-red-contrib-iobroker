@@ -1,6 +1,6 @@
 # Changelog
 
-## [1.1.0] - 2025-xx-xx
+## [1.1.0] - 2025-08-11
 
 ### **Added**
 - **Custom timestamps support for iob-out node**
