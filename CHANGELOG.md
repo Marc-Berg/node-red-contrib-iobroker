@@ -33,9 +33,9 @@
 
 - **Enhanced iob-out node configuration**
   - **Three-tab interface**: Basic, Object Creation, and Custom Settings Configuration tabs for better organization
-  - **Live configuration preview**: Real-time preview of custom settings with JSON validation
+  - **Live configuration preview**: Preview of custom settings with JSON validation
   - **Comprehensive help**: Built-in documentation for all adapter custom settings
-  - **Status indicators**: Node status now shows active features (auto-create, history)
+  - **Status indicators**: Node status now shows active features
  
 - **Consistent use of utils/helpers across nodes**
   - Unified value formatting via NodeHelpers.formatValueForStatus (iob-get, iob-out)
