@@ -25,7 +25,7 @@
   - **Dynamic layout handling**: Label text wrapping adjusts automatically between tree view and manual input modes
   - **Improved spacing**: Better visual separation between UI elements for enhanced usability
 
-- **Editor TreeView performance and diagnostics**
+- **Editor TreeView performance**
   - Uses lightweight /iobroker/ws/objects (+type=state) instead of /ws/states → smaller payloads and faster load
 
 - **iob-out instances picker**
