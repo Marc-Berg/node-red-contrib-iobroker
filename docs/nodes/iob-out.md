@@ -42,7 +42,10 @@ When enabled, automatically creates missing ioBroker objects with proper metadat
 Automatically configure custom adapter settings when creating new objects.
 
 **Custom Settings Adapter**
-Target adapter instance (e.g., `influxdb.0`, `history.0`, `sql.0`, `mqtt-client.0`)
+Target adapter instance (e.g., `influxdb.0`, `history.0`, `sql.0`, `mqtt-client.0`).
+
+- Pick from a dropdown list loaded from the server
+- If the list is empty or you prefer dynamic selection, you can leave it empty and provide it at runtime via `msg.customSettings.adapter`
 
 **Custom Settings Template**
 - **Sensor**: Basic logging (changesOnly: true)

@@ -646,14 +646,7 @@
                 try {
                     data = await fetchData(url);
                 } catch (err) {
-                    // Fallback to legacy states endpoint if objects endpoint not available
-                    if (dataEndpoint.endsWith('/objects')) {
-                        const legacyUrl = `/iobroker/ws/states/${encodeURIComponent(serverId)}`;
-                        try { console.warn('[TreeView] Objects endpoint failed, falling back to states', { error: err && err.message }); } catch (e) { /* no-op */ }
-                        data = await fetchData(legacyUrl);
-                    } else {
-                        throw err;
-                    }
+                    throw err;
                 }
                 
                 const hasObjects = data && Array.isArray(data.objects);

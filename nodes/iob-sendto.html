@@ -77,7 +77,7 @@ RED.nodes.registerType('iobsendto', {
         $('#response-info').toggle(waitForResponseChecked);
         $('#no-response-info').toggle(!waitForResponseChecked);
         
-        function cleanupAdapterDropdown() {
+    function cleanupAdapterDropdown() {
             adapterSelect.find('optgroup').remove();
             adapterSelect.find('option:contains("Loading")').remove();
         }
@@ -99,77 +99,37 @@ RED.nodes.registerType('iobsendto', {
         function loadAvailableInstances() {
             const serverNode = RED.nodes.node(serverInput.val());
             if (!serverNode) {
-                showFallbackInstances();
+                cleanupAdapterDropdown();
                 return;
             }
             
             const serverId = `${serverNode.iobhost}:${serverNode.iobport}`;
             
+            const url = `/iobroker/ws/instances/${encodeURIComponent(serverId)}`;
             $.ajax({
-                url: `/iobroker/ws/states/${encodeURIComponent(serverId)}`,
+                url,
                 method: 'GET',
                 timeout: 15000,
                 dataType: 'json',
                 cache: false
             }).done(function(response) {
-                if (response && typeof response === 'object') {
-                    const instances = extractInstancesFromStates(response);
-                    
-                    if (instances.length > 0) {
-                        populateInstanceDropdown(instances);
-                    } else {
-                        showFallbackInstances();
-                    }
+                if (response && Array.isArray(response.adapters)) {
+                    const instances = response.adapters.map(i => ({
+                        name: i.name,
+                        type: i.type,
+                        instance: i.instance
+                    }));
+                    populateInstanceDropdown(instances);
                 } else {
-                    showFallbackInstances();
+                    cleanupAdapterDropdown();
                 }
-            }).fail(function(xhr, status, error) {
-                showFallbackInstances();
+            }).fail(function() {
+                cleanupAdapterDropdown();
             });
         }
         
-        function extractInstancesFromStates(states) {
-            const instanceConfigs = new Map();
-            
-            Object.keys(states).forEach(stateId => {
-                const aliveMatch = stateId.match(/^system\.adapter\.([^.]+)\.(\d+)\.alive$/);
-                if (aliveMatch) {
-                    const adapterType = aliveMatch[1];
-                    const instance = parseInt(aliveMatch[2]);
-                    const instanceName = `${adapterType}.${instance}`;
-                    
-                    const state = states[stateId];
-                    const isAlive = state && typeof state.val === 'boolean' ? state.val : Boolean(state?.val);
-                    
-                    if (!instanceConfigs.has(instanceName)) {
-                        instanceConfigs.set(instanceName, {
-                            name: instanceName,
-                            type: adapterType,
-                            instance: instance,
-                            alive: isAlive
-                        });
-                    } else {
-                        instanceConfigs.get(instanceName).alive = isAlive;
-                    }
-                }
-            });
-
-            const instances = [];
-            for (const config of instanceConfigs.values()) {
-                if (!['admin', 'discovery', 'backitup', 'objects', 'states', 'web'].includes(config.type)) {
-                    instances.push(config);
-                }
-            }
-
-            instances.sort((a, b) => {
-                if (a.type !== b.type) return a.type.localeCompare(b.type);
-                return a.instance - b.instance;
-            });
-
-            return instances;
-        }
         
-        function populateInstanceDropdown(instances) {
+    function populateInstanceDropdown(instances) {
             console.log('🔍 populateInstanceDropdown called with', instances.length, 'instances');
             
             adapterSelect.find('option:contains("Loading")').remove();
@@ -177,13 +137,9 @@ RED.nodes.registerType('iobsendto', {
             
             if (instances.length > 0) {
                 const instanceGroup = $('<optgroup label="📦 Available Instances"></optgroup>');
-                
                 instances.forEach(instance => {
-                    const statusIcon = instance.alive ? '🟢' : '🔴';
-                    const displayName = `${statusIcon} ${instance.name}`;
-                    instanceGroup.append($('<option></option>').attr('value', instance.name).text(displayName));
+                    instanceGroup.append($('<option></option>').attr('value', instance.name).text(instance.name));
                 });
-                
                 instanceGroup.insertAfter(getEmptyOption());
                 console.log('✅ Added instance group with', instances.length, 'instances');
             }
@@ -192,22 +148,6 @@ RED.nodes.registerType('iobsendto', {
             if (currentAdapter && instances.find(i => i.name === currentAdapter)) {
                 adapterSelect.val(currentAdapter);
             }
-        }
-        
-        function showFallbackInstances() {
-            cleanupAdapterDropdown();
-            
-            const fallbackGroup = $('<optgroup label="⚠️ Common Instances (not verified)"></optgroup>');
-            const fallbackInstances = [
-                'telegram.0', 'email', 'pushover.0', 'javascript.0', 'sql.0', 
-                'influxdb.0', 'spotify-premium.0', 'sonos.0', 'kodi.0', 'slack.0'
-            ];
-            
-            fallbackInstances.forEach(instance => {
-                fallbackGroup.append(`<option value="${instance}" style="color: #666;">🔴 ${instance}</option>`);
-            });
-            
-            fallbackGroup.insertAfter(getEmptyOption());
         }
         
         serverInput.on('change', function() {
@@ -220,16 +160,6 @@ RED.nodes.registerType('iobsendto', {
     },
     
     oneditsave: function() {
-        const selectedAdapter = $('#node-input-adapter').val();
-        
-        if (selectedAdapter && selectedAdapter !== '') {
-            this.adapter = selectedAdapter;
-        } else {
-            this.adapter = "";
-        }
-        
-        this.changed = true;
-        this.dirty = true;
     },
     
     oneditresize: function() {
@@ -308,11 +238,7 @@ RED.nodes.registerType('iobsendto', {
     </ul>
     
     <h3>Instance Selection</h3>
-    <p>The dropdown shows all available adapter instances with their current status:</p>
-    <ul>
-        <li><b>🟢 Running:</b> Instance is currently active and ready to receive commands</li>
-        <li><b>🔴 Stopped:</b> Instance is installed but not currently running</li>
-    </ul>
+    <p>The dropdown lists available adapter instances from the server. Status indicators are not shown; selection is based on instance names only.</p>
     
     <h3>Input Message</h3>
     <p>Message properties that can override node configuration:</p>

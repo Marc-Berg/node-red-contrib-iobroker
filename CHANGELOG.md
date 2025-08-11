@@ -28,6 +28,9 @@
 - **Editor TreeView performance and diagnostics**
   - Uses lightweight /iobroker/ws/objects (+type=state) instead of /ws/states → smaller payloads and faster load
 
+- **iob-out instances picker**
+  - Uses /iobroker/ws/instances to suggest all available adapter instances (via datalist and dropdown)
+
 - **Enhanced iob-out node configuration**
   - **Three-tab interface**: Basic, Object Creation, and Custom Settings Configuration tabs for better organization
   - **Live configuration preview**: Real-time preview of custom settings with JSON validation

@@ -11,9 +11,7 @@ The WS ioB sendTo node allows you to send commands directly to ioBroker adapter 
 ### Basic Settings
 
 **Target Instance**
-- Dropdown selection of available adapter instances with their current status:
-  - 🟢 **Running**: Instance is currently active and ready to receive commands
-  - 🔴 **Stopped**: Instance is installed but not currently running
+- Dropdown list of available adapter instances
 - Leave empty to use `msg.instance` for dynamic targeting
 - Examples: `telegram.0`, `email`, `sql.0`, `javascript.0`
 

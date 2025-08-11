@@ -59,27 +59,7 @@ function setupAPIEndpoints(RED) {
     try {
         const connectionManager = require('../lib/manager/websocket-manager');
 
-        RED.httpAdmin.get('/iobroker/ws/states/:serverId', async (req, res) => {
-            try {
-                const serverId = decodeURIComponent(req.params.serverId);
-                new Logger('iob-config').debug(`GET /ws/states for ${serverId}`);
-                const states = await connectionManager.getStates(serverId);
-
-                res.setHeader('Cache-Control', 'public, max-age=300');
-                res.json(states);
-
-            } catch (error) {
-                new Logger('iob-config').error(`States API error: ${error.message}`);
-                res.status(500).json({
-                    error: 'Failed to retrieve states',
-                    details: error.message
-                });
-            }
-        });
-
-        // Objects endpoint using getObjectView under the hood via OperationManager
-        // Usage: /iobroker/ws/objects/:serverId?pattern=adapter.*&type=state
-        RED.httpAdmin.get('/iobroker/ws/objects/:serverId', async (req, res) => {
+       RED.httpAdmin.get('/iobroker/ws/objects/:serverId', async (req, res) => {
             try {
                 const serverId = decodeURIComponent(req.params.serverId);
                 const pattern = (req.query.pattern || '*').toString();
@@ -104,6 +84,43 @@ function setupAPIEndpoints(RED) {
                     error: 'Failed to retrieve objects',
                     details: error.message,
                     objects: []
+                });
+            }
+        });
+
+        RED.httpAdmin.get('/iobroker/ws/instances/:serverId', async (req, res) => {
+            try {
+                const serverId = decodeURIComponent(req.params.serverId);
+                new Logger('iob-config').debug(`GET /ws/instances for ${serverId}`);
+                const instanceObjects = await connectionManager.getObjects(serverId, 'system.adapter.*', 'instance');
+                const adapters = (Array.isArray(instanceObjects) ? instanceObjects : [])
+                    .map(obj => {
+                        const id = obj && (obj._id || obj.id);
+                        const match = id && id.match(/^system\.adapter\.([^.]+)\.(\d+)$/);
+                        if (!match) return null;
+                        const adapterType = match[1];
+                        const instanceNum = parseInt(match[2], 10);
+                        const name = `${adapterType}.${instanceNum}`;
+                        return {
+                            name,
+                            type: adapterType,
+                            instance: instanceNum,
+                            title: name
+                        };
+                    })
+                    .filter(Boolean)
+                    .filter(a => !['admin', 'discovery', 'backitup', 'objects', 'states', 'web'].includes(a.type))
+                    .sort((a, b) => (a.type === b.type ? a.instance - b.instance : a.type.localeCompare(b.type)));
+
+                res.setHeader('Cache-Control', 'public, max-age=60');
+                res.json({ adapters, count: adapters.length });
+
+            } catch (error) {
+                new Logger('iob-config').error(`Instances API error: ${error.message}`);
+                res.status(500).json({
+                    error: 'Failed to retrieve instances',
+                    details: error.message,
+                    adapters: []
                 });
             }
         });

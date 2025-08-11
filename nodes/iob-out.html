@@ -94,17 +94,60 @@ RED.nodes.registerType('iobout', {
         $('#node-input-autoCreate').on('change', function() {
             const isChecked = $(this).prop('checked');
             updateAutoCreateVisibility(isChecked);
-            updateHistoryTabVisibility(isChecked);
+            updateCustomSettingsTabVisibility(isChecked);
         });
         
-        // Initialize tabs
         initializeTabs();
         
-        // Initialize Custom Settings tab
         initializeHistoryTab(this);
+
+    (function setupAdapterInstancesPicker() {
+            const historyAdapterSelect = $('#node-input-historyAdapter');
+
+            function populateInstances(instances) {
+                historyAdapterSelect.empty();
+                const names = instances
+                    .map(inst => inst && inst.name)
+                    .filter(Boolean);
+
+                if (names.length === 0) {
+                    historyAdapterSelect.append('<option value="" disabled selected>-- No instances available --</option>');
+                    historyAdapterSelect.prop('disabled', true);
+                } else {
+                    historyAdapterSelect.append('<option value="" selected>-- Select instance --</option>');
+                    names.forEach(name => historyAdapterSelect.append($('<option>').attr('value', name).text(name)));
+                    historyAdapterSelect.prop('disabled', false);
+                    // keep previously set value if present
+                    const currentVal = historyAdapterSelect.data('current') || historyAdapterSelect.val();
+                    if (currentVal && names.includes(currentVal)) {
+                        historyAdapterSelect.val(currentVal);
+                    }
+                }
+            }
+
+            function loadInstances() {
+                const serverNode = RED.nodes.node(serverInput.val());
+                if (!serverNode) {
+                    populateInstances([]);
+                    return;
+                }
+                const serverId = `${serverNode.iobhost}:${serverNode.iobport}`;
+                const url = `/iobroker/ws/instances/${encodeURIComponent(serverId)}`;
+                $.ajax({ url, method: 'GET', timeout: 15000, dataType: 'json', cache: false })
+                    .done(function(resp){
+                        const list = Array.isArray(resp?.adapters) ? resp.adapters : [];
+                        // Show all adapter instances from the server
+                        populateInstances(list);
+                    })
+                    .fail(function(){
+                        populateInstances([]);
+                    });
+            }
+            loadInstances();
+            serverInput.on('change', loadInstances);
+        })();
         
-        // Function to update custom settings tab visibility
-        function updateHistoryTabVisibility(autoCreateEnabled) {
+    function updateCustomSettingsTabVisibility(autoCreateEnabled) {
             const historyTab = $('li[data-tab="history"]');
             const historyPane = $('.tab-pane[data-tab="history"]');
             
@@ -114,7 +157,11 @@ RED.nodes.registerType('iobout', {
                 historyTab.hide();
                 // Switch to basic tab if custom settings tab is currently active
                 if (historyTab.hasClass('active')) {
-                    showTab('basic');
+            // Activate the basic tab directly
+            $('.node-config-tabs li').removeClass('active');
+            $('.tab-pane').removeClass('active');
+            $('.node-config-tabs li[data-tab="basic"]').addClass('active');
+            $('.tab-pane[data-tab="basic"]').addClass('active');
                 }
             }
         }
@@ -122,7 +169,7 @@ RED.nodes.registerType('iobout', {
         // Initialize visibility based on current state
         const autoCreateChecked = $('#node-input-autoCreate').prop('checked');
         updateAutoCreateVisibility(autoCreateChecked);
-        updateHistoryTabVisibility(autoCreateChecked);
+    updateCustomSettingsTabVisibility(autoCreateChecked);
         
         // Initialize tab system
         function initializeTabs() {
@@ -219,8 +266,8 @@ RED.nodes.registerType('iobout', {
                     return;
                 }
                 
-                const adapter = $("#node-input-historyAdapter").val().trim();
-                const settingsText = $("#node-input-historySettings").val().trim();
+                const adapter = String($("#node-input-historyAdapter").val() || '').trim();
+                const settingsText = String($("#node-input-historySettings").val() || '').trim();
                 
                 if (!adapter) {
                     $("#history-config-preview").text("No adapter specified");
@@ -285,14 +332,14 @@ RED.nodes.registerType('iobout', {
         
         // Validate Custom Settings configuration
         if ($("#node-input-enableHistory").is(":checked")) {
-            const adapter = $("#node-input-historyAdapter").val().trim();
+            const adapter = $("#node-input-historyAdapter").val();
             if (!adapter) {
-                RED.notify("Please specify a target adapter when custom settings are enabled.", "error");
-                return false;
+                // Allow leaving empty; user can provide via msg.customSettings.adapter at runtime
+                RED.notify("No adapter selected. You can also set it via msg.customSettings.adapter at runtime.", { type: "info", timeout: 2500 });
             }
             
             // JSON validation
-            const settings = $("#node-input-historySettings").val().trim();
+            const settings = String($("#node-input-historySettings").val() || '').trim();
             if (settings) {
                 try {
                     JSON.parse(settings);
@@ -523,8 +570,8 @@ RED.nodes.registerType('iobout', {
                     
                     <div class="form-row">
                         <label for="node-input-historyAdapter"><i class="fa fa-database"></i> Target Adapter</label>
-                        <input type="text" id="node-input-historyAdapter" placeholder="e.g. influxdb.1, history.0, sql.0">
-                        <div class="form-tips">Specify the target adapter instance (with instance number)</div>
+                        <select id="node-input-historyAdapter" style="width:100%"></select>
+                        <div class="form-tips">Pick from the list. You may also leave it empty and set via <code>msg.customSettings.adapter</code>.</div>
                     </div>
 
                     <div class="form-row">
