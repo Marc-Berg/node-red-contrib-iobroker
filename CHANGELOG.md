@@ -1,5 +1,12 @@
 # Changelog
 
+## [1.1.1] - 2025-08-14
+
+### **Security**
+- Hardened validation for /iobroker/ws/objects endpoint query parameters
+  - Removed unsafe direct toString() usage on attacker-controlled values
+  - Enforced strict extraction of primitive string values (supports first string in repeated params)
+
 ## [1.1.0] - 2025-08-11
 
 ### **Added**

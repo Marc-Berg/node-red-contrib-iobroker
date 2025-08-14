@@ -59,15 +59,42 @@ function setupAPIEndpoints(RED) {
     try {
         const connectionManager = require('../lib/manager/websocket-manager');
 
-       RED.httpAdmin.get('/iobroker/ws/objects/:serverId', async (req, res) => {
+        RED.httpAdmin.get('/iobroker/ws/objects/:serverId', async (req, res) => {
             try {
                 const serverId = decodeURIComponent(req.params.serverId);
-                const pattern = (req.query.pattern || '*').toString();
-                const type = req.query.type ? req.query.type.toString() : null;
-                new Logger('iob-config').debug(`GET /ws/objects for ${serverId} pattern=${pattern} type=${type || 'any'}`);
+
+                const MAX_PATTERN_LEN = 512;
+                const MAX_TYPE_LEN = 32;
+                const allowedPatternChars = /^[A-Za-z0-9_.:*\-]+$/; // wildcard * plus common object id chars
+
+                function extractString(value) {
+                    if (typeof value === 'string') return value;
+                    if (Array.isArray(value)) {
+                        // express can give arrays for repeated query params
+                        const first = value.find(v => typeof v === 'string');
+                        if (first) return first;
+                    }
+                    return null;
+                }
+
+                let pattern = extractString(req.query.pattern) || '*';
+                if (pattern.length > MAX_PATTERN_LEN) {
+                    pattern = pattern.slice(0, MAX_PATTERN_LEN);
+                }
+                if (!allowedPatternChars.test(pattern)) {
+                    // Fallback to '*' if pattern contains unexpected chars to avoid injection into regex building later
+                    pattern = '*';
+                }
+
+                let typeRaw = extractString(req.query.type);
+                if (typeRaw && typeRaw.length > MAX_TYPE_LEN) {
+                    typeRaw = typeRaw.slice(0, MAX_TYPE_LEN);
+                }
 
                 const allowedTypes = new Set(['state', 'channel', 'device', 'folder', 'adapter', 'instance', 'host', 'group', 'user', 'config', 'enum']);
-                const objectType = type && allowedTypes.has(type) ? type : null;
+                const objectType = (typeRaw && allowedTypes.has(typeRaw)) ? typeRaw : null;
+
+                new Logger('iob-config').debug(`GET /ws/objects for ${serverId} pattern=${pattern} type=${objectType || 'any'}`);
 
                 const objects = await connectionManager.getObjects(serverId, pattern, objectType);
 
