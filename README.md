@@ -132,8 +132,7 @@ If you prefer not to use a Admin instance:
 - **🎯 Use Cases**: [Common Use Cases](https://github.com/Marc-Berg/node-red-contrib-iobroker/blob/main/docs/use-cases.md)
 - **📖 Full Documentation**: [GitHub Repository](https://github.com/Marc-Berg/node-red-contrib-iobroker)
 - **🐛 Bug Reports**: [GitHub Issues](https://github.com/Marc-Berg/node-red-contrib-iobroker/issues)
-- **📘 ioBroker Forum**: [ioBroker.net](https://forum.iobroker.net)
-
+- **📘 ioBroker Forum**: [ioBroker.net](https://forum.iobroker.net/topic/81449/node-red-nodes-für-externe-iobroker-integration)
 ## 📄 License
 
 MIT
