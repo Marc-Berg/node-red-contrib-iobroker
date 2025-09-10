@@ -1,5 +1,12 @@
 # Changelog
 
+## [1.1.2] - 2025-09-10
+
+### **Fixed**
+- **Corrected lastchange timestamp behavior in iob-out node**
+  - Removed manual `lc` (lastchange) timestamp override that was incorrectly updated on every write
+  - ioBroker now properly manages `lc` timestamp, only updating when value actually changes
+
 ## [1.1.1] - 2025-08-14
 
 ### **Security**

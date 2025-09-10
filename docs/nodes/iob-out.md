@@ -156,7 +156,7 @@ Override automatic timestamp used for the state write:
 msg.ts = Date.now() - 3600000;  // 1 hour ago
 ```
 
-Behavior: When msg.ts is a number, the state write uses it as ts. The lc (last changed) is set to the write time.
+Behavior: When msg.ts is a number, the state write uses it as ts. The lc (last changed) is managed by ioBroker.
 
 ### Creating Empty Objects
 Create ioBroker objects without setting a value by passing `null` as the payload. (Set payload type to JSON and value to null)

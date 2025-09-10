@@ -723,7 +723,7 @@ RED.nodes.registerType('iobout', {
     "from": "system.adapter.node-red",
     "ts": [timestamp]
 }</pre>
-    <p><strong>Note:</strong> <code>ack</code> is determined by the selected Set Mode (Value = true, Command = false). Any <code>msg.ack</code> provided in the input is ignored.</p>
+    <p><strong>Note:</strong> <code>ack</code> is determined by the selected Set Mode (Value = true, Command = false). Any <code>msg.ack</code> provided in the input is ignored. The <code>lc</code> (lastchange) timestamp is managed entirely by ioBroker and only updated when the value actually changes.</p>
     
     <h3>Created Object Structure</h3>
     <p>When creating objects (with auto-create enabled), the node creates a complete ioBroker object definition:</p>
@@ -818,5 +818,5 @@ RED.nodes.registerType('iobout', {
     ts: Date.now() - 3600000  // 1 hour ago
 }</pre>
     <p><b>Note:</b> The timestamp (<code>msg.ts</code>) must be a number representing milliseconds since Unix epoch.</p>
-    <p><b>Behavior:</b> <code>ts</code> will be set to your custom timestamp, while <code>lc</code> (last changed) will always be set to the current time when the value is actually written.</p>
+    <p><b>Behavior:</b> <code>ts</code> will be set to your custom timestamp, while <code>lc</code> (last changed) is managed by ioBroker.</p>
 </script>
