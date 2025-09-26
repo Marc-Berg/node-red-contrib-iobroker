@@ -272,11 +272,14 @@ module.exports = function (RED) {
 
     function ioBConfig(n) {
         RED.nodes.createNode(this, n);
-        this.iobhost = n.iobhost;
-        this.iobport = n.iobport;
-        this.user = this.credentials.user;
-        this.password = this.credentials.password;
-        this.usessl = n.usessl || false;
+    const credentials = (this.credentials && typeof this.credentials === 'object') ? this.credentials : {};
+    this.credentials = credentials;
+
+    this.iobhost = n.iobhost;
+    this.iobport = n.iobport;
+    this.user = typeof credentials.user === 'string' ? credentials.user.trim() : '';
+    this.password = typeof credentials.password === 'string' ? credentials.password : '';
+    this.usessl = n.usessl || false;
 
         const sslInfo = this.usessl ? ' (SSL enabled)' : '';
         const authInfo = this.user ? ' (with authentication)' : '';
