@@ -1,13 +1,12 @@
 # Changelog
 
-# Changelog
-
 ## [1.1.3] - 2025-xx-xx
 
 ### **Fixed**
 - **Graceful handling of missing credentials in config node**
   - Prevents runtime errors when username/password aren’t configured
   - Keeps connections anonymous when credentials fields are left blank
+  - Corrected `this.logger` to `this.log` in bulk state operations
 
 ## [1.1.2] - 2025-09-10
 
