@@ -6,6 +6,7 @@
 - **Graceful handling of missing credentials in config node**
   - Prevents runtime errors when username/password aren’t configured
   - Keeps connections anonymous when credentials fields are left blank
+- **Fixed logger reference in operation-manager**
   - Corrected `this.logger` to `this.log` in bulk state operations
 
 ## [1.1.2] - 2025-09-10
