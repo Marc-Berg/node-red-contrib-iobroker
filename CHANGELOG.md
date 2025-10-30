@@ -1,6 +1,13 @@
 # Changelog
 
-## [1.1.3] - 2025-xx-xx
+## [1.1.4] - 2025-10-30
+
+### **Improved**
+- **Code quality and maintainability**
+  - Updated dayjs dependency to 1.11.0
+  - Replaced magic numbers with named constants in recovery-manager.js (retry timing, backoff delays, timeouts)
+
+## [1.1.3] - 2025-10-30
 
 ### **Fixed**
 - **Graceful handling of missing credentials in config node**
