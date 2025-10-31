@@ -7,6 +7,9 @@
   - Skip default ports (80/443) when setting Host/Origin so ioBroker accepts default-port connections
   - Use module-local WebSocketClass during destroy cleanup to close sockets when global WebSocket is unavailable
 
+- **Race condition during SSL configuration changes**
+  - Fixed issue where toggling SSL in iob-config required two deploys to reconnect
+
 ## [1.1.4] - 2025-10-30
 
 ### **Improved**
