@@ -1,5 +1,12 @@
 # Changelog
 
+## [1.1.5] - 2025-xx-xx
+
+### **Fixed**
+- **WebSocket handshake headers**
+  - Skip default ports (80/443) when setting Host/Origin so ioBroker accepts default-port connections
+  - Use module-local WebSocketClass during destroy cleanup to close sockets when global WebSocket is unavailable
+
 ## [1.1.4] - 2025-10-30
 
 ### **Improved**
