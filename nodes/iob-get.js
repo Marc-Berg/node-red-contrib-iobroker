@@ -109,7 +109,7 @@ module.exports = function(RED) {
                         
                         // Return empty result in same format as batch mode
                         msg.topic = "batch_states";
-                        msg[settings.outputProperty] = {};
+                        NodeHelpers.setMessageProperty(RED, msg, settings.outputProperty, {});
                         msg.states = {};
                         msg.timestamp = Date.now();
                         msg.count = 0; // Update count to reflect actual retrieved states
@@ -153,7 +153,7 @@ module.exports = function(RED) {
                     const state = await connectionManager.getState(settings.serverId, stateId);
                     
                     const valueToSet = state?.val !== undefined ? state.val : state;
-                    msg[settings.outputProperty] = valueToSet;
+                    NodeHelpers.setMessageProperty(RED, msg, settings.outputProperty, valueToSet);
                     msg.state = state;
                     msg.timestamp = Date.now();
                     
@@ -178,7 +178,7 @@ module.exports = function(RED) {
                     }
                     
                     msg.topic = "batch_states";
-                    msg[settings.outputProperty] = values;
+                    NodeHelpers.setMessageProperty(RED, msg, settings.outputProperty, values);
                     msg.states = states;
                     msg.timestamp = Date.now();
                     msg.count = Object.keys(values).length; // Update count to reflect actual retrieved states

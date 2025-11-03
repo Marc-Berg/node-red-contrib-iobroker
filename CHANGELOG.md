@@ -1,6 +1,6 @@
 # Changelog
 
-## [1.1.5] - 2025-xx-xx
+## [1.2.0] - 2025-xx-xx
 
 ### **Fixed**
 - **WebSocket handshake headers**
@@ -9,6 +9,10 @@
 
 - **Race condition during SSL configuration changes**
   - Fixed issue where toggling SSL in iob-config required two deploys to reconnect
+  
+- **Message property (dot-notation) support**
+  - Fixed a bug where configured properties like `payload.downloads` could be written as literal keys (e.g. `msg["payload.downloads"]`). Nested properties are now created and updated correctly.
+  - Updated nodes to use the centralized helpers: `iob-out`, `iob-get`, `iob-getobject`, `iob-in`, `iob-inobject`, `iob-log`, `iob-history`.
 
 ## [1.1.4] - 2025-10-30
 

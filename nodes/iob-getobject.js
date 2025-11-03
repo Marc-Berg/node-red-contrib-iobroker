@@ -46,7 +46,7 @@ module.exports = function(RED) {
         NodeHelpers.initializeConnection(
             node, config, RED, settings, globalConfig, setStatus, statusTexts
         );
-
+        
         async function loadAllDataOptimized(objectIdOrPattern, currentObjectType) {
             try {
                 const queries = [];
@@ -515,7 +515,6 @@ module.exports = function(RED) {
 
         function formatOutput(objects, objectIdOrPattern, outputMode, appliedObjectType, enumData = null, aliasData = null) {
             const baseResult = {
-                [settings.outputProperty]: null,
                 objects: null,
                 count: 0,
                 timestamp: Date.now(),
@@ -526,18 +525,21 @@ module.exports = function(RED) {
             };
 
             if (!objects) {
-                return baseResult;
+                const res = { ...baseResult };
+                NodeHelpers.setMessageProperty(RED, res, settings.outputProperty, null);
+                return res;
             }
 
             if (!Array.isArray(objects) && typeof objects === 'object') {
                 // Check if the object is empty (no properties with valid IDs)
                 const hasValidProperties = objects._id || Object.keys(objects).length > 0;
-                return {
+                const res = {
                     ...baseResult,
-                    [settings.outputProperty]: objects,
                     objects: objects,
                     count: hasValidProperties ? 1 : 0
                 };
+                NodeHelpers.setMessageProperty(RED, res, settings.outputProperty, objects);
+                return res;
             }
 
             const objectArray = Array.isArray(objects) ? objects : Object.values(objects);
@@ -566,10 +568,10 @@ module.exports = function(RED) {
 
             const result = {
                 ...baseResult,
-                [settings.outputProperty]: outputData,
                 objects: objectMap,
                 count: objectArray.length
             };
+            NodeHelpers.setMessageProperty(RED, result, settings.outputProperty, outputData);
 
             if (settings.includeEnums && enumData && objectArray.length > 0) {
                 const enumStats = {

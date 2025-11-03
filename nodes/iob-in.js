@@ -66,7 +66,6 @@ module.exports = function (RED) {
                 if (state && state.val !== undefined) {
                     const message = {
                         topic: subscriptionPattern,
-                        [settings.outputProperty]: state.val,
                         state: {
                             val: state.val,
                             ts: state.ts || Date.now(),
@@ -77,7 +76,7 @@ module.exports = function (RED) {
                         cached: true,
                         initial: true
                     };
-                    
+                    NodeHelpers.setMessageProperty(RED, message, settings.outputProperty, state.val);
                     node.send(message);
                 }
             } else if (inputMode === 'multiple') {
@@ -104,7 +103,6 @@ module.exports = function (RED) {
                     if (hasValues) {
                         const message = {
                             topic: 'cached_states',
-                            [settings.outputProperty]: groupedValues,
                             states: groupedStates,
                             timestamp: Date.now(),
                             cached: true,
@@ -112,7 +110,7 @@ module.exports = function (RED) {
                             multipleStatesMode: true,
                             outputMode: 'grouped'
                         };
-                        
+                        NodeHelpers.setMessageProperty(RED, message, settings.outputProperty, groupedValues);
                         node.send(message);
                     }
                 } else {
@@ -122,7 +120,6 @@ module.exports = function (RED) {
                         if (state && state.val !== undefined) {
                             const message = {
                                 topic: stateId,
-                                [settings.outputProperty]: state.val,
                                 state: {
                                     val: state.val,
                                     ts: state.ts || Date.now(),
@@ -134,7 +131,7 @@ module.exports = function (RED) {
                                 initial: true,
                                 multipleStatesMode: true
                             };
-                            
+                            NodeHelpers.setMessageProperty(RED, message, settings.outputProperty, state.val);
                             node.send(message);
                         }
                     });
@@ -301,7 +298,7 @@ module.exports = function (RED) {
                 message.initial = true;
             }
 
-            message[settings.outputProperty] = state.val;
+            NodeHelpers.setMessageProperty(RED, message, settings.outputProperty, state.val);
             return message;
         }
 
@@ -348,10 +345,10 @@ module.exports = function (RED) {
 
             const message = {
                 topic: "grouped_states",
-                [settings.outputProperty]: values,
                 states: states,
                 timestamp: Date.now()
             };
+            NodeHelpers.setMessageProperty(RED, message, settings.outputProperty, values);
 
             if (isInitialMessage) {
                 message.initial = true;

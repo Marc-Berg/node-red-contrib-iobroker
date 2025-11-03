@@ -322,7 +322,12 @@ module.exports = function(RED) {
                     return;
                 }
 
-                const value = msg[settings.inputProperty];
+                // Support nested message properties (e.g. "payload.downloads").
+                // Use Node-RED utility to resolve the property path safely.
+                const value = RED.util && typeof RED.util.getMessageProperty === 'function'
+                    ? RED.util.getMessageProperty(msg, settings.inputProperty)
+                    : msg[settings.inputProperty];
+
                 if (value === undefined) {
                     node.error(`Input property "${settings.inputProperty}" not found in message`);
                     setStatus("red", "ring", "Input missing");

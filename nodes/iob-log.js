@@ -79,8 +79,7 @@ module.exports = function (RED) {
                     level: severity,
                     raw: logData
                 };
-
-                outputMessage[settings.outputProperty] = message;
+                NodeHelpers.setMessageProperty(RED, outputMessage, settings.outputProperty, message);
                 outputMessage.log = {
                     severity: severity,
                     message: message,

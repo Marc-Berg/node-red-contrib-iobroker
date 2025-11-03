@@ -46,7 +46,7 @@ module.exports = function (RED) {
                 message.pattern = node.objectPattern;
             }
 
-            message[settings.outputProperty] = objectData;
+            NodeHelpers.setMessageProperty(RED, message, settings.outputProperty, objectData);
             return message;
         }
 

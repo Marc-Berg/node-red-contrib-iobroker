@@ -330,16 +330,18 @@ module.exports = function (RED) {
         }
 
         function formatOutput(data, stateId, queryOptions, queryTime, format, msg) {
+            const base = {
+                stateId: stateId,
+                instance: settings.historyAdapter,
+                queryOptions: queryOptions,
+                queryTime: queryTime,
+                count: 0
+            };
+
             if (!data || !Array.isArray(data)) {
-                return {
-                    [settings.outputProperty]: null,
-                    stateId: stateId,
-                    instance: settings.historyAdapter,
-                    queryOptions: queryOptions,
-                    queryTime: queryTime,
-                    count: 0,
-                    error: "No data received"
-                };
+                const res = { ...base, error: "No data received" };
+                NodeHelpers.setMessageProperty(RED, res, settings.outputProperty, null);
+                return res;
             }
 
             const processedData = processDataFormat(data, msg);
@@ -361,12 +363,8 @@ module.exports = function (RED) {
                     break;
             }
 
-            return {
-                [settings.outputProperty]: output,
-                stateId: stateId,
-                instance: settings.historyAdapter,
-                queryOptions: queryOptions,
-                queryTime: queryTime,
+            const res = {
+                ...base,
                 count: processedData.length,
                 timestamp: Date.now(),
                 formatOptions: {
@@ -377,6 +375,8 @@ module.exports = function (RED) {
                     customTimezone: msg.customTimezone || settings.customTimezone
                 }
             };
+            NodeHelpers.setMessageProperty(RED, res, settings.outputProperty, output);
+            return res;
         }
 
         function getQueueStatusText() {
@@ -425,7 +425,7 @@ module.exports = function (RED) {
                         node.warn(`Query ${queryId} dropped - another query is running`);
                         const errorMsg = { ...queueItem.msg };
                         errorMsg.error = "Query dropped - another query was already running";
-                        errorMsg[settings.outputProperty] = null;
+                        NodeHelpers.setMessageProperty(RED, errorMsg, settings.outputProperty, null);
                         errorMsg.queryTime = 0;
                         errorMsg.dropped = true;
                         queueItem.send(errorMsg);
@@ -483,7 +483,7 @@ module.exports = function (RED) {
                 node.error(`History query ${id} failed for ${stateId}: ${queryError.message}`);
 
                 msg.error = queryError.message;
-                msg[settings.outputProperty] = null;
+                NodeHelpers.setMessageProperty(RED, msg, settings.outputProperty, null);
                 msg.stateId = stateId;
                 msg.instance = settings.historyAdapter;
                 msg.queryTime = Date.now() - queryStartTime;
@@ -555,7 +555,7 @@ module.exports = function (RED) {
                     node.error(`History query preparation failed for ${stateId}: ${queryError.message}`);
 
                     msg.error = queryError.message;
-                    msg[settings.outputProperty] = null;
+                    NodeHelpers.setMessageProperty(RED, msg, settings.outputProperty, null);
                     msg.stateId = stateId;
                     msg.instance = settings.historyAdapter;
                     msg.queryTime = 0;
