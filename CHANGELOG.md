@@ -13,6 +13,12 @@
 - **Message property (dot-notation) support**
   - Fixed a bug where configured properties like `payload.downloads` could be written as literal keys (e.g. `msg["payload.downloads"]`). Nested properties are now created and updated correctly.
   - Updated nodes to use the centralized helpers: `iob-out`, `iob-get`, `iob-getobject`, `iob-in`, `iob-inobject`, `iob-log`, `iob-history`.
+  
+- **Robust authentication & connection logging**
+  - AuthManager and ConnectionManager now log full error objects/stacks when error messages are empty (helps diagnose AggregateError/ECONNREFUSED cases).
+
+- **Retry classification for transient connection failures**
+  - ErrorClassifier is extended to inspect Error objects (code/name/message/stack and AggregateError.errors) and treats ECONNREFUSED/AggregateError network failures as retryable so RecoveryManager schedules retries for transient connection issues.
 
 ## [1.1.4] - 2025-10-30
 
