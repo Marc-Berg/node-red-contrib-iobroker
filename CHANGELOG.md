@@ -20,6 +20,12 @@
 - **Retry classification for transient connection failures**
   - ErrorClassifier is extended to inspect Error objects (code/name/message/stack and AggregateError.errors) and treats ECONNREFUSED/AggregateError network failures as retryable so RecoveryManager schedules retries for transient connection issues.
 
+- **Auth retry with grace period and cleaner error logging**
+  - Simplified error classification: all errors retryable with backoff
+  - Auth errors: 3 retries with 30s delay for credential fixes
+  - Suppress subscribe errors during connection failures
+  - Detect all config changes, not just port changes
+
 ## [1.1.4] - 2025-10-30
 
 ### **Improved**

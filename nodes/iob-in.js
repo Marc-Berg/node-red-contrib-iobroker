@@ -605,7 +605,11 @@ module.exports = function (RED) {
                     syncSubscribedStates(successfulStates);
 
                 } catch (error) {
-                    node.error(`Failed to subscribe to multiple states: ${error.message}`);
+                    // Only log subscribe errors if not caused by known connection issues
+                    const isAuthError = error.message && (error.message.includes('Authentication failed') || error.message.includes('auth_failed'));
+                    if (!isAuthError) {
+                        node.error(`Failed to subscribe to multiple states: ${error.message}`);
+                    }
                     throw error;
                 }
             } else {
