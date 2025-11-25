@@ -21,7 +21,17 @@ module.exports = function (RED) {
             stateList = multipleStatesRaw
                 .split('\n')
                 .map(s => s.trim())
-                .filter(s => s.length > 0);
+                .filter(s => s.length > 0)
+                .map(s => {
+                    // Check for environment variables ${VAR}
+                    if (s.includes('${')) {
+                        return s.replace(/\${([^}]+)}/g, (match, varName) => {
+                            const envValue = RED.util.evaluateNodeProperty(varName, 'env', node);
+                            return envValue !== undefined ? envValue : match;
+                        });
+                    }
+                    return s;
+                });
 
             if (stateList.length === 0) {
                 return setError("No states configured for multiple states mode", "No states");
@@ -76,7 +86,7 @@ module.exports = function (RED) {
                         cached: true,
                         initial: true
                     };
-                    NodeHelpers.setMessageProperty(RED, message, settings.outputProperty, state.val);
+                    RED.util.setMessageProperty(message, settings.outputProperty, state.val);
                     node.send(message);
                 }
             } else if (inputMode === 'multiple') {
@@ -110,7 +120,7 @@ module.exports = function (RED) {
                             multipleStatesMode: true,
                             outputMode: 'grouped'
                         };
-                        NodeHelpers.setMessageProperty(RED, message, settings.outputProperty, groupedValues);
+                        RED.util.setMessageProperty(message, settings.outputProperty, groupedValues);
                         node.send(message);
                     }
                 } else {
@@ -131,7 +141,7 @@ module.exports = function (RED) {
                                 initial: true,
                                 multipleStatesMode: true
                             };
-                            NodeHelpers.setMessageProperty(RED, message, settings.outputProperty, state.val);
+                            RED.util.setMessageProperty(message, settings.outputProperty, state.val);
                             node.send(message);
                         }
                     });
@@ -298,7 +308,7 @@ module.exports = function (RED) {
                 message.initial = true;
             }
 
-            NodeHelpers.setMessageProperty(RED, message, settings.outputProperty, state.val);
+            RED.util.setMessageProperty(message, settings.outputProperty, state.val);
             return message;
         }
 
@@ -348,7 +358,7 @@ module.exports = function (RED) {
                 states: states,
                 timestamp: Date.now()
             };
-            NodeHelpers.setMessageProperty(RED, message, settings.outputProperty, values);
+            RED.util.setMessageProperty(message, settings.outputProperty, values);
 
             if (isInitialMessage) {
                 message.initial = true;
