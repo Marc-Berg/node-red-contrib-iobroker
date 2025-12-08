@@ -1,6 +1,6 @@
 # Changelog
 
-## [1.2.0] - 2025-12-08
+## [1.2.0] - 2025-xx-xx
 
 ### **Added**
 - **Environment variable support in Multiple States mode**

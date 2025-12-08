@@ -416,9 +416,10 @@ RED.nodes.registerType('iobin', {
                 
                 <div class="form-row input-mode-row" id="multiple-states-row" style="display:none;">
                     <label for="node-input-multipleStates"><i class="icon-tag"></i> Multiple States</label>
-                    <textarea id="node-input-multipleStates" rows="6" style="width:100%; font-family: monospace;" placeholder="Enter one state ID per line:&#10;0_userdata.0.state1&#10;0_userdata.0.state2&#10;system.adapter.history.0.alive"></textarea>
+                    <textarea id="node-input-multipleStates" rows="6" style="width:100%; font-family: monospace;" placeholder="Enter one state ID per line:&#10;0_userdata.0.state1&#10;${MY_STATE_ID}&#10;system.adapter.history.0.alive"></textarea>
                     <div style="margin-top: 5px; font-size: 12px; color: #666;">
                         <span id="multiple-states-count">0 state(s) configured</span>
+                        <span style="float: right;">Supports ${ENV_VAR}</span>
                     </div>
                     
                     <div id="multiple-states-wildcard-warning" style="display: none; margin-top: 10px;">
@@ -574,7 +575,8 @@ RED.nodes.registerType('iobin', {
     <h3>Multiple States Configuration</h3>
     <ul>
         <li>Enter one state ID per line in the textarea</li>
-        <li>Empty lines are ignored</li>
+        <li>Supports environment variables: <code>${ENV_VAR}</code></li>
+        <li>Empty lines (or empty variables) are ignored</li>
         <li>No wildcards supported in multiple states mode</li>
     </ul>
     
