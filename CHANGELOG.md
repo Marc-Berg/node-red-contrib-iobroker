@@ -1,8 +1,16 @@
 # Changelog
 
-## [1.2.0] - 2025-xx-xx
+## [1.2.0] - 2025-12-08
+
+### **Added**
+- **Environment variable support in Multiple States mode**
+  - Added support for `${ENV_VAR}` substitution in the "Multiple States" configuration list of the `iob-in` node.
+  - Empty states resulting from variable substitution are automatically filtered out.
 
 ### **Fixed**
+- **Runtime error in iob-in node**
+  - Fixed `TypeError: NodeHelpers.setMessageProperty is not a function` by using `RED.util.setMessageProperty` directly.
+
 - **WebSocket handshake headers**
   - Skip default ports (80/443) when setting Host/Origin so ioBroker accepts default-port connections
   - Use module-local WebSocketClass during destroy cleanup to close sockets when global WebSocket is unavailable

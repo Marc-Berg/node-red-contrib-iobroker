@@ -24,6 +24,7 @@ The node configuration is organized into **4 tabs**:
 
 ### Multiple States Mode
 - **Configuration**: List of exact state IDs (one per line)
+- **Environment Variables**: Supports `${ENV_VAR}` substitution (e.g. `${MY_STATE_ID}`)
 - **Output Options**: Individual messages OR grouped object
 - **Use Case**: Dashboard data, related sensors, system health monitoring
 
