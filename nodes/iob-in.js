@@ -31,7 +31,8 @@ module.exports = function (RED) {
                         });
                     }
                     return s;
-                });
+                })
+                .filter(s => s.length > 0);
 
             if (stateList.length === 0) {
                 return setError("No states configured for multiple states mode", "No states");
