@@ -1,6 +1,6 @@
 # Changelog
 
-## [1.2.0] - 2025-xx-xx
+## [1.2.0] - 2025-12-11
 
 ### **Fixed**
 - **Runtime error in iob-in node**
