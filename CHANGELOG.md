@@ -2,11 +2,6 @@
 
 ## [1.2.0] - 2025-xx-xx
 
-### **Added**
-- **Environment variable support in Multiple States mode**
-  - Added support for `${ENV_VAR}` substitution in the "Multiple States" configuration list of the `iob-in` node.
-  - Empty states resulting from variable substitution are automatically filtered out.
-
 ### **Fixed**
 - **Runtime error in iob-in node**
   - Fixed `TypeError: NodeHelpers.setMessageProperty is not a function` by using `RED.util.setMessageProperty` directly.
