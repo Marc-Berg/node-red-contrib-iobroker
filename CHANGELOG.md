@@ -1,5 +1,13 @@
 # Changelog
 
+## [1.2.1-beta.1] - 2026-02-02
+
+### **Fixed**
+- **WebSocketManager interference with other Node-RED modules**
+  - Removed global `process.on('uncaughtException')` and `process.on('unhandledRejection')` event handlers that were intercepting errors from other plugins
+  - Fixed false error messages like "[WebSocketManager] Unhandled Rejection: TypeError: Cannot read properties of null (reading 'google-credentials')" when using third-party nodes
+  - All error handling now stays within the module's own promise chains following Node-RED best practices
+
 ## [1.2.0] - 2025-12-11
 
 ### **Fixed**
