@@ -1,6 +1,6 @@
 # Changelog
 
-## [1.2.1-beta.1] - 2026-02-02
+## [1.2.1] - 2026-xx-xx
 
 ### **Fixed**
 - **WebSocketManager interference with other Node-RED modules**
