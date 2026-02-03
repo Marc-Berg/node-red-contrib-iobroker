@@ -1,13 +1,12 @@
 # Changelog
 
-## [1.2.1] - 2026-xx-xx
+## [1.2.1] - 2026-02-03
 
 ### **Fixed**
 - **WebSocketManager interference with other Node-RED modules**
   - Removed global `process.on('uncaughtException')` and `process.on('unhandledRejection')` event handlers that were intercepting errors from other plugins
-  - All error handling now stays within the module's own promise chains
-- **Remove node-red peerDependency
-- **Add step to install semver in npm-publish workflow
+- **Remove Node-RED peerDependency**
+- **Add step to install semver in npm-publish workflow**
 
 ## [1.2.0] - 2025-12-11
 
