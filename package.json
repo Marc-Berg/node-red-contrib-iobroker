@@ -67,7 +67,7 @@
     ]
   },
   "categories": [
-    "smarthome"
+    "Other"
   ],
   "devDependencies": {
     "semver": "^7.7.3"
