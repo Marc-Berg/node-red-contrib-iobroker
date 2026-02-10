@@ -97,25 +97,6 @@
         "y": 80,
         "wires": [
             [
-                "sendto_restart_mqtt"
-            ]
-        ]
-    },
-    {
-        "id": "sendto_restart_mqtt",
-        "type": "iobsendto",
-        "z": "example_setobject_flow",
-        "name": "Restart MQTT",
-        "adapter": "mqtt.0",
-        "command": "restart",
-        "message": "",
-        "waitForResponse": false,
-        "responseTimeout": 10000,
-        "server": "iob_server",
-        "x": 1050,
-        "y": 80,
-        "wires": [
-            [
                 "debug_result"
             ]
         ]
@@ -141,7 +122,7 @@
         "id": "debug_result",
         "type": "debug",
         "z": "example_setobject_flow",
-        "name": "Restart Result",
+        "name": "SetObject Result",
         "active": true,
         "tosidebar": true,
         "console": false,
@@ -150,7 +131,7 @@
         "targetType": "full",
         "statusVal": "",
         "statusType": "auto",
-        "x": 1250,
+        "x": 1040,
         "y": 80,
         "wires": []
     },
@@ -436,9 +417,9 @@
         "id": "comment_1",
         "type": "comment",
         "z": "example_setobject_flow",
-        "name": "Example 1: Modify MQTT Adapter Configuration (Get → Modify → Write → Restart)",
-        "info": "This flow demonstrates how to:\n1. Get the current MQTT adapter configuration\n2. Modify the native.publish property\n3. Write it back using merge mode (preserves other settings)\n4. Restart the MQTT adapter to apply changes",
-        "x": 340,
+        "name": "Example 1: Modify MQTT Adapter Configuration (Get → Modify → Write)",
+        "info": "This flow demonstrates how to:\n1. Get the current MQTT adapter configuration\n2. Modify the native.publish property using a change node\n3. Write it back using merge mode (preserves other settings)\n\nNote: The adapter automatically restarts when its configuration changes - no manual restart needed!",
+        "x": 320,
         "y": 40,
         "wires": []
     },

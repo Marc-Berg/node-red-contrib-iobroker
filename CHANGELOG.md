@@ -9,7 +9,6 @@
   - For:
     - Modifying adapter configurations
     - Updating object properties (`common.name`, `common.role`, etc.)
-    - Creating custom states and devices programmatically
 
 ### **Improved**
 

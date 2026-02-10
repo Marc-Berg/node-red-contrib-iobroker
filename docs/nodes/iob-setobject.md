@@ -208,7 +208,7 @@ msg.payload = {
   }
 };
 // Use merge mode
-// Note: Adapter needs to be restarted to take effect
+// Note: Adapter automatically restarts when configuration is changed
 ```
 
 ### 5. Change State Role and Unit
@@ -335,7 +335,7 @@ return [messages];  // Send as array to process one by one
 ### Adapter Configuration Changes
 
 When modifying adapter objects (e.g., `system.adapter.mqtt.0`):
-1. The adapter may need to be **restarted** for changes to take effect
+1. The adapter **automatically restarts** when its configuration is changed - no manual restart needed
 2. Some settings require adapter reconfiguration
 3. Always test configuration changes in a safe environment first
 
