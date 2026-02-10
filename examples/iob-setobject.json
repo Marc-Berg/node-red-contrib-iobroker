@@ -50,21 +50,29 @@
         "y": 80,
         "wires": [
             [
-                "function_modify_mqtt"
+                "change_modify_mqtt"
             ]
         ]
     },
     {
-        "id": "function_modify_mqtt",
-        "type": "function",
+        "id": "change_modify_mqtt",
+        "type": "change",
         "z": "example_setobject_flow",
         "name": "Modify publish pattern",
-        "func": "// Modify the native.publish configuration\nmsg.payload.native.publish = \"mqtt.0.*, system.adapter.*\";\n\n// Optional: Modify other settings\nmsg.payload.native.patterns = \"sensor/#, actuator/#\";\n\nreturn msg;",
-        "outputs": 1,
-        "noerr": 0,
-        "initialize": "",
-        "finalize": "",
-        "libs": [],
+        "rules": [
+            {
+                "t": "set",
+                "p": "payload.native.publish",
+                "pt": "msg",
+                "to": "mqtt.0.*, system.adapter.*",
+                "tot": "str"
+            }
+        ],
+        "action": "",
+        "property": "",
+        "from": "",
+        "to": "",
+        "reg": false,
         "x": 590,
         "y": 80,
         "wires": [
@@ -86,6 +94,25 @@
         "validateObject": true,
         "server": "iob_server",
         "x": 830,
+        "y": 80,
+        "wires": [
+            [
+                "sendto_restart_mqtt"
+            ]
+        ]
+    },
+    {
+        "id": "sendto_restart_mqtt",
+        "type": "iobsendto",
+        "z": "example_setobject_flow",
+        "name": "Restart MQTT",
+        "adapter": "mqtt.0",
+        "command": "restart",
+        "message": "",
+        "waitForResponse": false,
+        "responseTimeout": 10000,
+        "server": "iob_server",
+        "x": 1050,
         "y": 80,
         "wires": [
             [
@@ -114,7 +141,7 @@
         "id": "debug_result",
         "type": "debug",
         "z": "example_setobject_flow",
-        "name": "Write Result",
+        "name": "Restart Result",
         "active": true,
         "tosidebar": true,
         "console": false,
@@ -123,7 +150,7 @@
         "targetType": "full",
         "statusVal": "",
         "statusType": "auto",
-        "x": 1050,
+        "x": 1250,
         "y": 80,
         "wires": []
     },
@@ -409,9 +436,9 @@
         "id": "comment_1",
         "type": "comment",
         "z": "example_setobject_flow",
-        "name": "Example 1: Modify MQTT Adapter Configuration (Get → Modify → Write)",
-        "info": "This flow demonstrates how to:\n1. Get the current MQTT adapter configuration\n2. Modify the native.publish property\n3. Write it back using merge mode (preserves other settings)",
-        "x": 310,
+        "name": "Example 1: Modify MQTT Adapter Configuration (Get → Modify → Write → Restart)",
+        "info": "This flow demonstrates how to:\n1. Get the current MQTT adapter configuration\n2. Modify the native.publish property\n3. Write it back using merge mode (preserves other settings)\n4. Restart the MQTT adapter to apply changes",
+        "x": 340,
         "y": 40,
         "wires": []
     },

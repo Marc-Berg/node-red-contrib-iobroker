@@ -136,7 +136,7 @@ function setupAPIEndpoints(RED) {
                         };
                     })
                     .filter(Boolean)
-                    .filter(a => !['admin', 'discovery', 'backitup', 'objects', 'states', 'web'].includes(a.type))
+                    .filter(a => !['discovery', 'backitup', 'objects', 'states', 'web'].includes(a.type))
                     .sort((a, b) => (a.type === b.type ? a.instance - b.instance : a.type.localeCompare(b.type)));
 
                 res.setHeader('Cache-Control', 'public, max-age=60');
