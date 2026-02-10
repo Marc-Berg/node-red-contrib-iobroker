@@ -196,6 +196,21 @@
                             depth: i, parent: parent || null, children: [], expanded: false,
                             visible: true, isMatch: false, isPathToMatch: false
                         });
+                    } else {
+                        // Node already exists - if it was a leaf but now has children, convert it
+                        const existingNode = this.nodes.get(path);
+                        if (i === segments.length - 1 && existingNode.isLeaf === false) {
+                            // This path is a complete object, mark it
+                            existingNode.fullId = stateId;
+                        }
+                    }
+                    
+                    // If this segment has a parent, ensure parent is not marked as leaf
+                    if (parent) {
+                        const parentNode = this.nodes.get(parent);
+                        if (parentNode && parentNode.isLeaf) {
+                            parentNode.isLeaf = false;
+                        }
                     }
                 });
             });
@@ -552,11 +567,12 @@
         
         // Helper functions
         function updateSelection(node) {
-            if (node?.isLeaf) {
+            // Allow selection if node has a fullId (complete object) OR is a leaf
+            if (node?.fullId || node?.isLeaf) {
                 selectedId = node.fullId || node.id;
                 updateLabel(selectedId, false);
                 useBtn.prop('disabled', false);
-            } else if (node && !node.isLeaf) {
+            } else if (node && !node.isLeaf && !node.fullId) {
                 selectedId = node.id;
                 updateLabel(selectedId + ' (folder)', true);
                 useBtn.prop('disabled', true);
@@ -748,12 +764,14 @@
         useBtn.on('click', () => {
             if (selectedId && treeView) {
                 const node = treeView.getSelected();
-                if (node?.isLeaf) {
-                    stateInput.val(node.fullId || node.id).trigger('change');
-                    RED.notify?.(`Selected: ${node.fullId || node.id}`, { type: "success", timeout: 2000 });
+                // Allow selection if node has a fullId (complete object) OR is a leaf
+                if (node?.fullId || node?.isLeaf) {
+                    const objectId = node.fullId || node.id;
+                    stateInput.val(objectId).trigger('change');
+                    RED.notify?.(`Selected: ${objectId}`, { type: "success", timeout: 2000 });
                     toggleMode();
                 } else {
-                    RED.notify?.('Folders cannot be selected', { type: "warning", timeout: 2000 });
+                    RED.notify?.('Only complete objects can be selected', { type: "warning", timeout: 2000 });
                 }
             }
         });
