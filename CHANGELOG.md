@@ -3,12 +3,24 @@
 ## [1.3.0] - 2026-xx-xx
 
 ### **Added**
+
 - **New iob-setobject node for writing object definitions**
   - Write and modify ioBroker object definitions (metadata) directly
   - For:
     - Modifying adapter configurations
     - Updating object properties (`common.name`, `common.role`, etc.)
     - Creating custom states and devices programmatically
+
+### **Improved**
+
+- **TreeView object selection**
+  - Objects with children can now be selected if they represent actual ioBroker objects (e.g., `system.adapter.mqtt.0`)
+  - Fixed parent nodes being incorrectly marked as non-expandable when child objects are loaded
+  - Selection now based on whether object has a complete definition, not just tree position
+
+- **Admin instance now available in iob-sendto**
+  - Admin instance (e.g., `admin.0`) now appears in instance dropdown for sendTo commands
+  - Enables direct use of admin commands like `sendToHost` for adapter management
 
 ## [1.2.1] - 2026-02-03
 
