@@ -1,0 +1,331 @@
+<script type="text/javascript">
+    // Shared TreeView loader
+    function loadSharedTreeView() {
+        return new Promise((resolve, reject) => {
+            if (window.ioBrokerSharedTreeView && window.ioBrokerSharedTreeView.initialized) {
+                resolve();
+                return;
+            }
+
+            const script = document.createElement('script');
+            script.src = 'iobroker/shared/iobroker-treeview.js?v=1.1.0';
+            script.async = true;
+
+            script.onload = () => {
+                if (window.ioBrokerSharedTreeView && window.ioBrokerSharedTreeView.initialized) {
+                    console.log('TreeView component loaded successfully');
+                    resolve();
+                } else {
+                    reject(new Error('TreeView component failed to initialize'));
+                }
+            };
+
+            script.onerror = () => {
+                console.error('TreeView component script not found');
+                reject(new Error('TreeView component script not found'));
+            };
+
+            document.head.appendChild(script);
+        });
+    }
+
+    RED.nodes.registerType('iobsetobject', {
+        category: 'ioBroker WS',
+        color: '#a6bbcf',
+        defaults: {
+            name: { value: "" },
+            objectId: { value: "" },
+            objectSource: { value: "msg" },
+            objectProperty: { value: "payload" },
+            mergeMode: { value: "replace" },
+            validateObject: { value: true },
+            server: { value: "", type: "iob-config" }
+        },
+        inputs: 1,
+        outputs: 1,
+        icon: "iobroker_setobject.svg",
+        paletteLabel: "WS ioB setObj",
+        label: function () {
+            if (this.name) return this.name;
+            
+            let label = this.objectId || "iob-setobject";
+            if (this.mergeMode === "merge") {
+                label += " (merge)";
+            }
+            return label;
+        },
+
+        oneditprepare: function () {
+            const node = this;
+            const serverInput = $('#node-input-server');
+
+            // Auto-select server if only one exists
+            if (!this.server || this.server === '') {
+                const configNodes = [];
+                RED.nodes.eachConfig(function (config) {
+                    if (config.type === 'iob-config') {
+                        configNodes.push(config);
+                    }
+                });
+
+                if (configNodes.length === 1) {
+                    this.server = configNodes[0].id;
+                    serverInput.val(this.server);
+
+                    setTimeout(() => {
+                        RED.notify(`Automatically selected server: ${configNodes[0].name || configNodes[0].iobhost}`, {
+                            type: "info",
+                            timeout: 1500
+                        });
+                    }, 500);
+                }
+            }
+
+            // Handle object source change
+            $('#node-input-objectSource').on('change', function () {
+                const source = $(this).val();
+                if (source === "payload") {
+                    $('#object-property-row').hide();
+                } else {
+                    $('#object-property-row').show();
+                }
+            });
+
+            // Initial state
+            const currentSource = $('#node-input-objectSource').val() || "msg";
+            if (currentSource === "payload") {
+                $('#object-property-row').hide();
+            }
+
+            // Handle merge mode info
+            $('#node-input-mergeMode').on('change', function () {
+                const mode = $(this).val();
+                $('.merge-mode-info').hide();
+                $(`.merge-mode-info.${mode}`).show();
+            });
+
+            // Initial merge mode display
+            const currentMergeMode = $('#node-input-mergeMode').val() || "replace";
+            $('.merge-mode-info').hide();
+            $(`.merge-mode-info.${currentMergeMode}`).show();
+
+            // TreeView for object selection
+            loadSharedTreeView().then(() => {
+                this.treeController = window.ioBrokerSharedTreeView.setup({
+                    nodeType: 'iobsetobject',
+                    inputId: 'node-input-objectId',
+                    serverInputId: 'node-input-server',
+                    searchPlaceholder: 'Search objects...',
+                    itemType: 'objects',
+                    dataEndpoint: '/iobroker/ws/objects',
+                    enableWildcardDetection: false,
+                    wildcardInputId: null
+                });
+            }).catch(error => {
+                console.error('Failed to load TreeView component:', error);
+            });
+        }
+    });
+</script>
+
+<script type="text/html" data-template-name="iobsetobject">
+    <div style="margin-bottom: 15px; padding: 12px; background-color: #ff4444; color: white; border: 2px solid #cc0000; border-radius: 4px; font-weight: bold;">
+        <i class="fa fa-exclamation-triangle" style="font-size: 20px; margin-right: 8px;"></i>
+        <span style="font-size: 14px;">WARNING: This node can modify system objects!</span>
+        <div style="margin-top: 8px; font-size: 12px; font-weight: normal;">
+            Incorrect configurations can break ioBroker adapters or the entire system. 
+            <strong>Always use Merge mode</strong> for existing objects and test changes in a safe environment first!
+        </div>
+    </div>
+    
+    <div class="form-row">
+        <label for="node-input-name"><i class="fa fa-tag"></i> Name</label>
+        <input type="text" id="node-input-name" placeholder="Name">
+    </div>
+    
+    <div class="form-row">
+        <label for="node-input-objectId"><i class="fa fa-dot-circle-o"></i> Object ID</label>
+        <input type="text" id="node-input-objectId" placeholder="Leave empty to use msg.objectId">
+    </div>
+
+    <div class="form-row">
+        <label for="node-input-objectSource"><i class="fa fa-database"></i> Object Source</label>
+        <select id="node-input-objectSource" style="width:100%">
+            <option value="payload">msg.payload (complete object)</option>
+            <option value="msg">msg property (specify below)</option>
+        </select>
+    </div>
+
+    <div class="form-row" id="object-property-row">
+        <label for="node-input-objectProperty"><i class="fa fa-arrow-right"></i> Object Property</label>
+        <input type="text" id="node-input-objectProperty" placeholder="payload">
+        <div style="margin-top: 5px; font-size: 11px; color: #666;">
+            <i class="fa fa-info-circle"></i> Example: <code>payload</code>, <code>data.object</code>, <code>modifiedObject</code>
+        </div>
+    </div>
+
+    <div class="form-row">
+        <label for="node-input-mergeMode"><i class="fa fa-code-fork"></i> Mode</label>
+        <select id="node-input-mergeMode" style="width:100%">
+            <option value="replace">Replace - Overwrite complete object</option>
+            <option value="merge">Merge - Update only changed properties</option>
+        </select>
+    </div>
+
+    <div class="merge-mode-info replace" style="margin-top: 5px; padding: 8px; background-color: #fff3cd; border: 1px solid #ffeaa7; border-radius: 4px; font-size: 12px; color: #856404;">
+        <i class="fa fa-info-circle"></i> <strong>Replace Mode:</strong><br>
+        The complete object will be overwritten with the new definition. Make sure to provide all required properties (type, common, native).
+    </div>
+
+    <div class="merge-mode-info merge" style="display: none; margin-top: 5px; padding: 8px; background-color: #d1ecf1; border: 1px solid #bee5eb; border-radius: 4px; font-size: 12px; color: #0c5460;">
+        <i class="fa fa-info-circle"></i> <strong>Merge Mode:</strong><br>
+        The existing object will be fetched first and then merged with your changes. Only the properties you provide will be updated. Useful for changing single values like <code>common.name</code> or <code>native.publish</code>.
+    </div>
+
+    <div class="form-row">
+        <label>&nbsp;</label>
+        <input type="checkbox" id="node-input-validateObject" style="display: inline-block; width: auto; vertical-align: top;">
+        <label for="node-input-validateObject" style="width: auto; margin-left: 5px;">Validate object structure (type, common)</label>
+        <div style="margin-top: 5px; margin-left: 20px; font-size: 11px; color: #666;">
+            <i class="fa fa-info-circle"></i> Ensures the object has required properties before writing
+        </div>
+    </div>
+
+    <div class="form-row">
+        <label for="node-input-server"><i class="fa fa-server"></i> Server</label>
+        <input type="text" id="node-input-server">
+    </div>
+</script>
+
+<script type="text/html" data-help-name="iobsetobject">
+    <p>Write ioBroker object definitions (metadata) via WebSocket.</p>
+    
+    <div style="margin: 10px 0; padding: 12px; background-color: #ff4444; color: white; border: 2px solid #cc0000; border-radius: 4px;">
+        <h3 style="margin-top: 0; color: white;"><i class="fa fa-exclamation-triangle"></i> WARNING</h3>
+        <p style="margin-bottom: 0;">This node can modify critical system objects! Incorrect configurations can break ioBroker adapters or the entire system. <strong>Always use Merge mode</strong> for existing objects and test changes in a safe test environment first!</p>
+    </div>
+    
+    <h3>Purpose</h3>
+    <p>This node allows you to create or update ioBroker object definitions, which contain metadata about states, devices, adapters, and other entities. Use this node to:</p>
+    <ul>
+        <li>Modify adapter configurations (e.g., change <code>native.publish</code> in MQTT adapter)</li>
+        <li>Update object properties like <code>common.name</code>, <code>common.role</code>, etc.</li>
+        <li>Create new objects dynamically</li>
+        <li>Change object settings programmatically</li>
+    </ul>
+    
+    <h3>Configuration</h3>
+    <ul>
+        <li><b>Object ID:</b> The ioBroker object identifier. Leave empty to use <code>msg.objectId</code>.</li>
+        <li><b>Object Source:</b> Where to get the object definition from:
+            <ul>
+                <li><b>msg.payload:</b> Complete object in message payload</li>
+                <li><b>msg property:</b> Object in specified message property</li>
+            </ul>
+        </li>
+        <li><b>Object Property:</b> Message property path (only for "msg property" source).</li>
+        <li><b>Mode:</b>
+            <ul>
+                <li><b>Replace:</b> Overwrites the complete object</li>
+                <li><b>Merge:</b> Fetches existing object and merges your changes</li>
+            </ul>
+        </li>
+        <li><b>Validate object structure:</b> Checks for required properties (type, common) before writing.</li>
+        <li><b>Server:</b> The ioBroker server configuration.</li>
+    </ul>
+    
+    <h3>Input</h3>
+    <p><b>msg.objectId</b> (string, optional): Object ID to write (overrides configured value)</p>
+    <p><b>msg.payload</b> or <b>msg.[property]</b> (object): The object definition containing:</p>
+    <ul>
+        <li><code>type</code>: Object type (state, channel, device, adapter, instance, etc.)</li>
+        <li><code>common</code>: Common properties (name, role, type, read, write, etc.)</li>
+        <li><code>native</code>: Adapter-specific properties</li>
+    </ul>
+    
+    <h3>Output</h3>
+    <p>On success, outputs a message with:</p>
+    <pre>{
+  "payload": {
+    "success": true,
+    "objectId": "system.adapter.mqtt.0",
+    "object": { ... }
+  },
+  "objectId": "system.adapter.mqtt.0",
+  "timestamp": 1234567890
+}</pre>
+    
+    <h3>Examples</h3>
+    
+    <h4>Example 1: Modify MQTT adapter configuration</h4>
+    <p>Get object → Modify → Write back:</p>
+    <pre>// In function node after iob-getobject:
+msg.payload.native.publish = "mqtt.0.*, system.*";
+msg.payload.native.patterns = "new/pattern/#";
+return msg;
+// Then connect to iob-setobject with merge mode</pre>
+    
+    <h4>Example 2: Change object name</h4>
+    <p>Update only the name property:</p>
+    <pre>msg.objectId = "hue.0.lights.1";
+msg.payload = {
+  common: {
+    name: "Living Room Light - New Name"
+  }
+};
+// Use merge mode to keep other properties</pre>
+    
+    <h4>Example 3: Create new state object</h4>
+    <pre>msg.objectId = "javascript.0.myState";
+msg.payload = {
+  type: "state",
+  common: {
+    name: "My Custom State",
+    type: "boolean",
+    role: "switch",
+    read: true,
+    write: true
+  },
+  native: {}
+};
+// Use replace mode for new objects</pre>
+    
+    <h3>Modes Explained</h3>
+    
+    <h4>Replace Mode</h4>
+    <p>Completely overwrites the object with your definition. You must provide all required properties. Use this for:</p>
+    <ul>
+        <li>Creating new objects</li>
+        <li>Complete object replacement</li>
+        <li>When you have the full object definition</li>
+    </ul>
+    
+    <h4>Merge Mode</h4>
+    <p>Fetches the existing object first, then merges your changes. Only specified properties are updated. Use this for:</p>
+    <ul>
+        <li>Changing single properties (e.g., only <code>native.publish</code>)</li>
+        <li>Updating adapter configurations</li>
+        <li>Partial object updates</li>
+        <li>Preserving other settings</li>
+    </ul>
+    
+    <h3>Important Notes</h3>
+    <ul>
+        <li>Changing adapter objects may require adapter restart to take effect</li>
+        <li>Always backup important objects before modifying</li>
+        <li>Use merge mode to avoid accidentally removing properties</li>
+        <li>The <code>_id</code> property is automatically removed from object definitions</li>
+        <li>Validation ensures objects have required structure</li>
+    </ul>
+    
+    <h3>Error Handling</h3>
+    <p>The node reports errors for:</p>
+    <ul>
+        <li>Missing object ID</li>
+        <li>Invalid object structure (when validation is enabled)</li>
+        <li>Connection failures</li>
+        <li>Write operation failures</li>
+    </ul>
+    
+    <p>📖 <a href="https://www.iobroker.net/#en/documentation/dev/objectsschema.md" target="_blank">ioBroker Object Schema Documentation</a></p>
+</script>

@@ -1,0 +1,466 @@
+[
+    {
+        "id": "example_setobject_flow",
+        "type": "tab",
+        "label": "iob-setobject Examples",
+        "disabled": false,
+        "info": "Demonstrates various uses of the iob-setobject node for writing and modifying ioBroker object definitions."
+    },
+    {
+        "id": "inject_modify_mqtt",
+        "type": "inject",
+        "z": "example_setobject_flow",
+        "name": "Modify MQTT Config",
+        "props": [
+            {
+                "p": "payload"
+            }
+        ],
+        "repeat": "",
+        "crontab": "",
+        "once": false,
+        "onceDelay": 0.1,
+        "topic": "",
+        "payload": "",
+        "payloadType": "date",
+        "x": 140,
+        "y": 80,
+        "wires": [
+            [
+                "getobject_mqtt"
+            ]
+        ]
+    },
+    {
+        "id": "getobject_mqtt",
+        "type": "iobgetobject",
+        "z": "example_setobject_flow",
+        "name": "Get MQTT Config",
+        "objectId": "system.adapter.mqtt.0",
+        "outputProperty": "payload",
+        "outputMode": "single",
+        "objectType": "",
+        "useWildcard": false,
+        "includeEnums": false,
+        "enumTypes": "all",
+        "includeAliases": false,
+        "aliasResolution": "both",
+        "server": "iob_server",
+        "x": 350,
+        "y": 80,
+        "wires": [
+            [
+                "function_modify_mqtt"
+            ]
+        ]
+    },
+    {
+        "id": "function_modify_mqtt",
+        "type": "function",
+        "z": "example_setobject_flow",
+        "name": "Modify publish pattern",
+        "func": "// Modify the native.publish configuration\nmsg.payload.native.publish = \"mqtt.0.*, system.adapter.*\";\n\n// Optional: Modify other settings\nmsg.payload.native.patterns = \"sensor/#, actuator/#\";\n\nreturn msg;",
+        "outputs": 1,
+        "noerr": 0,
+        "initialize": "",
+        "finalize": "",
+        "libs": [],
+        "x": 590,
+        "y": 80,
+        "wires": [
+            [
+                "setobject_mqtt",
+                "debug_modified"
+            ]
+        ]
+    },
+    {
+        "id": "setobject_mqtt",
+        "type": "iobsetobject",
+        "z": "example_setobject_flow",
+        "name": "Write MQTT Config",
+        "objectId": "",
+        "objectSource": "msg",
+        "objectProperty": "payload",
+        "mergeMode": "merge",
+        "validateObject": true,
+        "server": "iob_server",
+        "x": 830,
+        "y": 80,
+        "wires": [
+            [
+                "debug_result"
+            ]
+        ]
+    },
+    {
+        "id": "debug_modified",
+        "type": "debug",
+        "z": "example_setobject_flow",
+        "name": "Modified Object",
+        "active": true,
+        "tosidebar": true,
+        "console": false,
+        "tostatus": false,
+        "complete": "payload",
+        "targetType": "msg",
+        "statusVal": "",
+        "statusType": "auto",
+        "x": 840,
+        "y": 140,
+        "wires": []
+    },
+    {
+        "id": "debug_result",
+        "type": "debug",
+        "z": "example_setobject_flow",
+        "name": "Write Result",
+        "active": true,
+        "tosidebar": true,
+        "console": false,
+        "tostatus": false,
+        "complete": "true",
+        "targetType": "full",
+        "statusVal": "",
+        "statusType": "auto",
+        "x": 1050,
+        "y": 80,
+        "wires": []
+    },
+    {
+        "id": "inject_create_state",
+        "type": "inject",
+        "z": "example_setobject_flow",
+        "name": "Create Custom State",
+        "props": [
+            {
+                "p": "payload"
+            },
+            {
+                "p": "objectId",
+                "v": "javascript.0.custom.temperature",
+                "vt": "str"
+            }
+        ],
+        "repeat": "",
+        "crontab": "",
+        "once": false,
+        "onceDelay": 0.1,
+        "topic": "",
+        "payload": "{\"type\":\"state\",\"common\":{\"name\":\"Temperature Sensor\",\"type\":\"number\",\"role\":\"value.temperature\",\"read\":true,\"write\":false,\"unit\":\"°C\",\"min\":-50,\"max\":100},\"native\":{}}",
+        "payloadType": "json",
+        "x": 150,
+        "y": 240,
+        "wires": [
+            [
+                "setobject_create"
+            ]
+        ]
+    },
+    {
+        "id": "setobject_create",
+        "type": "iobsetobject",
+        "z": "example_setobject_flow",
+        "name": "Create State",
+        "objectId": "",
+        "objectSource": "payload",
+        "objectProperty": "payload",
+        "mergeMode": "replace",
+        "validateObject": true,
+        "server": "iob_server",
+        "x": 390,
+        "y": 240,
+        "wires": [
+            [
+                "debug_create_result"
+            ]
+        ]
+    },
+    {
+        "id": "debug_create_result",
+        "type": "debug",
+        "z": "example_setobject_flow",
+        "name": "Create Result",
+        "active": true,
+        "tosidebar": true,
+        "console": false,
+        "tostatus": false,
+        "complete": "true",
+        "targetType": "full",
+        "statusVal": "",
+        "statusType": "auto",
+        "x": 590,
+        "y": 240,
+        "wires": []
+    },
+    {
+        "id": "inject_update_name",
+        "type": "inject",
+        "z": "example_setobject_flow",
+        "name": "Update Object Name",
+        "props": [
+            {
+                "p": "payload"
+            },
+            {
+                "p": "objectId",
+                "v": "hue.0.lights.livingroom",
+                "vt": "str"
+            }
+        ],
+        "repeat": "",
+        "crontab": "",
+        "once": false,
+        "onceDelay": 0.1,
+        "topic": "",
+        "payload": "{\"common\":{\"name\":\"Living Room Light - Updated Name\"}}",
+        "payloadType": "json",
+        "x": 150,
+        "y": 340,
+        "wires": [
+            [
+                "setobject_update_name"
+            ]
+        ]
+    },
+    {
+        "id": "setobject_update_name",
+        "type": "iobsetobject",
+        "z": "example_setobject_flow",
+        "name": "Update Name (Merge)",
+        "objectId": "",
+        "objectSource": "payload",
+        "objectProperty": "payload",
+        "mergeMode": "merge",
+        "validateObject": false,
+        "server": "iob_server",
+        "x": 420,
+        "y": 340,
+        "wires": [
+            [
+                "debug_update_result"
+            ]
+        ]
+    },
+    {
+        "id": "debug_update_result",
+        "type": "debug",
+        "z": "example_setobject_flow",
+        "name": "Update Result",
+        "active": true,
+        "tosidebar": true,
+        "console": false,
+        "tostatus": false,
+        "complete": "true",
+        "targetType": "full",
+        "statusVal": "",
+        "statusType": "auto",
+        "x": 650,
+        "y": 340,
+        "wires": []
+    },
+    {
+        "id": "inject_enable_adapter",
+        "type": "inject",
+        "z": "example_setobject_flow",
+        "name": "Enable/Disable Adapter",
+        "props": [
+            {
+                "p": "payload"
+            },
+            {
+                "p": "objectId",
+                "v": "system.adapter.hue.0",
+                "vt": "str"
+            }
+        ],
+        "repeat": "",
+        "crontab": "",
+        "once": false,
+        "onceDelay": 0.1,
+        "topic": "",
+        "payload": "{\"common\":{\"enabled\":false}}",
+        "payloadType": "json",
+        "x": 160,
+        "y": 440,
+        "wires": [
+            [
+                "setobject_adapter"
+            ]
+        ]
+    },
+    {
+        "id": "setobject_adapter",
+        "type": "iobsetobject",
+        "z": "example_setobject_flow",
+        "name": "Update Adapter Config",
+        "objectId": "",
+        "objectSource": "payload",
+        "objectProperty": "payload",
+        "mergeMode": "merge",
+        "validateObject": false,
+        "server": "iob_server",
+        "x": 430,
+        "y": 440,
+        "wires": [
+            [
+                "debug_adapter_result"
+            ]
+        ]
+    },
+    {
+        "id": "debug_adapter_result",
+        "type": "debug",
+        "z": "example_setobject_flow",
+        "name": "Adapter Result",
+        "active": true,
+        "tosidebar": true,
+        "console": false,
+        "tostatus": false,
+        "complete": "true",
+        "targetType": "full",
+        "statusVal": "",
+        "statusType": "auto",
+        "x": 660,
+        "y": 440,
+        "wires": []
+    },
+    {
+        "id": "inject_batch_update",
+        "type": "inject",
+        "z": "example_setobject_flow",
+        "name": "Batch Update Objects",
+        "props": [
+            {
+                "p": "payload"
+            }
+        ],
+        "repeat": "",
+        "crontab": "",
+        "once": false,
+        "onceDelay": 0.1,
+        "topic": "",
+        "payload": "",
+        "payloadType": "date",
+        "x": 150,
+        "y": 560,
+        "wires": [
+            [
+                "function_batch"
+            ]
+        ]
+    },
+    {
+        "id": "function_batch",
+        "type": "function",
+        "z": "example_setobject_flow",
+        "name": "Prepare Batch",
+        "func": "// Update multiple objects with the same changes\nconst objectIds = [\n    \"javascript.0.room1.temp\",\n    \"javascript.0.room2.temp\",\n    \"javascript.0.room3.temp\"\n];\n\nconst messages = objectIds.map(id => ({\n    objectId: id,\n    payload: {\n        common: {\n            unit: \"°C\",\n            role: \"value.temperature\"\n        }\n    }\n}));\n\nreturn [messages];",
+        "outputs": 1,
+        "noerr": 0,
+        "initialize": "",
+        "finalize": "",
+        "libs": [],
+        "x": 370,
+        "y": 560,
+        "wires": [
+            [
+                "setobject_batch"
+            ]
+        ]
+    },
+    {
+        "id": "setobject_batch",
+        "type": "iobsetobject",
+        "z": "example_setobject_flow",
+        "name": "Batch Write",
+        "objectId": "",
+        "objectSource": "payload",
+        "objectProperty": "payload",
+        "mergeMode": "merge",
+        "validateObject": false,
+        "server": "iob_server",
+        "x": 570,
+        "y": 560,
+        "wires": [
+            [
+                "debug_batch_result"
+            ]
+        ]
+    },
+    {
+        "id": "debug_batch_result",
+        "type": "debug",
+        "z": "example_setobject_flow",
+        "name": "Batch Results",
+        "active": true,
+        "tosidebar": true,
+        "console": false,
+        "tostatus": false,
+        "complete": "true",
+        "targetType": "full",
+        "statusVal": "",
+        "statusType": "auto",
+        "x": 760,
+        "y": 560,
+        "wires": []
+    },
+    {
+        "id": "comment_1",
+        "type": "comment",
+        "z": "example_setobject_flow",
+        "name": "Example 1: Modify MQTT Adapter Configuration (Get → Modify → Write)",
+        "info": "This flow demonstrates how to:\n1. Get the current MQTT adapter configuration\n2. Modify the native.publish property\n3. Write it back using merge mode (preserves other settings)",
+        "x": 310,
+        "y": 40,
+        "wires": []
+    },
+    {
+        "id": "comment_2",
+        "type": "comment",
+        "z": "example_setobject_flow",
+        "name": "Example 2: Create a New Custom State (Replace Mode)",
+        "info": "Creates a completely new state object with full definition.\nUses replace mode since the object doesn't exist yet.",
+        "x": 250,
+        "y": 200,
+        "wires": []
+    },
+    {
+        "id": "comment_3",
+        "type": "comment",
+        "z": "example_setobject_flow",
+        "name": "Example 3: Update Only Object Name (Merge Mode)",
+        "info": "Updates only the name property of an existing object.\nAll other properties remain unchanged.",
+        "x": 240,
+        "y": 300,
+        "wires": []
+    },
+    {
+        "id": "comment_4",
+        "type": "comment",
+        "z": "example_setobject_flow",
+        "name": "Example 4: Enable/Disable Adapter",
+        "info": "Changes the enabled flag of an adapter.\nNote: Adapter may need restart to take effect.",
+        "x": 200,
+        "y": 400,
+        "wires": []
+    },
+    {
+        "id": "comment_5",
+        "type": "comment",
+        "z": "example_setobject_flow",
+        "name": "Example 5: Batch Update Multiple Objects",
+        "info": "Updates multiple objects with the same changes.\nEach object is processed sequentially.",
+        "x": 210,
+        "y": 520,
+        "wires": []
+    },
+    {
+        "id": "iob_server",
+        "type": "iob-config",
+        "name": "ioBroker Server",
+        "iobhost": "localhost",
+        "iobport": "8081",
+        "usessl": false
+    }
+]

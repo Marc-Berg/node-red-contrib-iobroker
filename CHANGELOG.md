@@ -1,5 +1,15 @@
 # Changelog
 
+## [1.3.0] - 2026-xx-xx
+
+### **Added**
+- **New iob-setobject node for writing object definitions**
+  - Write and modify ioBroker object definitions (metadata) directly
+  - For:
+    - Modifying adapter configurations
+    - Updating object properties (`common.name`, `common.role`, etc.)
+    - Creating custom states and devices programmatically
+
 ## [1.2.1] - 2026-02-03
 
 ### **Fixed**

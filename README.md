@@ -73,6 +73,7 @@ The diagram shows the recommended architecture with a dedicated Admin adapter in
 | **WS ioB out** | Send values to states with auto-creation | Control lights, switches |[📖 Details](docs/nodes/iob-out.md) |
 | **WS ioB get** | Read current state values | Get sensor readings on demand |  [📖 Details](docs/nodes/iob-get.md) |
 | **WS ioB getObj** | Retrieve object definitions with enum assignments | Access device metadata with room/function info | [📖 Details](docs/nodes/iob-getobject.md) |
+| **WS ioB setObj** | Write/modify object definitions | Update adapter configs, change object properties | [📖 Details](docs/nodes/iob-setobject.md) |
 | **WS ioB inObj** | Monitor object changes | Track adapter installations | [📖 Details](docs/nodes/iob-inobj.md) |
 | **WS ioB history** | Access historical data | Energy consumption analysis | [📖 Details](docs/nodes/iob-history.md) |
 | **WS ioB log** | Live log monitoring | System health monitoring | [📖 Details](docs/nodes/iob-log.md) |
