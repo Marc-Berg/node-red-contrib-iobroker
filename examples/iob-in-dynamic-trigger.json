@@ -1,0 +1,334 @@
+[
+    {
+        "id": "example.flow.1",
+        "type": "tab",
+        "label": "External Trigger - Dynamic Topic",
+        "disabled": false,
+        "info": "Example: Use external triggering to dynamically switch iob-in node to different states.\n\n**Features:**\n- Resend cached values (without topic change)\n- Switch to new state/topic dynamically\n- Check if node supports dynamic topic switching\n\n**Usage from Function Node:**\n```javascript\n// Get registered nodes\nconst nodes = flow.get('iobroker_in_nodes') || {};\nconst targetNode = nodes['YOUR_NODE_ID'];\n\nif (targetNode) {\n    // Option 1: Send cached value\n    targetNode.triggerCached();\n    \n    // Option 2: Switch to new topic\n    if (targetNode.supportsDynamicTopic) {\n        await targetNode.triggerWithTopic('system.adapter.hm-rpc.0.alive');\n    }\n}\n```"
+    },
+    {
+        "id": "iob.in.node",
+        "type": "iobin",
+        "z": "example.flow.1",
+        "name": "Dynamic ioBroker State",
+        "server": "iob.config.1",
+        "state": "system.adapter.admin.0.alive",
+        "multipleStates": "",
+        "inputMode": "single",
+        "outputProperty": "payload",
+        "ackFilter": "both",
+        "sendInitialValue": true,
+        "useWildcard": false,
+        "outputMode": "individual",
+        "filterMode": "all",
+        "enableExternalTrigger": true,
+        "triggerGroup": "iobroker_in_nodes",
+        "x": 340,
+        "y": 180,
+        "wires": [
+            ["debug.node"]
+        ]
+    },
+    {
+        "id": "inject.trigger.cached",
+        "type": "inject",
+        "z": "example.flow.1",
+        "name": "Trigger: Send Cached Value",
+        "repeat": "",
+        "crontab": "",
+        "once": false,
+        "onceDelay": 0.1,
+        "topic": "",
+        "x": 180,
+        "y": 100,
+        "wires": [
+            ["function.trigger.cached"]
+        ]
+    },
+    {
+        "id": "function.trigger.cached",
+        "type": "function",
+        "z": "example.flow.1",
+        "name": "Resend Cached Value",
+        "func": "const iobNode = Object.values(flow.get('iobroker_in_nodes') || {})[0];\nif (!iobNode) {\n    node.warn('No iob-in node found');\n    return null;\n}\n\niobNode.triggerCached();\nreturn null;",
+        "outputs": 1,
+        "timeout": "",
+        "noerr": 0,
+        "initialize": "",
+        "finalize": "",
+        "libs": [],
+        "x": 440,
+        "y": 100,
+        "wires": [
+            []
+        ]
+    },
+    {
+        "id": "inject.switch.admin",
+        "type": "inject",
+        "z": "example.flow.1",
+        "name": "Switch to: admin.0.alive",
+        "repeat": "",
+        "crontab": "",
+        "once": false,
+        "onceDelay": 0.1,
+        "topic": "system.adapter.admin.0.alive",
+        "x": 180,
+        "y": 260,
+        "wires": [
+            ["function.switch.topic"]
+        ]
+    },
+    {
+        "id": "inject.switch.hmrpc",
+        "type": "inject",
+        "z": "example.flow.1",
+        "name": "Switch to: hm-rpc.0.alive",
+        "repeat": "",
+        "crontab": "",
+        "once": false,
+        "onceDelay": 0.1,
+        "topic": "system.adapter.hm-rpc.0.alive",
+        "x": 180,
+        "y": 300,
+        "wires": [
+            ["function.switch.topic"]
+        ]
+    },
+    {
+        "id": "inject.switch.custom",
+        "type": "inject",
+        "z": "example.flow.1",
+        "name": "Switch to Custom State",
+        "repeat": "",
+        "crontab": "",
+        "once": false,
+        "onceDelay": 0.1,
+        "topic": "0_userdata.0.temperature.living_room",
+        "payload": "",
+        "payloadType": "date",
+        "x": 180,
+        "y": 340,
+        "wires": [
+            ["function.switch.topic"]
+        ]
+    },
+    {
+        "id": "function.switch.topic",
+        "type": "function",
+        "z": "example.flow.1",
+        "name": "Switch to New Topic",
+        "func": "const iobNode = Object.values(flow.get('iobroker_in_nodes') || {}).find(n => n.supportsDynamicTopic);\nif (!iobNode) {\n    node.warn('No single-mode iob-in node found');\n    return null;\n}\n\n(async () => {\n    await iobNode.triggerWithTopic(msg.topic);\n})();\n\nreturn null;",
+        "outputs": 1,
+        "timeout": "",
+        "noerr": 0,
+        "initialize": "",
+        "finalize": "",
+        "libs": [],
+        "x": 440,
+        "y": 300,
+        "wires": [
+            []
+        ]
+    },
+    {
+        "id": "inject.list.nodes",
+        "type": "inject",
+        "z": "example.flow.1",
+        "name": "List All Registered Nodes",
+        "repeat": "",
+        "crontab": "",
+        "once": false,
+        "onceDelay": 0.1,
+        "topic": "",
+        "x": 180,
+        "y": 420,
+        "wires": [
+            ["function.list.nodes"]
+        ]
+    },
+    {
+        "id": "function.list.nodes",
+        "type": "function",
+        "z": "example.flow.1",
+        "name": "List Registered Nodes",
+        "func": "// Get all registered iob-in nodes with external triggering enabled\nconst nodes = flow.get('iobroker_in_nodes') || {};\n\n// Build overview\nconst nodeList = [];\nfor (const [nodeId, nodeInfo] of Object.entries(nodes)) {\n    nodeList.push({\n        id: nodeId.substring(0, 8) + '...',\n        name: nodeInfo.name,\n        mode: nodeInfo.mode,\n        states: nodeInfo.states,\n        currentState: nodeInfo.stateId,\n        outputMode: nodeInfo.outputMode,\n        supportsDynamicTopic: nodeInfo.supportsDynamicTopic || false,\n        supportsDynamicArray: nodeInfo.supportsDynamicArray || false,\n        group: nodeInfo.group\n    });\n}\n\nif (nodeList.length === 0) {\n    node.warn('No nodes registered for external triggering');\n} else {\n    node.status({ fill: 'green', shape: 'dot', text: `${nodeList.length} nodes found` });\n}\n\nmsg.payload = nodeList;\nmsg.count = nodeList.length;\nreturn msg;",
+        "outputs": 1,
+        "timeout": "",
+        "noerr": 0,
+        "initialize": "",
+        "finalize": "",
+        "libs": [],
+        "x": 440,
+        "y": 420,
+        "wires": [
+            ["debug.list"]
+        ]
+    },
+    {
+        "id": "debug.node",
+        "type": "debug",
+        "z": "example.flow.1",
+        "name": "Output from iob-in",
+        "active": true,
+        "tosidebar": true,
+        "console": false,
+        "tostatus": false,
+        "complete": "true",
+        "targetType": "full",
+        "x": 590,
+        "y": 180,
+        "wires": []
+    },
+    {
+        "id": "debug.list",
+        "type": "debug",
+        "z": "example.flow.1",
+        "name": "Registered Nodes",
+        "active": true,
+        "tosidebar": true,
+        "console": false,
+        "tostatus": false,
+        "complete": "payload",
+        "targetType": "msg",
+        "x": 650,
+        "y": 420,
+        "wires": []
+    },
+    {
+        "id": "comment.intro",
+        "type": "comment",
+        "z": "example.flow.1",
+        "name": "External Triggering with Dynamic Topic Switching",
+        "info": "This flow demonstrates the enhanced external triggering feature:\n\n**1. Trigger Cached Value**\n   - Resends the last received value without changing subscription\n   - Useful for re-triggering downstream flows\n\n**2. Dynamic Topic Switching (Single Mode)**\n   - Changes subscription to a new state/topic at runtime\n   - Only works for single state mode (not wildcard)\n   - Automatically unsubscribes from old topic and subscribes to new one\n\n**3. Dynamic Topics Array (Multiple Mode)**\n   - Changes subscription to new array of states\n   - Only works for multiple state mode\n   - Can also change output mode (individual/grouped)\n\n**4. Feature Detection**\n   - Check `supportsDynamicTopic` flag for single mode\n   - Check `supportsDynamicArray` flag for multiple mode\n   - Prevents errors when using wrong mode",
+        "x": 270,
+        "y": 40,
+        "wires": []
+    },
+    {
+        "id": "iob.in.multiple",
+        "type": "iobin",
+        "z": "example.flow.1",
+        "name": "Dynamic Multiple States",
+        "server": "iob.config.1",
+        "state": "",
+        "multipleStates": "system.adapter.admin.0.alive\nsystem.adapter.admin.0.connected",
+        "inputMode": "multiple",
+        "outputProperty": "payload",
+        "ackFilter": "both",
+        "sendInitialValue": true,
+        "useWildcard": false,
+        "outputMode": "individual",
+        "filterMode": "all",
+        "enableExternalTrigger": true,
+        "triggerGroup": "iobroker_in_nodes",
+        "x": 340,
+        "y": 620,
+        "wires": [
+            ["debug.multiple"]
+        ]
+    },
+    {
+        "id": "inject.switch.adapters",
+        "type": "inject",
+        "z": "example.flow.1",
+        "name": "Switch to: Adapter States",
+        "repeat": "",
+        "crontab": "",
+        "once": false,
+        "onceDelay": 0.1,
+        "topic": "",
+        "payload": "[\"system.adapter.admin.0.alive\",\"system.adapter.admin.0.connected\",\"system.adapter.admin.0.memRss\"]",
+        "payloadType": "json",
+        "x": 190,
+        "y": 520,
+        "wires": [
+            ["function.switch.array"]
+        ]
+    },
+    {
+        "id": "inject.switch.host",
+        "type": "inject",
+        "z": "example.flow.1",
+        "name": "Switch to: Host States",
+        "repeat": "",
+        "crontab": "",
+        "once": false,
+        "onceDelay": 0.1,
+        "topic": "",
+        "payload": "[\"system.host.iobroker.alive\",\"system.host.iobroker.cpuPercent\",\"system.host.iobroker.memAvailable\"]",
+        "payloadType": "json",
+        "x": 180,
+        "y": 560,
+        "wires": [
+            ["function.switch.array"]
+        ]
+    },
+    {
+        "id": "function.switch.array",
+        "type": "function",
+        "z": "example.flow.1",
+        "name": "Switch to Topics Array",
+        "func": "const iobNode = Object.values(flow.get('iobroker_in_nodes') || {}).find(n => n.supportsDynamicArray);\nif (!iobNode) {\n    node.warn('No multiple-mode iob-in node found');\n    return null;\n}\n\n(async () => {\n    await iobNode.triggerWithTopicArray(msg.payload, msg.outputMode);\n})();\n\nreturn null;",
+        "outputs": 1,
+        "timeout": "",
+        "noerr": 0,
+        "initialize": "",
+        "finalize": "",
+        "libs": [],
+        "x": 440,
+        "y": 540,
+        "wires": [
+            []
+        ]
+    },
+    {
+        "id": "debug.multiple",
+        "type": "debug",
+        "z": "example.flow.1",
+        "name": "Multiple States Output",
+        "active": true,
+        "tosidebar": true,
+        "console": false,
+        "tostatus": false,
+        "complete": "true",
+        "targetType": "full",
+        "x": 590,
+        "y": 620,
+        "wires": []
+    },
+    {
+        "id": "comment.multiple",
+        "type": "comment",
+        "z": "example.flow.1",
+        "name": "Multiple Mode - Dynamic Topics Array",
+        "info": "Demonstrates dynamic switching for multiple state mode.\n\n**Usage:**\n- Send array of state IDs in msg.payload\n- Optionally set msg.outputMode to 'individual' or 'grouped'\n- Node unsubscribes from old states and subscribes to new array\n- Always stays in multiple mode (no mode switching)",
+        "x": 240,
+        "y": 480,
+        "wires": []
+    },
+    {
+        "id": "comment.single",
+        "type": "comment",
+        "z": "example.flow.1",
+        "name": "Single Mode - Dynamic Topic",
+        "info": "Demonstrates dynamic switching for single state mode.\n\n**Usage:**\n- Send new state ID in msg.topic\n- Node unsubscribes from old state and subscribes to new one\n- Always stays in single mode (no mode switching)",
+        "x": 210,
+        "y": 220,
+        "wires": []
+    },
+    {
+        "id": "iob.config.1",
+        "type": "iob-config",
+        "host": "localhost",
+        "port": "8082",
+        "protocol": "socketio",
+        "secure": false,
+        "auth": false,
+        "username": "",
+        "password": "",
+        "reconnectInterval": "5000",
+        "connectionTimeout": "10000",
+        "enableDefaultErrorLog": true
+    }
+]

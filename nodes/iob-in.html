@@ -650,7 +650,7 @@ Both modes behave identically because initial values bypass change filtering.
     </ul>
     
     <h3>External Triggering</h3>
-    <p>External triggering allows other nodes (e.g., Function nodes) to resend cached state values without requiring a node restart. This feature can be enabled/disabled and uses configurable trigger groups.</p>
+    <p>External triggering allows other nodes (e.g., Function nodes) to resend cached state values or dynamically switch to different topics without requiring a node restart. This feature can be enabled/disabled and uses configurable trigger groups.</p>
     
     <h4>Configuration</h4>
     <ul>
@@ -658,10 +658,23 @@ Both modes behave identically because initial values bypass change filtering.
         <li><b>Trigger Group:</b> Custom group name to organize triggerable nodes (default: "iobroker_in_nodes")</li>
     </ul>
     
-    <h4>Usage in Function Nodes</h4>
+    <h4>Three Modes of Operation</h4>
+    <ol>
+        <li><b>Cached Value Triggering:</b> Resend the last received value without changing the subscription</li>
+        <li><b>Dynamic Topic Switching:</b> Change subscription to a new state/topic at runtime (single state mode)</li>
+        <li><b>Dynamic Topics Array:</b> Change subscription to a new array of states at runtime (multiple state mode)</li>
+    </ol>
+    
+    <h4>Usage: Cached Value Triggering</h4>
     <pre>
 // Get all available triggerable nodes from custom group
 const triggerableNodes = flow.get('my_dashboard_nodes') || {};
+
+// Trigger specific node
+const targetNode = triggerableNodes['node-id-xyz'];
+if (targetNode && targetNode.triggerCached) {
+    targetNode.triggerCached();
+}
 
 // Trigger all nodes in the group
 Object.values(triggerableNodes).forEach(nodeInfo => {
@@ -674,34 +687,99 @@ Object.values(triggerableNodes).forEach(nodeInfo => {
 // Filter specific nodes by name
 Object.values(triggerableNodes)
     .filter(nodeInfo => nodeInfo.name?.includes('[Dashboard]'))
-    .forEach(nodeInfo => {
-        nodeInfo.triggerCached();
-        node.log(`Dashboard trigger: ${nodeInfo.name}`);
-    });
-
-// Trigger only single-mode nodes
-Object.values(triggerableNodes)
-    .filter(nodeInfo => nodeInfo.mode === 'single')
     .forEach(nodeInfo => nodeInfo.triggerCached());
+    </pre>
+
+    <h4>Usage: Dynamic Topic Switching</h4>
+    <pre>
+// Get nodes from trigger group
+const nodes = flow.get('iobroker_in_nodes') || {};
+const targetNode = nodes['node-id-xyz'];
+
+// Check if dynamic topic switching is supported
+if (targetNode && targetNode.supportsDynamicTopic) {
+    // Switch to new state/topic (async)
+    await targetNode.triggerWithTopic('system.adapter.hm-rpc.0.alive');
+    
+    // Or use msg.topic for dynamic switching
+    if (msg.topic) {
+        await targetNode.triggerWithTopic(msg.topic);
+    }
+} else {
+    node.warn('Dynamic topic switching not supported (wildcard or multiple mode)');
+}
+
+// Example: Dashboard with room selection
+// msg.room = 'living_room' | 'bedroom' | 'kitchen'
+const stateId = `0_userdata.0.temperature.${msg.room}`;
+await targetNode.triggerWithTopic(stateId);
+    </pre>
+
+    <h4>Usage: Dynamic Topics Array (Multiple Mode)</h4>
+    <pre>
+// Get nodes from trigger group
+const nodes = flow.get('iobroker_in_nodes') || {};
+const targetNode = nodes['node-id-xyz'];
+
+// Check if dynamic array switching is supported
+if (targetNode && targetNode.supportsDynamicArray) {
+    // Switch to new array of states (async)
+    const newTopics = [
+        'system.adapter.admin.0.alive',
+        'system.adapter.admin.0.connected',
+        'system.adapter.admin.0.memRss'
+    ];
+    
+    // Optional: change output mode
+    const outputMode = 'grouped'; // or 'individual' or undefined (keep current)
+    
+    await targetNode.triggerWithTopicArray(newTopics, outputMode);
+    
+    // Example from msg.payload
+    // msg.payload = ['state1', 'state2', 'state3'];
+    await targetNode.triggerWithTopicArray(msg.payload);
+} else {
+    node.warn('Dynamic array switching not supported (not in multiple mode)');
+}
+
+// Example: Dashboard with adapter selection
+// msg.adapters = ['admin.0', 'hm-rpc.0', 'sql.0']
+const stateIds = msg.adapters.map(a => `system.adapter.${a}.alive`);
+await targetNode.triggerWithTopicArray(stateIds);
     </pre>
 
     <h4>Resend Behavior</h4>
     <ul>
         <li>Single mode: sends the last cached state for the configured state ID</li>
         <li>Multiple states (grouped output): sends all current values in one message with <code>msg.topic = "cached_states"</code> and sets <code>msg.isInitial = true</code></li>
+        <li>Dynamic topic switching (single): unsubscribes from old topic, subscribes to new topic, and sends initial value</li>
+        <li>Dynamic topics array (multiple): unsubscribes from old array, subscribes to new array, and sends initial values</li>
+    </ul>
+    
+    <h4>Dynamic Switching Capabilities</h4>
+    <ul>
+        <li>✅ <b>Single Mode Dynamic:</b> Switch between individual state IDs (check <code>supportsDynamicTopic</code>)</li>
+        <li>✅ <b>Multiple Mode Dynamic:</b> Switch between arrays of state IDs (check <code>supportsDynamicArray</code>)</li>
+        <li>❌ <b>Not supported:</b> Wildcard patterns (<code>state: 'system.adapter.*.alive'</code>)</li>
+        <li>❌ <b>Not supported:</b> Switching between single and multiple modes at runtime</li>
+        <li>Always check the appropriate capability flag before switching</li>
     </ul>
     
     <h4>Node Info Object Structure</h4>
     <pre>
 {
     nodeRef: [Node Reference],
-    triggerCached: [Function],        // Function to trigger resend
-    states: ["state1", "state2"],     // Monitored states
-    mode: "single|multiple",          // Input mode
-    name: "Node Name",                // Node name
-    outputMode: "individual|grouped", // Output mode (multiple only)
-    stateId: "single.state.id",       // State ID (single mode only)
-    group: "custom_group_name"        // Configurable trigger group name
+    triggerCached: [Function],              // Function to trigger resend
+    triggerWithTopic: [Async Function],     // Function to switch topic (single mode only)
+    triggerWithTopicArray: [Async Function], // Function to switch topics array (multiple mode only)
+    supportsDynamicTopic: true|false,       // Capability flag for single mode dynamic
+    supportsDynamicArray: true|false,       // Capability flag for multiple mode dynamic
+    states: ["state1", "state2"],           // Monitored states
+    mode: "single|multiple",                // Input mode
+    name: "Node Name",                      // Node name
+    outputMode: "individual|grouped",       // Output mode (multiple only)
+    stateId: "single.state.id",             // State ID (single mode only)
+    group: "custom_group_name"              // Configurable trigger group name
 }
     </pre>
     

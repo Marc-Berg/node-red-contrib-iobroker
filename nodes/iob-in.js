@@ -150,6 +150,230 @@ module.exports = function (RED) {
             }
         };
 
+        // Function to dynamically switch to a new topic (only for single state mode)
+        node.triggerWithTopic = async function(newTopic) {
+            // Only available for single state mode (not wildcard, not multiple)
+            if (inputMode !== 'single') {
+                node.warn("Dynamic topic switching only available for single state mode");
+                return;
+            }
+
+            if (!newTopic || typeof newTopic !== 'string') {
+                node.warn("Invalid topic provided for dynamic switching");
+                return;
+            }
+
+            // If same topic, just send cached value
+            if (newTopic === subscriptionPattern) {
+                node.sendCachedValues();
+                return;
+            }
+
+            try {
+                setStatus("yellow", "ring", `Switching to: ${newTopic}`);
+
+                // Unsubscribe from old topic
+                if (node.isSubscribed) {
+                    await connectionManager.unsubscribe(
+                        settings.nodeId,
+                        settings.serverId,
+                        subscriptionPattern,
+                        globalConfig
+                    );
+                    node.debug(`Unsubscribed from: ${subscriptionPattern}`);
+                }
+
+                // Clear previous state
+                node.currentStateValues.clear();
+                node.lastValue = undefined;
+                node.hasReceivedValue = false;
+                node.previous.clear();
+
+                // Update subscription pattern
+                const oldPattern = subscriptionPattern;
+                subscriptionPattern = newTopic;
+                node.subscriptionPattern = newTopic;
+
+                // Check if new topic is wildcard pattern
+                const newIsWildcard = newTopic.includes('*');
+                if (newIsWildcard) {
+                    node.warn(`Wildcard patterns not supported for dynamic switching: ${newTopic}`);
+                    // Restore old pattern
+                    subscriptionPattern = oldPattern;
+                    node.subscriptionPattern = oldPattern;
+                    setStatus("red", "ring", "Wildcard not supported");
+                    return;
+                }
+
+                // Subscribe to new topic
+                const callback = createCallback();
+                await connectionManager.subscribe(
+                    settings.nodeId,
+                    settings.serverId,
+                    subscriptionPattern,
+                    callback,
+                    globalConfig
+                );
+
+                node.isSubscribed = true;
+                node.debug(`Subscribed to: ${subscriptionPattern}`);
+
+                // Initialize smart change filter for new topic if needed
+                if (settings.filterMode === 'changes-smart') {
+                    try {
+                        const state = await connectionManager.getState(settings.serverId, subscriptionPattern);
+                        if (state && state.val !== undefined) {
+                            updatePreviousValue(subscriptionPattern, state.val);
+                            node.debug(`Smart filter: Pre-loaded ${subscriptionPattern} = ${state.val}`);
+                        }
+                    } catch (error) {
+                        node.debug(`Smart filter: Could not load ${subscriptionPattern}: ${error.message}`);
+                    }
+                }
+
+                // Update status to show new topic
+                updateStatusWithValue();
+
+                // Update registration in flow context if external triggering is enabled
+                if (settings.enableExternalTrigger) {
+                    const flowContext = node.context().flow;
+                    const existingNodes = flowContext.get(settings.triggerGroup) || {};
+                    if (existingNodes[node.id]) {
+                        existingNodes[node.id].states = [subscriptionPattern];
+                        existingNodes[node.id].stateId = subscriptionPattern;
+                        flowContext.set(settings.triggerGroup, existingNodes);
+                    }
+                }
+
+            } catch (error) {
+                setError(`Failed to switch topic: ${error.message}`, "Switch failed");
+                node.isSubscribed = false;
+            }
+        };
+
+        // Function to dynamically switch to new topics array (only for multiple state mode)
+        node.triggerWithTopicArray = async function(newTopics, newOutputMode) {
+            // Only available for multiple state mode
+            if (inputMode !== 'multiple') {
+                node.warn("Dynamic topics array switching only available for multiple state mode");
+                return;
+            }
+
+            if (!Array.isArray(newTopics) || newTopics.length === 0) {
+                node.warn("Invalid topics array provided - must be non-empty array");
+                return;
+            }
+
+            // Filter and validate topics
+            const validTopics = newTopics
+                .map(t => typeof t === 'string' ? t.trim() : '')
+                .filter(t => t.length > 0);
+
+            if (validTopics.length === 0) {
+                node.warn("No valid topics in array after filtering");
+                return;
+            }
+
+            // Check for wildcards (not supported in dynamic switching)
+            const wildcardTopics = validTopics.filter(t => t.includes('*'));
+            if (wildcardTopics.length > 0) {
+                node.warn(`Wildcard patterns not supported for dynamic switching: ${wildcardTopics.join(', ')}`);
+                setStatus("red", "ring", "Wildcards not supported");
+                return;
+            }
+
+            // Check if anything changed
+            const currentTopicsStr = JSON.stringify([...stateList].sort());
+            const newTopicsStr = JSON.stringify([...validTopics].sort());
+            
+            if (currentTopicsStr === newTopicsStr && !newOutputMode) {
+                // Nothing changed, just trigger current values
+                node.sendCachedValues();
+                return;
+            }
+
+            try {
+                setStatus("yellow", "ring", `Switching to ${validTopics.length} states...`);
+
+                // Unsubscribe from old topics
+                if (node.isSubscribed && node.subscribedStates.size > 0) {
+                    await connectionManager.unsubscribeMultiple(
+                        settings.nodeId,
+                        settings.serverId,
+                        Array.from(node.subscribedStates),
+                        globalConfig
+                    );
+                    node.debug(`Unsubscribed from ${node.subscribedStates.size} states`);
+                }
+
+                // Clear previous state
+                node.currentStateValues.clear();
+                node.subscribedStates.clear();
+                node.hasReceivedValue = false;
+                node.previous.clear();
+
+                // Update state list
+                stateList = validTopics;
+                node.stateList = validTopics;
+
+                // Update output mode if provided
+                if (newOutputMode && (newOutputMode === 'individual' || newOutputMode === 'grouped')) {
+                    settings.outputMode = newOutputMode;
+                }
+
+                // Subscribe to new topics (with forced initial value)
+                const callback = createCallback(true); // Force initial value
+                
+                const successfulStates = await connectionManager.subscribeMultiple(
+                    settings.nodeId,
+                    settings.serverId,
+                    stateList,
+                    callback,
+                    globalConfig
+                );
+
+                // Sync subscribedStates with successful subscriptions
+                node.subscribedStates.clear();
+                successfulStates.forEach(s => node.subscribedStates.add(s));
+
+                node.isSubscribed = true;
+                node.debug(`Subscribed to ${successfulStates.length} states (${settings.outputMode} mode)`);
+
+                // Initialize smart change filter for new topics if needed
+                if (settings.filterMode === 'changes-smart') {
+                    for (const stateId of stateList) {
+                        try {
+                            const state = await connectionManager.getState(settings.serverId, stateId);
+                            if (state && state.val !== undefined) {
+                                updatePreviousValue(stateId, state.val);
+                                node.debug(`Smart filter: Pre-loaded ${stateId} = ${state.val}`);
+                            }
+                        } catch (error) {
+                            node.debug(`Smart filter: Could not load ${stateId}: ${error.message}`);
+                        }
+                    }
+                }
+
+                // Update status
+                updateStatusWithValue();
+
+                // Update registration in flow context if external triggering is enabled
+                if (settings.enableExternalTrigger) {
+                    const flowContext = node.context().flow;
+                    const existingNodes = flowContext.get(settings.triggerGroup) || {};
+                    if (existingNodes[node.id]) {
+                        existingNodes[node.id].states = stateList;
+                        existingNodes[node.id].outputMode = settings.outputMode;
+                        flowContext.set(settings.triggerGroup, existingNodes);
+                    }
+                }
+
+            } catch (error) {
+                setError(`Failed to switch topics array: ${error.message}`, "Switch failed");
+                node.isSubscribed = false;
+            }
+        };
+
         // Register node in flow context for external triggering (only if enabled)
         if (settings.enableExternalTrigger) {
             const flowContext = node.context().flow;
@@ -157,12 +381,16 @@ module.exports = function (RED) {
             existingNodes[node.id] = {
                 nodeRef: node,
                 triggerCached: node.sendCachedValues,
+                triggerWithTopic: inputMode === 'single' && !isWildcardPattern ? node.triggerWithTopic : undefined,
+                triggerWithTopicArray: inputMode === 'multiple' ? node.triggerWithTopicArray : undefined,
                 states: inputMode === 'single' ? [subscriptionPattern] : stateList,
                 mode: inputMode,
                 name: node.name || `iob-in-${node.id.substring(0, 8)}`,
                 outputMode: settings.outputMode,
                 stateId: inputMode === 'single' ? subscriptionPattern : undefined,
-                group: settings.triggerGroup
+                group: settings.triggerGroup,
+                supportsDynamicTopic: inputMode === 'single' && !isWildcardPattern,
+                supportsDynamicArray: inputMode === 'multiple'
             };
             flowContext.set(settings.triggerGroup, existingNodes);
         }
