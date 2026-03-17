@@ -4,13 +4,13 @@ Write and update ioBroker object definitions (metadata) via WebSocket.
 
 ## Purpose
 
-The WS ioB setObject node allows you to create or modify ioBroker object definitions, which contain metadata about states, devices, adapters, and other entities in your ioBroker installation.
+The WS ioB setObject node allows you to create or modify ioBroker object definitions, which contain metadata about states, devices, instances, and other entities in your ioBroker installation.
 
 ## When to Use This Node
 
-- **Modify adapter configurations:** Change settings like `native.publish` in MQTT adapter, `native.enabled` flags, etc.
+- **Modify instance configurations:** Change settings like `native.publish` in an MQTT instance, `native.enabled` flags, etc.
 - **Update object properties:** Change `common.name`, `common.role`, `common.unit`, and other metadata
-- **Create new objects:** Dynamically create custom states or objects
+- **Create new objects:** Dynamically create custom states or objects in allowed namespaces (for example `0_userdata.0`)
 - **Programmatic configuration:** Automate ioBroker configuration changes via flows
 
 ## Configuration
@@ -20,7 +20,7 @@ The WS ioB setObject node allows you to create or modify ioBroker object definit
 **Object ID**
 - The ioBroker object identifier (e.g., `system.adapter.mqtt.0`)
 - Leave empty to use `msg.objectId` for dynamic operation
-- Examples: `javascript.0.myState`, `hue.0.lights.1`, `system.adapter.admin.0`
+- Examples: `0_userdata.0.myState`, `hue.0.lights.1`, `system.adapter.admin.0`
 
 **Object Source**
 - **msg.payload (complete object):** Object definition is in `msg.payload`
@@ -64,7 +64,7 @@ The object definition to write. Must contain:
     read: true,
     write: true
   },
-  native: {}              // Optional: Adapter-specific properties
+  native: {}              // Optional: Instance-specific properties
 }
 ```
 
@@ -100,7 +100,7 @@ The object definition to write. Must contain:
 
 **Example:**
 ```javascript
-msg.objectId = "javascript.0.myState";
+msg.objectId = "0_userdata.0.myState";
 msg.payload = {
   type: "state",
   common: {
@@ -120,7 +120,7 @@ msg.payload = {
 
 **When to use:**
 - Changing single properties
-- Updating adapter configurations
+- Updating instance configurations
 - Partial object updates
 - Preserving existing settings
 
@@ -132,7 +132,7 @@ msg.payload = {
 
 **Example:**
 ```javascript
-// Only change the publish pattern in MQTT adapter
+// Only change the publish pattern in MQTT instance
 msg.objectId = "system.adapter.mqtt.0";
 msg.payload = {
   native: {
@@ -144,7 +144,7 @@ msg.payload = {
 
 ## Use Cases
 
-### 1. Modify MQTT Adapter Configuration
+### 1. Modify MQTT Instance Configuration
 
 **Flow: Get → Modify → Write**
 
@@ -177,10 +177,10 @@ msg.payload = {
 // Use merge mode
 ```
 
-### 3. Create Custom State
+### 3. Create Custom State in 0_userdata.0
 
 ```javascript
-msg.objectId = "javascript.0.sensors.temperature";
+msg.objectId = "0_userdata.0.sensors.temperature";
 msg.payload = {
   type: "state",
   common: {
@@ -198,17 +198,17 @@ msg.payload = {
 // Use replace mode for new objects
 ```
 
-### 4. Enable/Disable Adapter
+### 4. Enable/Disable Instance
 
 ```javascript
 msg.objectId = "system.adapter.hue.0";
 msg.payload = {
   common: {
-    enabled: false  // Disable adapter
+    enabled: false  // Disable instance
   }
 };
 // Use merge mode
-// Note: Adapter automatically restarts when configuration is changed
+// Note: Instance automatically restarts when configuration is changed
 ```
 
 ### 5. Change State Role and Unit
@@ -230,9 +230,9 @@ msg.payload = {
 ```javascript
 // Update multiple objects
 const objectIds = [
-  "javascript.0.room1.temp",
-  "javascript.0.room2.temp",
-  "javascript.0.room3.temp"
+  "0_userdata.0.room1.temp",
+  "0_userdata.0.room2.temp",
+  "0_userdata.0.room3.temp"
 ];
 
 const messages = objectIds.map(id => ({
@@ -292,17 +292,17 @@ return [messages];  // Send as array to process one by one
 }
 ```
 
-**adapter/instance** - Adapter configuration
+**adapter/instance** - Instance configuration
 ```javascript
 {
   type: "instance",
   common: {
-    name: "Adapter Name",
+    name: "Instance Name",
     enabled: true,
     mode: "daemon"
   },
   native: {
-    // Adapter-specific configuration
+    // Instance-specific configuration
   }
 }
 ```
@@ -332,12 +332,17 @@ return [messages];  // Send as array to process one by one
 
 ## Important Notes
 
-### Adapter Configuration Changes
+### Instance Configuration Changes
 
-When modifying adapter objects (e.g., `system.adapter.mqtt.0`):
-1. The adapter **automatically restarts** when its configuration is changed - no manual restart needed
-2. Some settings require adapter reconfiguration
+When modifying instance objects (e.g., `system.adapter.mqtt.0`):
+1. The instance **automatically restarts** when its configuration is changed - no manual restart needed
+2. Some settings require instance reconfiguration
 3. Always test configuration changes in a safe environment first
+
+### No Custom Object Creation in javascript.0
+
+Do not create new custom objects in the `javascript.0` namespace.
+Use `0_userdata.0` (or another allowed custom namespace) for user-defined objects.
 
 ### Object Validation
 
@@ -390,7 +395,7 @@ The `_id` property is automatically removed from object definitions before writi
 
 ## Complete Example Flow
 
-**Goal:** Change MQTT adapter publish pattern
+**Goal:** Change MQTT instance publish pattern
 
 ```json
 [
@@ -425,13 +430,13 @@ The `_id` property is automatically removed from object definitions before writi
 ## Performance Considerations
 
 - **Merge mode** requires an additional read operation (getObject) before writing
-- Use **replace mode** when creating new objects or when you have complete definitions
+- Use **replace mode** when creating new objects in allowed namespaces (for example `0_userdata.0`) or when you have complete definitions
 - Batch updates using loops may take time - consider rate limiting for many objects
 - Object writes are generally fast (<100ms) but depend on server load
 
 ## Security Considerations
 
-- Modifying adapter configurations can affect system behavior
+- Modifying instance configurations can affect system behavior
 - Some objects require admin permissions
 - Always validate user input before writing objects
 - Consider implementing user authentication for flows that modify objects

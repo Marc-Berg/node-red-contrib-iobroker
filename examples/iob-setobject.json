@@ -10,7 +10,7 @@
         "id": "inject_modify_mqtt",
         "type": "inject",
         "z": "example_setobject_flow",
-        "name": "Modify MQTT Config",
+        "name": "Modify MQTT Instance Settings",
         "props": [
             {
                 "p": "payload"
@@ -35,7 +35,7 @@
         "id": "getobject_mqtt",
         "type": "iobgetobject",
         "z": "example_setobject_flow",
-        "name": "Get MQTT Config",
+        "name": "Get MQTT Instance Settings",
         "objectId": "system.adapter.mqtt.0",
         "outputProperty": "payload",
         "outputMode": "single",
@@ -86,7 +86,7 @@
         "id": "setobject_mqtt",
         "type": "iobsetobject",
         "z": "example_setobject_flow",
-        "name": "Write MQTT Config",
+        "name": "Write MQTT Instance Settings",
         "objectId": "",
         "objectSource": "msg",
         "objectProperty": "payload",
@@ -146,7 +146,7 @@
             },
             {
                 "p": "objectId",
-                "v": "javascript.0.custom.temperature",
+                "v": "0_userdata.0.custom.temperature",
                 "vt": "str"
             }
         ],
@@ -271,7 +271,7 @@
         "id": "inject_enable_adapter",
         "type": "inject",
         "z": "example_setobject_flow",
-        "name": "Enable/Disable Adapter",
+        "name": "Enable/Disable Instance",
         "props": [
             {
                 "p": "payload"
@@ -301,7 +301,7 @@
         "id": "setobject_adapter",
         "type": "iobsetobject",
         "z": "example_setobject_flow",
-        "name": "Update Adapter Config",
+        "name": "Update Instance Settings",
         "objectId": "",
         "objectSource": "payload",
         "objectProperty": "payload",
@@ -320,7 +320,7 @@
         "id": "debug_adapter_result",
         "type": "debug",
         "z": "example_setobject_flow",
-        "name": "Adapter Result",
+        "name": "Instance Result",
         "active": true,
         "tosidebar": true,
         "console": false,
@@ -363,7 +363,7 @@
         "type": "function",
         "z": "example_setobject_flow",
         "name": "Prepare Batch",
-        "func": "// Update multiple objects with the same changes\nconst objectIds = [\n    \"javascript.0.room1.temp\",\n    \"javascript.0.room2.temp\",\n    \"javascript.0.room3.temp\"\n];\n\nconst messages = objectIds.map(id => ({\n    objectId: id,\n    payload: {\n        common: {\n            unit: \"°C\",\n            role: \"value.temperature\"\n        }\n    }\n}));\n\nreturn [messages];",
+        "func": "// Update multiple objects with the same changes\nconst objectIds = [\n    \"0_userdata.0.room1.temp\",\n    \"0_userdata.0.room2.temp\",\n    \"0_userdata.0.room3.temp\"\n];\n\nconst messages = objectIds.map(id => ({\n    objectId: id,\n    payload: {\n        common: {\n            unit: \"°C\",\n            role: \"value.temperature\"\n        }\n    }\n}));\n\nreturn [messages];",
         "outputs": 1,
         "noerr": 0,
         "initialize": "",
@@ -417,8 +417,8 @@
         "id": "comment_1",
         "type": "comment",
         "z": "example_setobject_flow",
-        "name": "Example 1: Modify MQTT Adapter Configuration (Get → Modify → Write)",
-        "info": "This flow demonstrates how to:\n1. Get the current MQTT adapter configuration\n2. Modify the native.publish property using a change node\n3. Write it back using merge mode (preserves other settings)\n\nNote: The adapter automatically restarts when its configuration changes - no manual restart needed!",
+        "name": "Example 1: Modify MQTT Instance Settings (Get → Modify → Write)",
+        "info": "This flow demonstrates how to:\n1. Get the current MQTT instance settings\n2. Modify the native.publish property using a change node\n3. Write it back using merge mode (preserves other settings)\n\nNote: The instance automatically restarts when its settings change - no manual restart needed!",
         "x": 320,
         "y": 40,
         "wires": []
@@ -428,7 +428,7 @@
         "type": "comment",
         "z": "example_setobject_flow",
         "name": "Example 2: Create a New Custom State (Replace Mode)",
-        "info": "Creates a completely new state object with full definition.\nUses replace mode since the object doesn't exist yet.",
+        "info": "Creates a completely new state object with full definition in 0_userdata.0.\nUses replace mode since the object doesn't exist yet.",
         "x": 250,
         "y": 200,
         "wires": []
@@ -447,8 +447,8 @@
         "id": "comment_4",
         "type": "comment",
         "z": "example_setobject_flow",
-        "name": "Example 4: Enable/Disable Adapter",
-        "info": "Changes the enabled flag of an adapter.\nNote: Adapter may need restart to take effect.",
+        "name": "Example 4: Enable/Disable Instance",
+        "info": "Changes the enabled flag of an instance.\nNote: The instance may restart automatically when settings are changed.",
         "x": 200,
         "y": 400,
         "wires": []

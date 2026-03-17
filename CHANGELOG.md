@@ -1,5 +1,11 @@
 # Changelog
 
+## [1.3.1] - 2026-03-17
+
+### **Changed**
+
+- General documentation and example updates for iob-setobject
+
 ## [1.3.0] - 2026-03-17
 
 ### **Added**
