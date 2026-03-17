@@ -72,25 +72,25 @@ Control door locks based on user authentication and schedules.
 
 ## 2. System Monitoring
 
-### 2.1 Adapter Health Monitoring
+### 2.1 Instance Health Monitoring
 
 #### Real-Time Status Dashboard
-Create a comprehensive overview of all ioBroker adapter states.
+Create a comprehensive overview of all ioBroker instance states.
 
 **Flow Setup:**
 1. **WS ioB in** → Subscribe to `system.adapter.*.alive`
-2. **Function** → Process and format adapter status
-3. **Dashboard** → Display adapter health grid
-4. **Switch** → Filter only offline adapters for alerts
+2. **Function** → Process and format instance status
+3. **Dashboard** → Display instance health grid
+4. **Switch** → Filter only offline instances for alerts
 
-#### Automatic Restart Failed Adapters
-Monitor adapter health and automatically restart failed instances.
+#### Automatic Restart Failed Instances
+Monitor instance health and automatically restart failed instances.
 
 **Flow Setup:**
 1. **WS ioB in** → Monitor `system.adapter.*.alive`
 2. **Switch** → Detect false (offline) states
 3. **Delay** → Wait before restart to avoid false triggers
-4. **WS ioB out** → Send restart command to specific adapter like `system.adapter.hm-rpc.restart`
+4. **WS ioB out** → Send restart command to a specific instance like `system.adapter.hm-rpc.restart`
 
 ### 2.2 Performance Monitoring
 
@@ -119,12 +119,12 @@ Monitor ioBroker logs and send notifications for critical errors.
 
 **Flow Setup:**
 1. **WS ioB log** → Set level to "error"
-2. **Switch** → Filter specific error types or adapters
+2. **Switch** → Filter specific error types or instances
 3. **Template** → Format notification message
 4. **Email/Push** → Send alert notifications
 
-#### Adapter Activity Monitoring
-Track adapter startup, shutdown, and error events.
+#### Instance Activity Monitoring
+Track instance startup, shutdown, and error events.
 
 **Flow Setup:**
 1. **WS ioB log** → Monitor all log levels
