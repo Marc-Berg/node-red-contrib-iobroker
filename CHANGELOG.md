@@ -1,5 +1,18 @@
 # Changelog
 
+## [1.3.2] - 2026-03-21
+
+### **Changed**
+
+- Refactor: remove dead code and consolidate manager duplications
+  - Remove `getBulkStates()`
+  - Remove unused ManagerHelpers factories
+  - Remove `process.removeAllListeners()` block from WebSocketManager
+  - Remove `fetchAndDeliverInitialValue()`
+  - Remove duplicate `matchesPattern()` in OperationManager
+  - `filterObjectsByPattern()` now delegates to `filterObjectsByType()`
+  - Simplify `destroy()` in all four managers
+
 ## [1.3.1] - 2026-03-17
 
 ### **Changed**
