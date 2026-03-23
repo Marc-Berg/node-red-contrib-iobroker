@@ -6,11 +6,6 @@
 
 - Reconnection log warning downgraded to debug when connection is already in retry state
 - Fixed node counter desync when a node is re-registered under a different server after a config change
-
-## [1.3.3-beta.1] - 2026-03-23
-
-### **Fixed**
-
 - Token refresh overlap now waits for completed resubscription before old connection is closed
 - Removed duplicate resubscription trigger path during auth refresh handover
 - Deduplicated subscribed-state sync notifications for consolidated multi-state patterns
