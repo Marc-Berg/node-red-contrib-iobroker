@@ -563,11 +563,6 @@ module.exports = function (RED) {
                 if (originalOnSubscribed) {
                     originalOnSubscribed();
                 }
-                
-                // Sync subscribedStates after successful subscription
-                if (isMultipleStates) {
-                    syncSubscribedStates(stateList);
-                }
             };
 
             callback.onReconnect = function() {
