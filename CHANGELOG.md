@@ -37,7 +37,7 @@
 - **New iob-setobject node for writing object definitions**
   - Write and modify ioBroker object definitions (metadata) directly
   - For:
-    - Modifying adapter configurations
+    - Modifying instance configurations
     - Updating object properties (`common.name`, `common.role`, etc.)
 
 ### **Improved**
@@ -49,7 +49,7 @@
 
 - **Admin instance now available in iob-sendto**
   - Admin instance (e.g., `admin.0`) now appears in instance dropdown for sendTo commands
-  - Enables direct use of admin commands like `sendToHost` for adapter management
+  - Enables direct use of admin commands like `sendToHost` for instance management
 
 ## [1.2.1] - 2026-02-03
 
@@ -147,7 +147,7 @@
   - Uses lightweight /iobroker/ws/objects (+type=state) instead of /ws/states → smaller payloads and faster load
 
 - **iob-out instances picker**
-  - Uses /iobroker/ws/instances to suggest all available adapter instances (via datalist and dropdown)
+  - Uses /iobroker/ws/instances to suggest all available instances (via datalist and dropdown)
 
 - **Enhanced iob-out node configuration**
   - **Three-tab interface**: Basic, Object Creation, and Custom Settings Configuration tabs for better organization
@@ -163,7 +163,7 @@
  
 ### **Changed**
 - **Terminology standardization: “instance” over “adapter”**
-  - UI labels and documentation now consistently use “instance” when referring to ioBroker adapter instances
+  - UI labels and documentation now consistently use “instance” when referring to ioBroker instances
  
 ### **Fixed**
 - Subscription management for iob-in
@@ -172,7 +172,7 @@
   - Unsubscribes obsolete consolidated patterns when broader ones arrive
 
 - iob-sendto and iob-history no longer accept or emit `msg.adapter`.
-  - Use `msg.instance` exclusively for specifying/returning the target adapter instance
+  - Use `msg.instance` exclusively for specifying/returning the target instance
   - Replace all flow usages of `msg.adapter` with `msg.instance`
  
 ## [1.0.2] - 2025-08-06
@@ -380,7 +380,7 @@ This marks the first stable release of node-red-contrib-iobroker
 - **New node "iobsendto"** - Send commands to ioBroker adapters via sendTo functionality
   - Support for fire-and-forget and response modes
   - Configurable timeout for response operations
-  - Dynamic adapter, command, and message override via input messages
+  - Dynamic instance, command, and message override via input messages
 
 ## [0.10.0] - 2025-07-06
 
@@ -455,7 +455,7 @@ This marks the first stable release of node-red-contrib-iobroker
 - **New node "ioblog"** - Live log subscription and monitoring
   - Real-time log message streaming from ioBroker with configurable log levels
   - Client-side log level filtering (silly, debug, info, warn, error)
-  - Support for timestamp and source adapter inclusion in output messages
+  - Support for timestamp and source instance inclusion in output messages
 
 ## [0.8.1] - 2025-06-30
 ### Fixed
