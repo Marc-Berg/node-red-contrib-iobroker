@@ -10,6 +10,8 @@
 - Removed duplicate resubscription trigger path during auth refresh handover
 - Deduplicated subscribed-state sync notifications for consolidated multi-state patterns
 - Fixed node count drift by incrementing only on first successful node registration
+- Improved token-renewal failure cleanup to reliably close stale old sockets after socket swap
+- Improved token refresh callback error logging to include full error details
 
 ## [1.3.2] - 2026-03-21
 
