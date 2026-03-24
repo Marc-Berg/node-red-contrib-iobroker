@@ -4,14 +4,11 @@
 
 ### **Fixed**
 
-- Reconnection log warning downgraded to debug when connection is already in retry state
-- Fixed node counter desync when a node is re-registered under a different server after a config change
-- Token refresh overlap now waits for completed resubscription before old connection is closed
-- Removed duplicate resubscription trigger path during auth refresh handover
-- Deduplicated subscribed-state sync notifications for consolidated multi-state patterns
-- Fixed node count drift by incrementing only on first successful node registration
+- Hardened connection and recovery coordination by reducing duplicate retry noise and fixing node counter desync/drift across server switches and re-registrations
+- Improved token refresh handover so old connections are closed only after completed resubscription on the new session
+- Removed duplicate resubscription trigger paths and duplicate subscribed-state sync notifications for consolidated multi-state patterns
 - Improved token-renewal failure cleanup to reliably close stale old sockets after socket swap
-- Improved token refresh callback error logging to include full error details
+
 
 ## [1.3.2] - 2026-03-21
 
