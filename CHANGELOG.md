@@ -1,5 +1,17 @@
 # Changelog
 
+## [1.3.4] - 2026-xx-xx
+
+### **Changed**
+
+- Token renewal now refreshes the existing ioBroker session in place via `updateTokenExpiration` instead of creating a parallel WebSocket session for handover
+
+### **Fixed**
+
+- Removed renewal races caused by session swapping and early non-ready transitions during token refresh
+- `iob-in` smart-filter baselines are now loaded only after a subscription is fully established, preventing startup `No ready connection` noise and preserving correct `changes with baseline` behavior
+- `initial` values and smart-filter baseline preloads now work correctly together during startup and reconnect without duplicate WebSocket requests
+
 ## [1.3.3] - 2026-03-27
 
 ### **Fixed**
@@ -8,7 +20,6 @@
 - Improved token refresh handover so old connections are closed only after completed resubscription on the new session
 - Removed duplicate resubscription trigger paths and duplicate subscribed-state sync notifications for consolidated multi-state patterns
 - Improved token-renewal failure cleanup to reliably close stale old sockets after socket swap
-
 
 ## [1.3.2] - 2026-03-21
 
