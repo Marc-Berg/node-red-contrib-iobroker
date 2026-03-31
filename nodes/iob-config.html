@@ -93,7 +93,7 @@
                 statusEl.text("Testing connection…").css("color", "#666").show();
 
                 $.ajax({
-                    url: "iobroker/ai/test",
+                    url: "/iobroker/ai/test",
                     method: "POST",
                     contentType: "application/json",
                     data: JSON.stringify({ provider, model, baseUrl, apiKey }),

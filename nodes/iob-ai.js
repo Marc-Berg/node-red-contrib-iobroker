@@ -151,8 +151,12 @@ function modeDiscover(msg, settings) {
 
     const result = [];
 
-    for (const [id, obj] of Object.entries(objects)) {
+    for (const [entryKey, obj] of Object.entries(objects)) {
         if (!obj || obj.type !== 'state') continue;
+
+        // Support both object-map and array payloads from iob-getobject.
+        const id = obj._id || obj.id || entryKey;
+        if (!id || typeof id !== 'string') continue;
 
         const custom = obj.common?.custom;
         if (!custom || typeof custom !== 'object') continue;
@@ -191,6 +195,59 @@ function modeDiscover(msg, settings) {
     };
 }
 
+function parseRelativeTime(value, nowMs) {
+    if (typeof value !== 'string') return null;
+    const normalized = value.trim().toLowerCase();
+    if (normalized === 'now') return nowMs;
+
+    const match = normalized.match(/^-(\d+)\s*([smhdw])$/);
+    if (!match) return null;
+
+    const amount = parseInt(match[1], 10);
+    const unit = match[2];
+    const multipliers = {
+        s: 1000,
+        m: 60 * 1000,
+        h: 60 * 60 * 1000,
+        d: 24 * 60 * 60 * 1000,
+        w: 7 * 24 * 60 * 60 * 1000
+    };
+    return nowMs - (amount * multipliers[unit]);
+}
+
+function parseToTimestampMs(value, nowMs) {
+    if (value === undefined || value === null || value === '') return null;
+    if (typeof value === 'number') return value > 10000000000 ? value : value * 1000;
+
+    if (typeof value === 'string') {
+        const relative = parseRelativeTime(value, nowMs);
+        if (relative !== null) return relative;
+
+        const parsed = Date.parse(value);
+        if (!Number.isNaN(parsed)) return parsed;
+    }
+
+    return null;
+}
+
+function normalizeQueryForHistory(query) {
+    const normalized = { ...(query || {}) };
+    const nowMs = Date.now();
+
+    const startMs = parseToTimestampMs(normalized.start, nowMs);
+    const endMs = parseToTimestampMs(normalized.end, nowMs) ?? nowMs;
+
+    if (startMs !== null) normalized.start = startMs;
+    if (endMs !== null) normalized.end = endMs;
+
+    const allowedAggregates = new Set(['onchange', 'average', 'min', 'max', 'total', 'count']);
+    if (typeof normalized.aggregate !== 'string' || !allowedAggregates.has(normalized.aggregate)) {
+        normalized.aggregate = 'onchange';
+    }
+
+    return normalized;
+}
+
 async function modeQuery(msg, settings, llm) {
     const question = (typeof msg.payload === 'string' ? msg.payload : '') ||
                      (typeof msg.question === 'string' ? msg.question : '');
@@ -215,7 +272,25 @@ async function modeQuery(msg, settings, llm) {
         return { mode: 'query', error: 'LLM did not return valid JSON', rawResponse: response.text };
     }
 
-    return { mode: 'query', llmUsed: true, usage: response.usage, query: parsed };
+    const query = normalizeQueryForHistory(parsed);
+
+    if (query.start === null || query.start === undefined) {
+        return {
+            mode: 'query',
+            error: 'LLM query is missing a valid start time. Use ISO date/time or relative values like -24h.',
+            rawQuery: parsed
+        };
+    }
+
+    if (query.start >= query.end) {
+        return {
+            mode: 'query',
+            error: 'LLM query produced an invalid time range (start must be before end).',
+            rawQuery: parsed
+        };
+    }
+
+    return { mode: 'query', llmUsed: true, usage: response.usage, query };
 }
 
 async function modeSummarize(msg, settings, llm) {
