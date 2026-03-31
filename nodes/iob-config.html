@@ -2,14 +2,20 @@
     RED.nodes.registerType('iob-config', {
         category: 'config',
         defaults: {
-            name: { value: "config1", required: true },
-            iobhost: { value: "iobroker.local", required: true },
-            iobport: { value: 8082, required: true, validate: RED.validators.number() },
-            usessl: { value: false }
+            name:          { value: "config1", required: true },
+            iobhost:       { value: "iobroker.local", required: true },
+            iobport:       { value: 8082, required: true, validate: RED.validators.number() },
+            usessl:        { value: false },
+            aiProvider:    { value: "none" },
+            aiModel:       { value: "" },
+            aiBaseUrl:     { value: "" },
+            aiMaxTokens:   { value: 2000 },
+            aiTemperature: { value: 0.3 }
         },
         credentials: {
-            user: { type: "text" },
-            password: { type: "password" }
+            user:     { type: "text" },
+            password: { type: "password" },
+            aiApiKey: { type: "password" }
         },
         label: function () {
             return this.name;
@@ -17,118 +23,244 @@
         oneditprepare: function () {
             var node = this;
 
-            // Function to toggle the token expiry warning
+            // ── Tab setup ────────────────────────────────────────────────
+            var tabs = RED.tabs.create({
+                id: "iob-config-tabs",
+                onchange: function (tab) {
+                    $("#iob-config-tabs-content").children().hide();
+                    $("#" + tab.id).show();
+                }
+            });
+            tabs.addTab({ id: "tab-connection", label: "Connection" });
+            tabs.addTab({ id: "tab-ai",         label: "AI / LLM" });
+            $("#iob-config-tabs-content").children().hide();
+            $("#tab-connection").show();
+
+            // ── Connection tab helpers ────────────────────────────────────
             function toggleTokenWarning() {
                 var username = $("#node-config-input-user").val().trim();
-                var warningDiv = $("#token-expiry-warning");
-
-                if (username) {
-                    warningDiv.show();
-                } else {
-                    warningDiv.hide();
-                }
+                $("#token-expiry-warning").toggle(!!username);
             }
 
-            // Function to show SSL info based on current settings
             function updateSSLInfo() {
                 var useSSL = $("#node-config-input-usessl").prop('checked');
-                var sslInfoDiv = $("#ssl-info");
-
-                if (useSSL) {
-                    sslInfoDiv.show();
-                } else {
-                    sslInfoDiv.hide();
-                }
+                $("#ssl-info").toggle(useSSL);
             }
 
-            // Initial checks
             toggleTokenWarning();
             updateSSLInfo();
 
-            // Watch for changes in the username field
-            $("#node-config-input-user").on('input keyup change', function () {
-                toggleTokenWarning();
-            });
+            $("#node-config-input-user").on('input keyup change', toggleTokenWarning);
+            $("#node-config-input-usessl").on('change', updateSSLInfo);
 
-            // Watch for changes in SSL checkbox
-            $("#node-config-input-usessl").on('change', function () {
-                updateSSLInfo();
+            // ── AI tab helpers ────────────────────────────────────────────
+            function updateAIFields() {
+                var provider = $("#node-config-input-aiProvider").val();
+                $("#ai-fields").toggle(provider !== "none");
+                $("#ai-apikey-row").toggle(provider === "openai" || provider === "azure");
+                $("#ai-baseurl-row").toggle(provider === "ollama" || provider === "azure");
+                $("#ai-baseurl-label").text(provider === "azure" ? "Azure Endpoint" : "Ollama URL");
+
+                if (provider === "openai" && !$("#node-config-input-aiModel").val()) {
+                    $("#node-config-input-aiModel").attr("placeholder", "e.g. gpt-4o-mini");
+                } else if (provider === "ollama" && !$("#node-config-input-aiModel").val()) {
+                    $("#node-config-input-aiModel").attr("placeholder", "e.g. llama3.2");
+                } else if (provider === "azure" && !$("#node-config-input-aiModel").val()) {
+                    $("#node-config-input-aiModel").attr("placeholder", "Deployment name");
+                }
+
+                if (provider === "ollama" && !$("#node-config-input-aiBaseUrl").val()) {
+                    $("#node-config-input-aiBaseUrl").val("http://localhost:11434");
+                }
+            }
+
+            $("#node-config-input-aiProvider").on('change', updateAIFields);
+            updateAIFields();
+
+            // Test connection button
+            $("#ai-test-btn").on('click', function () {
+                var provider = $("#node-config-input-aiProvider").val();
+                var model    = $("#node-config-input-aiModel").val().trim();
+                var baseUrl  = $("#node-config-input-aiBaseUrl").val().trim();
+                var apiKey   = $("#node-config-input-aiApiKey").val().trim();
+                var statusEl = $("#ai-test-status");
+
+                if (provider === "none" || !model) {
+                    statusEl.text("Please select a provider and model first.").css("color", "#856404").show();
+                    return;
+                }
+
+                statusEl.text("Testing connection…").css("color", "#666").show();
+
+                $.ajax({
+                    url: "iobroker/ai/test",
+                    method: "POST",
+                    contentType: "application/json",
+                    data: JSON.stringify({ provider, model, baseUrl, apiKey }),
+                    success: function (data) {
+                        if (data.ok) {
+                            statusEl.text("✓ Connection successful – " + data.model).css("color", "#155724");
+                        } else {
+                            statusEl.text("✗ " + (data.error || "Unknown error")).css("color", "#721c24");
+                        }
+                    },
+                    error: function (xhr) {
+                        statusEl.text("✗ " + (xhr.responseJSON && xhr.responseJSON.error ? xhr.responseJSON.error : "Request failed")).css("color", "#721c24");
+                    }
+                });
             });
         }
     });
 </script>
 
 <script type="text/html" data-template-name="iob-config">
+    <!-- Config node name (always visible, outside tabs) -->
     <div class="form-row">
         <label for="node-config-input-name"><i class="fa fa-bookmark"></i> Name</label>
         <input type="text" id="node-config-input-name" required placeholder="Configuration name">
     </div>
-    <div class="form-row">
-        <label for="node-config-input-iobhost"><i class="fa fa-server"></i> ioBroker Host</label>
-        <input type="text" id="node-config-input-iobhost" required placeholder="e.g. iobroker.local">
+
+    <!-- Tab bar -->
+    <div class="form-row" style="margin-bottom: 0;">
+        <ul style="background: #fff; min-width: 600px;" id="iob-config-tabs"></ul>
     </div>
-    <div class="form-row">
-        <label for="node-config-input-iobport"><i class="fa fa-plug"></i> ioBroker Port</label>
-        <input type="number" id="node-config-input-iobport" required placeholder="e.g. 8082">
-    </div>
-    <div class="form-row">
-        <label for="node-config-input-usessl" style="width: auto;">
-            <input type="checkbox" id="node-config-input-usessl" style="width: auto; margin-right: 5px;">
-            <i class="fa fa-lock"></i> Use SSL/TLS (HTTPS/WSS)
-        </label>
-    </div>
-    <div class="form-row">
-        <label for="node-config-input-user"><i class="fa fa-user"></i> Username</label>
-        <input type="text" id="node-config-input-user" placeholder="Optional">
-    </div>
-    <div class="form-row">
-        <label for="node-config-input-password"><i class="fa fa-lock"></i> Password</label>
-        <input type="password" id="node-config-input-password" placeholder="Optional">
-    </div>
-    
-    <!-- SSL Information -->
-    <div id="ssl-info" class="form-row" style="display: none; margin-top: 15px; padding: 10px; background-color: #e8f4fd; border: 1px solid #bee5eb; border-radius: 4px;">
-        <div style="color: #0c5460; font-size: 13px;">
-            <i class="fa fa-shield" style="color: #17a2b8; margin-right: 5px;"></i>
-            <strong>SSL/TLS Mode:</strong><br>
-            Encrypted communication will be used for both WebSocket and HTTP connections.
-            <ul style="margin: 8px 0 0 20px; padding: 0;">
-                <li>WebSocket will use WSS protocol</li>
-                <li>OAuth authentication will use HTTPS</li>
-                <li>Self-signed certificates are accepted</li>
-            </ul>
-        </div>
-    </div>
-    
-    <!-- Token Expiry Warning -->
-    <div id="token-expiry-warning" class="form-row" style="display: none; margin-top: 15px; padding: 10px; background-color: #fff3cd; border: 1px solid #ffeaa7; border-radius: 4px;">
-        <div style="color: #856404; font-size: 13px;">
-            <i class="fa fa-exclamation-triangle" style="color: #f39c12; margin-right: 5px;"></i>
-            <strong>Authentication Token Issue:</strong><br>
-            There's a known issue with expiring authentication tokens.
-            <ul style="margin: 8px 0 0 20px; padding: 0;">
-                <li>Use session duration of at least 3600 seconds (1 hour)!</li>
-            </ul>
-        </div>
-    </div>
+
+    <!-- Tab content container -->
+    <div id="iob-config-tabs-content" style="min-height: 200px;">
+
+        <!-- ── Tab 1: Connection ────────────────────────────────────────── -->
+        <div id="tab-connection">
+            <div class="form-row">
+                <label for="node-config-input-iobhost"><i class="fa fa-server"></i> ioBroker Host</label>
+                <input type="text" id="node-config-input-iobhost" required placeholder="e.g. iobroker.local">
+            </div>
+            <div class="form-row">
+                <label for="node-config-input-iobport"><i class="fa fa-plug"></i> ioBroker Port</label>
+                <input type="number" id="node-config-input-iobport" required placeholder="e.g. 8082">
+            </div>
+            <div class="form-row">
+                <label for="node-config-input-usessl" style="width: auto;">
+                    <input type="checkbox" id="node-config-input-usessl" style="width: auto; margin-right: 5px;">
+                    <i class="fa fa-lock"></i> Use SSL/TLS (HTTPS/WSS)
+                </label>
+            </div>
+            <div class="form-row">
+                <label for="node-config-input-user"><i class="fa fa-user"></i> Username</label>
+                <input type="text" id="node-config-input-user" placeholder="Optional">
+            </div>
+            <div class="form-row">
+                <label for="node-config-input-password"><i class="fa fa-lock"></i> Password</label>
+                <input type="password" id="node-config-input-password" placeholder="Optional">
+            </div>
+
+            <!-- SSL Information -->
+            <div id="ssl-info" class="form-row" style="display: none; margin-top: 10px; padding: 10px; background-color: #e8f4fd; border: 1px solid #bee5eb; border-radius: 4px;">
+                <div style="color: #0c5460; font-size: 13px;">
+                    <i class="fa fa-shield" style="color: #17a2b8; margin-right: 5px;"></i>
+                    <strong>SSL/TLS Mode:</strong><br>
+                    Encrypted communication will be used for both WebSocket and HTTP connections.
+                    <ul style="margin: 8px 0 0 20px; padding: 0;">
+                        <li>WebSocket will use WSS protocol</li>
+                        <li>OAuth authentication will use HTTPS</li>
+                        <li>Self-signed certificates are accepted</li>
+                    </ul>
+                </div>
+            </div>
+
+            <!-- Token Expiry Warning -->
+            <div id="token-expiry-warning" class="form-row" style="display: none; margin-top: 10px; padding: 10px; background-color: #fff3cd; border: 1px solid #ffeaa7; border-radius: 4px;">
+                <div style="color: #856404; font-size: 13px;">
+                    <i class="fa fa-exclamation-triangle" style="color: #f39c12; margin-right: 5px;"></i>
+                    <strong>Authentication Token Issue:</strong><br>
+                    There's a known issue with expiring authentication tokens.
+                    <ul style="margin: 8px 0 0 20px; padding: 0;">
+                        <li>Use session duration of at least 3600 seconds (1 hour)!</li>
+                    </ul>
+                </div>
+            </div>
+        </div><!-- /tab-connection -->
+
+        <!-- ── Tab 2: AI / LLM ─────────────────────────────────────────── -->
+        <div id="tab-ai">
+            <div class="form-row">
+                <label for="node-config-input-aiProvider"><i class="fa fa-magic"></i> Provider</label>
+                <select id="node-config-input-aiProvider" style="width: 70%;">
+                    <option value="none">Disabled (no AI)</option>
+                    <option value="openai">OpenAI (GPT)</option>
+                    <option value="ollama">Ollama (local)</option>
+                    <option value="azure">Azure OpenAI</option>
+                </select>
+            </div>
+
+            <!-- Fields shown only when a provider is selected -->
+            <div id="ai-fields">
+                <div class="form-row">
+                    <label for="node-config-input-aiModel"><i class="fa fa-cube"></i> Model</label>
+                    <input type="text" id="node-config-input-aiModel" style="width: 70%;" placeholder="e.g. gpt-4o-mini">
+                </div>
+
+                <div id="ai-apikey-row" class="form-row">
+                    <label for="node-config-input-aiApiKey"><i class="fa fa-key"></i> API Key</label>
+                    <input type="password" id="node-config-input-aiApiKey" style="width: 70%;" placeholder="sk-…">
+                </div>
+
+                <div id="ai-baseurl-row" class="form-row">
+                    <label id="ai-baseurl-label" for="node-config-input-aiBaseUrl"><i class="fa fa-link"></i> Base URL</label>
+                    <input type="text" id="node-config-input-aiBaseUrl" style="width: 70%;" placeholder="http://localhost:11434">
+                </div>
+
+                <div class="form-row">
+                    <label for="node-config-input-aiMaxTokens"><i class="fa fa-list-ol"></i> Max Tokens</label>
+                    <input type="number" id="node-config-input-aiMaxTokens" style="width: 70px;" min="100" max="32000" value="2000">
+                </div>
+
+                <div class="form-row">
+                    <label for="node-config-input-aiTemperature"><i class="fa fa-thermometer-half"></i> Temperature</label>
+                    <input type="number" id="node-config-input-aiTemperature" style="width: 70px;" min="0" max="2" step="0.1" value="0.3">
+                    <span style="margin-left: 8px; font-size: 12px; color: #888;">(0 = deterministic, 1 = creative)</span>
+                </div>
+
+                <!-- Privacy hint for cloud providers -->
+                <div class="form-row" style="margin-top: 10px; padding: 10px; background-color: #fff3cd; border: 1px solid #ffeaa7; border-radius: 4px;">
+                    <div style="color: #856404; font-size: 12px;">
+                        <i class="fa fa-exclamation-triangle" style="color: #f39c12; margin-right: 5px;"></i>
+                        <strong>Privacy:</strong> When using a cloud provider (OpenAI, Azure), ioBroker state IDs, names
+                        and values will be sent to external servers. Use <strong>Ollama</strong> for fully local processing.
+                    </div>
+                </div>
+
+                <!-- Connection test -->
+                <div class="form-row" style="margin-top: 10px;">
+                    <label></label>
+                    <button id="ai-test-btn" class="red-ui-button" type="button" style="width: auto;">
+                        <i class="fa fa-plug"></i> Test LLM Connection
+                    </button>
+                    <span id="ai-test-status" style="display:none; margin-left: 10px; font-size: 13px;"></span>
+                </div>
+            </div><!-- /ai-fields -->
+        </div><!-- /tab-ai -->
+
+    </div><!-- /iob-config-tabs-content -->
 </script>
 
 <script type="text/html" data-help-name="iob-config">
     <p>Configuration for the connection between ioBroker and Node-RED.</p>
+    <h3>Connection Tab</h3>
     <ul>
         <li><b>ioBroker Host/Port:</b> Address and port of your ioBroker server.</li>
         <li><b>Use SSL/TLS:</b> Enable encrypted communication (HTTPS/WSS).</li>
         <li><b>Username/Password:</b> Optional. Only required if the ioBroker adapter requires authentication.</li>
     </ul>
-    <p>The authentication credentials are automatically used by all connected nodes.</p>
-    
-    <h3>SSL/TLS Support</h3>
-    <p>When SSL/TLS is enabled:</p>
+
+    <h3>AI / LLM Tab</h3>
+    <p>Optional AI integration for the <code>iob-ai</code> node. Supported providers:</p>
     <ul>
-        <li>WebSocket connections use WSS (WebSocket Secure)</li>
-        <li>OAuth authentication uses HTTPS</li>
-        <li>Self-signed certificates are accepted</li>
+        <li><b>OpenAI:</b> Requires an API key. Recommended model: <code>gpt-4o-mini</code>.</li>
+        <li><b>Ollama (local):</b> Fully local, no API key required. Recommended model: <code>llama3.2</code>.</li>
+        <li><b>Azure OpenAI:</b> Requires endpoint URL and API key.</li>
     </ul>
-    
+    <p><b>Temperature:</b> Lower values (0.1–0.4) give deterministic results suitable for smarthome analysis.</p>
+    <p><b>Privacy:</b> When using cloud providers, state IDs and values are sent to external servers. Use Ollama for local-only processing.</p>
+
     <p>📖 <a href="https://github.com/Marc-Berg/node-red-contrib-iobroker/blob/main/README.md" target="_blank">Project README</a></p>
 </script>

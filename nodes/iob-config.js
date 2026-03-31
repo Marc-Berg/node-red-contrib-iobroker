@@ -266,30 +266,67 @@ function setupAPIEndpoints(RED) {
     }
 }
 
+let aiEndpointSetup = false;
+
+function setupAIEndpoints(RED) {
+    if (aiEndpointSetup) return;
+    aiEndpointSetup = true;
+
+    // Test-endpoint for LLM connectivity (used by config editor)
+    RED.httpAdmin.post('/iobroker/ai/test', async (req, res) => {
+        try {
+            const { provider, model, baseUrl, apiKey } = req.body || {};
+
+            if (!provider || provider === 'none' || !model) {
+                return res.status(400).json({ ok: false, error: 'provider and model are required' });
+            }
+
+            const { LLMClient } = require('../lib/ai/llm-client');
+            const client = new LLMClient({ provider, model, baseUrl, apiKey, maxTokens: 10, temperature: 0 });
+            const response = await client.chat([{ role: 'user', content: 'ping' }]);
+            res.json({ ok: true, model: response.model || model });
+        } catch (error) {
+            new Logger('iob-config').warn(`AI test failed: ${error.message}`);
+            res.status(200).json({ ok: false, error: error.message });
+        }
+    });
+}
+
 module.exports = function (RED) {
     const staticResult = setupStaticResources(RED);
     const apiResult = setupAPIEndpoints(RED);
+    setupAIEndpoints(RED);
 
     function ioBConfig(n) {
         RED.nodes.createNode(this, n);
         const credentials = (this.credentials && typeof this.credentials === 'object') ? this.credentials : {};
         this.credentials = credentials;
 
-        this.iobhost = n.iobhost;
-        this.iobport = n.iobport;
-        this.user = typeof credentials.user === 'string' ? credentials.user.trim() : '';
+        this.iobhost  = n.iobhost;
+        this.iobport  = n.iobport;
+        this.user     = typeof credentials.user === 'string' ? credentials.user.trim() : '';
         this.password = typeof credentials.password === 'string' ? credentials.password : '';
-        this.usessl = n.usessl || false;
+        this.usessl   = n.usessl || false;
 
-        const sslInfo = this.usessl ? ' (SSL enabled)' : '';
-        const authInfo = this.user ? ' (with authentication)' : '';
-        new Logger('iob-config').debug(`ioBroker config created: ${this.iobhost}:${this.iobport}${sslInfo}${authInfo}`);
+        // AI / LLM settings
+        this.aiProvider    = n.aiProvider    || 'none';
+        this.aiModel       = n.aiModel       || '';
+        this.aiBaseUrl     = n.aiBaseUrl     || '';
+        this.aiMaxTokens   = parseInt(n.aiMaxTokens)   || 2000;
+        this.aiTemperature = parseFloat(n.aiTemperature) || 0.3;
+        this.aiApiKey      = typeof credentials.aiApiKey === 'string' ? credentials.aiApiKey : '';
+
+        const sslInfo  = this.usessl  ? ' (SSL enabled)'          : '';
+        const authInfo = this.user    ? ' (with authentication)'  : '';
+        const aiInfo   = this.aiProvider !== 'none' ? ` (AI: ${this.aiProvider}/${this.aiModel})` : '';
+        new Logger('iob-config').debug(`ioBroker config created: ${this.iobhost}:${this.iobport}${sslInfo}${authInfo}${aiInfo}`);
     }
 
     RED.nodes.registerType("iob-config", ioBConfig, {
         credentials: {
-            user: { type: "text" },
-            password: { type: "password" }
+            user:     { type: "text" },
+            password: { type: "password" },
+            aiApiKey: { type: "password" }
         }
     });
 };

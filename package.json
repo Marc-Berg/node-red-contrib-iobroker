@@ -54,7 +54,8 @@
       "iobhistory": "nodes/iob-history.js",
       "ioblog": "nodes/iob-log.js",
       "iobsendto": "nodes/iob-sendto.js",
-      "iob-config": "nodes/iob-config.js"
+      "iob-config": "nodes/iob-config.js",
+      "iob-ai": "nodes/iob-ai.js"
     },
     "examples": [
       "examples/iob-get.json",

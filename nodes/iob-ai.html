@@ -1,0 +1,143 @@
+<script type="text/javascript">
+    RED.nodes.registerType('iob-ai', {
+        category:    'ioBroker',
+        color:       '#a3d9f5',
+        icon:        'font-awesome/fa-magic',
+        paletteLabel: 'iob ai',
+        inputs:      1,
+        outputs:     1,
+        defaults: {
+            name:             { value: "" },
+            server:           { value: "", type: "iob-config", required: true },
+            mode:             { value: "analyze" },
+            historyAdapter:   { value: "" },
+            anomalyThreshold: { value: 2.5 },
+            outputProperty:   { value: "payload" }
+        },
+        label: function () {
+            return this.name || ('iob-ai: ' + (this.mode || 'analyze'));
+        },
+        labelStyle: function () {
+            return this.name ? 'node_label_italic' : '';
+        },
+        oneditprepare: function () {
+            var node = this;
+
+            // Mode → show/hide mode-specific options
+            function updateModeFields() {
+                var mode = $("#node-input-mode").val();
+                $(".iob-ai-mode-field").hide();
+                $(".iob-ai-mode-" + mode).show();
+
+                // Describe what the mode expects
+                var hints = {
+                    analyze:   "Expects: <code>msg.payload</code> = time-series array from <b>iob-history</b>.",
+                    anomaly:   "Expects: <code>msg.payload</code> = time-series array from <b>iob-history</b>. Detects statistical outliers.",
+                    discover:  "Expects: <code>msg.objects</code> (or <code>msg.payload</code>) from <b>iob-getobject</b>. Returns only historised states.",
+                    query:     "Expects: <code>msg.payload</code> = natural-language question. Returns query params for <b>iob-history</b>.",
+                    summarize: "Expects: <code>msg.payload</code> = array of <code>{id, name, val, unit}</code> or <code>msg.states</code> object."
+                };
+                $("#iob-ai-mode-hint").html(hints[mode] || "");
+            }
+
+            $("#node-input-mode").on('change', updateModeFields);
+            updateModeFields();
+
+            // Typed input for outputProperty
+            $("#node-input-outputProperty").typedInput({
+                default: 'msg',
+                types: ['msg']
+            });
+        }
+    });
+</script>
+
+<script type="text/html" data-template-name="iob-ai">
+    <div class="form-row">
+        <label for="node-input-name"><i class="fa fa-tag"></i> Name</label>
+        <input type="text" id="node-input-name" placeholder="Optional label">
+    </div>
+
+    <div class="form-row">
+        <label for="node-input-server"><i class="fa fa-server"></i> ioBroker</label>
+        <input type="text" id="node-input-server">
+        <div style="margin-top: 4px; font-size: 12px; color: #888; margin-left: 105px;">
+            AI provider is configured in the <b>AI / LLM</b> tab of the config node.
+        </div>
+    </div>
+
+    <div class="form-row">
+        <label for="node-input-mode"><i class="fa fa-cogs"></i> Mode</label>
+        <select id="node-input-mode" style="width: 70%;">
+            <option value="analyze">analyze – time-series insight</option>
+            <option value="anomaly">anomaly – detect outliers</option>
+            <option value="discover">discover – find historised states</option>
+            <option value="query">query – natural language → history params</option>
+            <option value="summarize">summarize – plain-language home status</option>
+        </select>
+    </div>
+
+    <!-- Mode hint -->
+    <div class="form-row" style="margin-left: 105px;">
+        <span id="iob-ai-mode-hint" style="font-size: 12px; color: #555;"></span>
+    </div>
+
+    <!-- Discover: optional adapter filter -->
+    <div class="form-row iob-ai-mode-field iob-ai-mode-discover" style="display:none;">
+        <label for="node-input-historyAdapter"><i class="fa fa-database"></i> History Adapter</label>
+        <input type="text" id="node-input-historyAdapter" style="width: 60%;" placeholder="e.g. history.0 (empty = any)">
+    </div>
+
+    <!-- Anomaly: threshold -->
+    <div class="form-row iob-ai-mode-field iob-ai-mode-anomaly" style="display:none;">
+        <label for="node-input-anomalyThreshold"><i class="fa fa-exclamation-triangle"></i> Threshold (σ)</label>
+        <input type="number" id="node-input-anomalyThreshold" style="width: 70px;" min="1" max="10" step="0.1" value="2.5">
+        <span style="margin-left: 8px; font-size: 12px; color: #888;">Standard deviations from mean (2–3 is typical)</span>
+    </div>
+
+    <div class="form-row">
+        <label for="node-input-outputProperty"><i class="fa fa-ellipsis-h"></i> Output</label>
+        <input type="text" id="node-input-outputProperty" style="width: 60%;">
+    </div>
+</script>
+
+<script type="text/html" data-help-name="iob-ai">
+    <p>Analyses ioBroker data using an LLM (OpenAI, Ollama, Azure) or built-in statistics.
+    The AI provider is configured in the <b>AI / LLM</b> tab of the <code>iob-config</code> node.</p>
+
+    <h3>Modes</h3>
+    <dl>
+        <dt>analyze</dt>
+        <dd>Requires <code>msg.payload</code> = time-series array from <b>iob-history</b>.
+        Returns trend, min/max/avg, anomalies and an optional recommendation.</dd>
+
+        <dt>anomaly</dt>
+        <dd>Requires <code>msg.payload</code> = time-series array.
+        Detects statistical outliers (Z-score). When an LLM is configured it explains each anomaly.</dd>
+
+        <dt>discover</dt>
+        <dd>Requires <code>msg.objects</code> (or <code>msg.payload</code>) from <b>iob-getobject</b>.
+        Returns only those states that have active history recording (<code>common.custom.[adapter].enabled == true</code>),
+        enriched with room/function enum assignments.</dd>
+
+        <dt>query</dt>
+        <dd>Requires <code>msg.payload</code> = natural-language question (e.g. "How much energy did we use last week?").
+        Returns <code>msg.aiResult.query</code> with <code>stateId</code>, <code>start</code>, <code>end</code> and
+        <code>aggregate</code> — ready to wire into <b>iob-history</b>.</dd>
+
+        <dt>summarize</dt>
+        <dd>Requires <code>msg.payload</code> = array of <code>{id, name, val, unit}</code> objects
+        or <code>msg.states</code> object. Returns a plain-language home status description.</dd>
+    </dl>
+
+    <h3>Output</h3>
+    <p>The result is written to the configured output property (default <code>msg.payload</code>).
+    <code>msg.aiMode</code> contains the active mode string.
+    <code>msg.aiResult</code> always contains the full structured result.</p>
+
+    <h3>Without LLM</h3>
+    <p>The <b>anomaly</b> and <b>discover</b> modes work fully without an LLM.
+    <b>analyze</b> falls back to pure statistics when no provider is configured.</p>
+
+    <p>📖 <a href="https://github.com/Marc-Berg/node-red-contrib-iobroker/blob/main/README.md" target="_blank">Project README</a></p>
+</script>
