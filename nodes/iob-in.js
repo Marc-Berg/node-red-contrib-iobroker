@@ -182,6 +182,8 @@ module.exports = function (RED) {
         node.hasReceivedValue = false;
 
         node.previous = new Map();
+        node.smartFilterInitialized = false;
+        node.smartFilterInitInProgress = false;
 
         function updateStatusWithValue(isInitialValue = false) {
             if (isSingleState && node.hasReceivedValue && node.lastValue !== undefined) {
@@ -265,6 +267,12 @@ module.exports = function (RED) {
                 return;
             }
 
+            if (node.smartFilterInitialized || node.smartFilterInitInProgress) {
+                return;
+            }
+
+            node.smartFilterInitInProgress = true;
+
             try {
                 if (isMultipleStates) {
                     for (const stateId of stateList) {
@@ -289,8 +297,12 @@ module.exports = function (RED) {
                         node.debug(`Smart filter: Could not load ${subscriptionPattern}: ${error.message}`);
                     }
                 }
+
+                node.smartFilterInitialized = true;
             } catch (error) {
                 node.warn(`Smart change filter initialization failed: ${error.message}`);
+            } finally {
+                node.smartFilterInitInProgress = false;
             }
         }
 
@@ -563,6 +575,10 @@ module.exports = function (RED) {
                 if (originalOnSubscribed) {
                     originalOnSubscribed();
                 }
+
+                initializeSmartChangeFilter().catch(error => {
+                    node.debug(`Smart filter: Deferred initialization failed: ${error.message}`);
+                });
             };
 
             callback.onReconnect = function() {
@@ -572,6 +588,8 @@ module.exports = function (RED) {
                 node.hasReceivedValue = false;
                 node.lastValue = undefined;
                 node.previous.clear();
+                node.smartFilterInitialized = false;
+                node.smartFilterInitInProgress = false;
                 if (node.fallbackTimeout) {
                     clearTimeout(node.fallbackTimeout);
                     node.fallbackTimeout = null;
@@ -645,6 +663,8 @@ module.exports = function (RED) {
                 node.hasReceivedValue = false;
                 node.lastValue = undefined;
                 node.previous.clear();
+                node.smartFilterInitialized = false;
+                node.smartFilterInitInProgress = false;
                 if (node.fallbackTimeout) {
                     clearTimeout(node.fallbackTimeout);
                     node.fallbackTimeout = null;
@@ -653,8 +673,6 @@ module.exports = function (RED) {
                 await NodeHelpers.handleConfigChange(node, config, RED, settings);
 
                 await subscribeToStates();
-
-                await initializeSmartChangeFilter();
 
                 node.isSubscribed = true;
 
