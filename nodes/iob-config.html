@@ -10,7 +10,8 @@
             aiModel:       { value: "" },
             aiBaseUrl:     { value: "" },
             aiMaxTokens:   { value: 2000 },
-            aiTemperature: { value: 0.3 }
+            aiTemperature: { value: 0.3 },
+            aiAllowInsecureTls: { value: false }
         },
         credentials: {
             user:     { type: "text" },
@@ -83,6 +84,7 @@
                 var model    = $("#node-config-input-aiModel").val().trim();
                 var baseUrl  = $("#node-config-input-aiBaseUrl").val().trim();
                 var apiKey   = $("#node-config-input-aiApiKey").val().trim();
+                var allowInsecureTls = $("#node-config-input-aiAllowInsecureTls").prop('checked');
                 var statusEl = $("#ai-test-status");
 
                 if (provider === "none" || !model) {
@@ -96,7 +98,7 @@
                     url: "/iobroker/ai/test",
                     method: "POST",
                     contentType: "application/json",
-                    data: JSON.stringify({ provider, model, baseUrl, apiKey }),
+                    data: JSON.stringify({ provider, model, baseUrl, apiKey, allowInsecureTls }),
                     success: function (data) {
                         if (data.ok) {
                             statusEl.text("✓ Connection successful – " + data.model).css("color", "#155724");
@@ -218,6 +220,13 @@
                     <label for="node-config-input-aiTemperature"><i class="fa fa-thermometer-half"></i> Temperature</label>
                     <input type="number" id="node-config-input-aiTemperature" style="width: 70px;" min="0" max="2" step="0.1" value="0.3">
                     <span style="margin-left: 8px; font-size: 12px; color: #888;">(0 = deterministic, 1 = creative)</span>
+                </div>
+
+                <div class="form-row" id="ai-insecure-tls-row">
+                    <label for="node-config-input-aiAllowInsecureTls" style="width: auto;">
+                        <input type="checkbox" id="node-config-input-aiAllowInsecureTls" style="width: auto; margin-right: 5px;">
+                        <i class="fa fa-unlock-alt"></i> Allow insecure TLS certificates (self-signed)
+                    </label>
                 </div>
 
                 <!-- Privacy hint for cloud providers -->

@@ -347,7 +347,8 @@ module.exports = function (RED) {
                 apiKey:      globalConfig.aiApiKey,
                 baseUrl:     globalConfig.aiBaseUrl,
                 maxTokens:   globalConfig.aiMaxTokens,
-                temperature: globalConfig.aiTemperature
+                temperature: globalConfig.aiTemperature,
+                allowInsecureTls: globalConfig.aiAllowInsecureTls === true
             });
         }
 

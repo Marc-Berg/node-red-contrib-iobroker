@@ -275,14 +275,22 @@ function setupAIEndpoints(RED) {
     // Test-endpoint for LLM connectivity (used by config editor)
     RED.httpAdmin.post('/iobroker/ai/test', async (req, res) => {
         try {
-            const { provider, model, baseUrl, apiKey } = req.body || {};
+            const { provider, model, baseUrl, apiKey, allowInsecureTls } = req.body || {};
 
             if (!provider || provider === 'none' || !model) {
                 return res.status(400).json({ ok: false, error: 'provider and model are required' });
             }
 
             const { LLMClient } = require('../lib/ai/llm-client');
-            const client = new LLMClient({ provider, model, baseUrl, apiKey, maxTokens: 10, temperature: 0 });
+            const client = new LLMClient({
+                provider,
+                model,
+                baseUrl,
+                apiKey,
+                maxTokens: 10,
+                temperature: 0,
+                allowInsecureTls: allowInsecureTls === true
+            });
             const response = await client.chat([{ role: 'user', content: 'ping' }]);
             res.json({ ok: true, model: response.model || model });
         } catch (error) {
@@ -314,6 +322,7 @@ module.exports = function (RED) {
         this.aiBaseUrl     = n.aiBaseUrl     || '';
         this.aiMaxTokens   = parseInt(n.aiMaxTokens)   || 2000;
         this.aiTemperature = parseFloat(n.aiTemperature) || 0.3;
+        this.aiAllowInsecureTls = n.aiAllowInsecureTls === true;
         this.aiApiKey      = typeof credentials.aiApiKey === 'string' ? credentials.aiApiKey : '';
 
         const sslInfo  = this.usessl  ? ' (SSL enabled)'          : '';
