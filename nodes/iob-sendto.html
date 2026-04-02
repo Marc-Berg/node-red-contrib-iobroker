@@ -29,27 +29,7 @@ RED.nodes.registerType('iobsendto', {
         const node = this;
         const serverInput = $('#node-input-server');
         const adapterSelect = $('#node-input-adapter');
-        
-        if (!this.server || this.server === '') {
-            const configNodes = [];
-            RED.nodes.eachConfig(function(config) {
-                if (config.type === 'iob-config') {
-                    configNodes.push(config);
-                }
-            });
-            
-            if (configNodes.length === 1) {
-                this.server = configNodes[0].id;
-                serverInput.val(this.server);
-                
-                setTimeout(() => {
-                    RED.notify(`Automatically selected server: ${configNodes[0].name || configNodes[0].iobhost}`, {
-                        type: "info",
-                        timeout: 1500
-                    });
-                }, 500);
-            }
-        }
+        window.ioBrokerEditorUtils.autoSelectSingleServerConfig(RED, this, serverInput);
         
         initializeAdapterDropdown();
         
