@@ -62,27 +62,7 @@ RED.nodes.registerType('iobout', {
     oneditprepare: function() {
         const serverInput = $('#node-input-server');
         
-        // Auto-select server configuration
-        if (!this.server || this.server === '') {
-            const configNodes = [];
-            RED.nodes.eachConfig(function(config) {
-                if (config.type === 'iob-config') {
-                    configNodes.push(config);
-                }
-            });
-            
-            if (configNodes.length === 1) {
-                this.server = configNodes[0].id;
-                serverInput.val(this.server);
-                
-                setTimeout(() => {
-                    RED.notify(`Auto-selected server: ${configNodes[0].name || configNodes[0].iobhost}`, {
-                        type: "info",
-                        timeout: 1500
-                    });
-                }, 500);
-            }
-        }
+        window.ioBrokerEditorUtils.autoSelectSingleServerConfig(RED, this, serverInput);
         
         // Utility function to update auto-create visibility
         function updateAutoCreateVisibility(isChecked) {

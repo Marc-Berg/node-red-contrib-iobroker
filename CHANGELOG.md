@@ -1,5 +1,11 @@
 # Changelog
 
+## [1.3.5] - 2026-xx-xx
+
+### **Changed**
+- Refactored editor-side auto-selection of single `iob-config` into a shared helper (`window.ioBrokerEditorUtils.autoSelectSingleServerConfig`) used by all affected nodes
+- Unified auto-selection notification text across node editors
+
 ## [1.3.4] - 2026-04-01
 
 ### **Changed**
