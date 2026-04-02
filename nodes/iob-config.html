@@ -1,4 +1,34 @@
 <script type="text/javascript">
+    window.ioBrokerEditorUtils = window.ioBrokerEditorUtils || {};
+    window.ioBrokerEditorUtils.autoSelectSingleServerConfig = function (RED, node, serverInput) {
+        if (!node || !serverInput || node.server) {
+            return false;
+        }
+
+        var configNodes = [];
+        RED.nodes.eachConfig(function (config) {
+            if (config.type === 'iob-config') {
+                configNodes.push(config);
+            }
+        });
+
+        if (configNodes.length !== 1) {
+            return false;
+        }
+
+        node.server = configNodes[0].id;
+        serverInput.val(node.server);
+
+        setTimeout(function () {
+            RED.notify('Automatically selected server: ' + (configNodes[0].name || configNodes[0].iobhost), {
+                type: 'info',
+                timeout: 1500
+            });
+        }, 500);
+
+        return true;
+    };
+
     RED.nodes.registerType('iob-config', {
         category: 'config',
         defaults: {

@@ -196,27 +196,7 @@ RED.nodes.registerType('iobhistory', {
         // Initialize tabs
         initializeTabs();
         
-        // Auto-select server configuration
-        if (!node.server || node.server === '') {
-            const configNodes = [];
-            RED.nodes.eachConfig(function(config) {
-                if (config.type === 'iob-config') {
-                    configNodes.push(config);
-                }
-            });
-            
-            if (configNodes.length === 1) {
-                node.server = configNodes[0].id;
-                serverInput.val(node.server);
-                
-                setTimeout(() => {
-                    RED.notify(`Automatically selected server: ${configNodes[0].name || configNodes[0].iobhost}`, {
-                        type: "info",
-                        timeout: 1500
-                    });
-                }, 500);
-            }
-        }
+        window.ioBrokerEditorUtils.autoSelectSingleServerConfig(RED, node, serverInput);
         
         // Utility function for showing/hiding sections
         function toggleSectionVisibility(className, activeSection) {

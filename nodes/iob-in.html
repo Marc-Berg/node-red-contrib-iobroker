@@ -91,28 +91,8 @@ RED.nodes.registerType('iobin', {
     oneditprepare: function() {
         const node = this;
         
-        // Auto-select server configuration if only one exists
         const serverInput = $('#node-input-server');
-        if (!this.server || this.server === '') {
-            const configNodes = [];
-            RED.nodes.eachConfig(function(config) {
-                if (config.type === 'iob-config') {
-                    configNodes.push(config);
-                }
-            });
-            
-            if (configNodes.length === 1) {
-                this.server = configNodes[0].id;
-                serverInput.val(this.server);
-                
-                setTimeout(() => {
-                    RED.notify(`Auto-selected server: ${configNodes[0].name || configNodes[0].iobhost}`, {
-                        type: "info",
-                        timeout: 1500
-                    });
-                }, 500);
-            }
-        }
+        window.ioBrokerEditorUtils.autoSelectSingleServerConfig(RED, this, serverInput);
         
         // Unified wildcard detection using shared utilities
         function checkWildcardPatterns() {
