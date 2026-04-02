@@ -88,9 +88,19 @@
             function updateAIFields() {
                 var provider = $("#node-config-input-aiProvider").val();
                 $("#ai-fields").toggle(provider !== "none");
-                $("#ai-apikey-row").toggle(provider === "openai" || provider === "azure");
-                $("#ai-baseurl-row").toggle(provider === "ollama" || provider === "azure");
-                $("#ai-baseurl-label").text(provider === "azure" ? "Azure Endpoint" : "Ollama URL");
+                $("#ai-apikey-row").toggle(provider === "openai" || provider === "azure" || provider === "openai_compatible");
+                $("#ai-baseurl-row").toggle(provider === "ollama" || provider === "azure" || provider === "openai_compatible");
+
+                if (provider === "azure") {
+                    $("#ai-baseurl-label").text("Azure Endpoint");
+                    $("#node-config-input-aiBaseUrl").attr("placeholder", "https://<resource>.openai.azure.com");
+                } else if (provider === "openai_compatible") {
+                    $("#ai-baseurl-label").text("API Base URL");
+                    $("#node-config-input-aiBaseUrl").attr("placeholder", "https://openrouter.ai/api/v1");
+                } else {
+                    $("#ai-baseurl-label").text("Ollama URL");
+                    $("#node-config-input-aiBaseUrl").attr("placeholder", "http://localhost:11434");
+                }
 
                 if (provider === "openai" && !$("#node-config-input-aiModel").val()) {
                     $("#node-config-input-aiModel").attr("placeholder", "e.g. gpt-4o-mini");
@@ -98,6 +108,8 @@
                     $("#node-config-input-aiModel").attr("placeholder", "e.g. llama3.2");
                 } else if (provider === "azure" && !$("#node-config-input-aiModel").val()) {
                     $("#node-config-input-aiModel").attr("placeholder", "Deployment name");
+                } else if (provider === "openai_compatible" && !$("#node-config-input-aiModel").val()) {
+                    $("#node-config-input-aiModel").attr("placeholder", "e.g. llama-3.3-70b-versatile");
                 }
 
                 if (provider === "ollama" && !$("#node-config-input-aiBaseUrl").val()) {
@@ -253,6 +265,7 @@
                 <select id="node-config-input-aiProvider" style="width: 70%;">
                     <option value="none">Disabled (no AI)</option>
                     <option value="openai">OpenAI (GPT)</option>
+                    <option value="openai_compatible">OpenAI-compatible (OpenRouter, Groq, ...)</option>
                     <option value="ollama">Ollama (local)</option>
                     <option value="azure">Azure OpenAI</option>
                 </select>
@@ -297,7 +310,7 @@
                 <div class="form-row" style="margin-top: 10px; padding: 10px; background-color: #fff3cd; border: 1px solid #ffeaa7; border-radius: 4px;">
                     <div style="color: #856404; font-size: 12px;">
                         <i class="fa fa-exclamation-triangle" style="color: #f39c12; margin-right: 5px;"></i>
-                        <strong>Privacy:</strong> When using a cloud provider (OpenAI, Azure), ioBroker state IDs, names
+                        <strong>Privacy:</strong> When using a cloud provider (OpenAI, Azure, OpenAI-compatible), ioBroker state IDs, names
                         and values will be sent to external servers. Use <strong>Ollama</strong> for fully local processing.
                     </div>
                 </div>
@@ -329,6 +342,7 @@
     <p>Optional AI integration for the <code>iob-ai</code> node. Supported providers:</p>
     <ul>
         <li><b>OpenAI:</b> Requires an API key. Recommended model: <code>gpt-4o-mini</code>.</li>
+        <li><b>OpenAI-compatible:</b> Requires API base URL and API key (e.g. OpenRouter, Groq).</li>
         <li><b>Ollama (local):</b> Fully local, no API key required. Recommended model: <code>llama3.2</code>.</li>
         <li><b>Azure OpenAI:</b> Requires endpoint URL and API key.</li>
     </ul>
