@@ -272,7 +272,36 @@ function setupAIEndpoints(RED) {
     if (aiEndpointSetup) return;
     aiEndpointSetup = true;
 
-    // Test-endpoint for LLM connectivity (used by config editor)
+    // Test using stored credentials (node already saved – preferred path)
+    RED.httpAdmin.get('/iobroker/ai/test/:nodeId', async (req, res) => {
+        try {
+            const nodeId     = req.params.nodeId;
+            const configNode = RED.nodes.getNode(nodeId);
+
+            if (!configNode) {
+                return res.status(404).json({ ok: false, error: 'Config node not found. Save the configuration first.' });
+            }
+
+            const { aiProvider: provider, aiModel: model, aiBaseUrl: baseUrl,
+                    aiApiKey: apiKey, aiMaxTokens: maxTokens,
+                    aiTemperature: temperature, aiAllowInsecureTls: allowInsecureTls } = configNode;
+
+            if (!provider || provider === 'none' || !model) {
+                return res.status(400).json({ ok: false, error: 'AI provider not configured on this node.' });
+            }
+
+            const { LLMClient } = require('../lib/ai/llm-client');
+            const client = new LLMClient({ provider, model, baseUrl, apiKey,
+                maxTokens: 10, temperature: 0, allowInsecureTls });
+            const response = await client.chat([{ role: 'user', content: 'ping' }]);
+            res.json({ ok: true, model: response.model || model });
+        } catch (error) {
+            new Logger('iob-config').warn(`AI test (stored) failed: ${error.message}`);
+            res.status(200).json({ ok: false, error: error.message });
+        }
+    });
+
+    // Test using values from the editor (node not yet saved – fallback path)
     RED.httpAdmin.post('/iobroker/ai/test', async (req, res) => {
         try {
             const { provider, model, baseUrl, apiKey, allowInsecureTls } = req.body || {};
@@ -281,20 +310,20 @@ function setupAIEndpoints(RED) {
                 return res.status(400).json({ ok: false, error: 'provider and model are required' });
             }
 
+            if (!apiKey) {
+                return res.status(400).json({ ok: false, error: 'API key is required. Save the node first so the key can be read securely, or enter it in the field above.' });
+            }
+
             const { LLMClient } = require('../lib/ai/llm-client');
             const client = new LLMClient({
-                provider,
-                model,
-                baseUrl,
-                apiKey,
-                maxTokens: 10,
-                temperature: 0,
+                provider, model, baseUrl, apiKey,
+                maxTokens: 10, temperature: 0,
                 allowInsecureTls: allowInsecureTls === true
             });
             const response = await client.chat([{ role: 'user', content: 'ping' }]);
             res.json({ ok: true, model: response.model || model });
         } catch (error) {
-            new Logger('iob-config').warn(`AI test failed: ${error.message}`);
+            new Logger('iob-config').warn(`AI test (editor) failed: ${error.message}`);
             res.status(200).json({ ok: false, error: error.message });
         }
     });

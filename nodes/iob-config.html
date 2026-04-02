@@ -108,6 +108,11 @@
             $("#node-config-input-aiProvider").on('change', updateAIFields);
             updateAIFields();
 
+            // Show placeholder when API key is already stored (password fields are never echoed back)
+            if (node.credentials && node.credentials.has_aiApiKey) {
+                $("#node-config-input-aiApiKey").attr("placeholder", "API key stored – leave blank to keep");
+            }
+
             // Test connection button
             $("#ai-test-btn").on('click', function () {
                 var provider = $("#node-config-input-aiProvider").val();
@@ -124,22 +129,51 @@
 
                 statusEl.text("Testing connection…").css("color", "#666").show();
 
-                $.ajax({
-                    url: "/iobroker/ai/test",
-                    method: "POST",
-                    contentType: "application/json",
-                    data: JSON.stringify({ provider, model, baseUrl, apiKey, allowInsecureTls }),
-                    success: function (data) {
-                        if (data.ok) {
-                            statusEl.text("✓ Connection successful – " + data.model).css("color", "#155724");
-                        } else {
-                            statusEl.text("✗ " + (data.error || "Unknown error")).css("color", "#721c24");
-                        }
-                    },
-                    error: function (xhr) {
-                        statusEl.text("✗ " + (xhr.responseJSON && xhr.responseJSON.error ? xhr.responseJSON.error : "Request failed")).css("color", "#721c24");
+                // Preferred: use stored credentials on the server (node already saved).
+                // This avoids the problem that password fields are empty after re-opening.
+                var nodeId = node.id;
+                if (nodeId && nodeId !== '__NEW__') {
+                    $.ajax({
+                        url: "/iobroker/ai/test/" + encodeURIComponent(nodeId),
+                        method: "GET",
+                        success: function (data) {
+                            if (data.ok) {
+                                statusEl.text("✓ Connection successful – " + data.model).css("color", "#155724");
+                            } else if (data.error && data.error.indexOf('not found') !== -1) {
+                                // Node not saved yet → fall back to editor values
+                                testWithEditorValues();
+                            } else {
+                                statusEl.text("✗ " + (data.error || "Unknown error")).css("color", "#721c24");
+                            }
+                        },
+                        error: function () { testWithEditorValues(); }
+                    });
+                } else {
+                    testWithEditorValues();
+                }
+
+                function testWithEditorValues() {
+                    if (!apiKey) {
+                        statusEl.html("✗ API key not available. <b>Save the configuration first</b>, then test again.").css("color", "#721c24").show();
+                        return;
                     }
-                });
+                    $.ajax({
+                        url: "/iobroker/ai/test",
+                        method: "POST",
+                        contentType: "application/json",
+                        data: JSON.stringify({ provider, model, baseUrl, apiKey, allowInsecureTls }),
+                        success: function (data) {
+                            if (data.ok) {
+                                statusEl.text("✓ Connection successful – " + data.model).css("color", "#155724");
+                            } else {
+                                statusEl.text("✗ " + (data.error || "Unknown error")).css("color", "#721c24");
+                            }
+                        },
+                        error: function (xhr) {
+                            statusEl.text("✗ " + (xhr.responseJSON && xhr.responseJSON.error ? xhr.responseJSON.error : "Request failed")).css("color", "#721c24");
+                        }
+                    });
+                }
             });
         }
     });
