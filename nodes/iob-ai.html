@@ -1,7 +1,7 @@
 <script type="text/javascript">
     RED.nodes.registerType('iob-ai', {
-        category:    'ioBroker',
-        color:       '#a3d9f5',
+        category:    'ioBroker WS',
+        color:       '#a6bbcf',
         icon:        'iobroker_ai.svg',
         paletteLabel: 'iob ai',
         inputs:      1,
@@ -22,6 +22,8 @@
         },
         oneditprepare: function () {
             var node = this;
+            var serverInput = $('#node-input-server');
+            window.ioBrokerEditorUtils.autoSelectSingleServerConfig(RED, node, serverInput);
 
             // Mode → show/hide mode-specific options
             function updateModeFields() {

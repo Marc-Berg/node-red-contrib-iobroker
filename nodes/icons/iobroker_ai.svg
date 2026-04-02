@@ -39,37 +39,18 @@
    </g>
 </g>
 
-<!-- AI neural network badge (centered, lower area) -->
-<g transform="translate(324, 520)">
-  <!-- Purple background pill -->
-  <rect x="-165" y="-78" width="330" height="156" rx="22" ry="22" class="st3"/>
-
-  <!-- Neural network: connections (drawn first, behind nodes) -->
-  <!-- Input → Hidden left -->
-  <line x1="-100" y1="-42" x2="-14" y2="-26" stroke="white" stroke-width="6" stroke-opacity="0.85"/>
-  <line x1="-100" y1="-42" x2="-14" y2="26"  stroke="white" stroke-width="6" stroke-opacity="0.85"/>
-  <line x1="-100" y1="0"   x2="-14" y2="-26" stroke="white" stroke-width="6" stroke-opacity="0.85"/>
-  <line x1="-100" y1="0"   x2="-14" y2="26"  stroke="white" stroke-width="6" stroke-opacity="0.85"/>
-  <line x1="-100" y1="42"  x2="-14" y2="-26" stroke="white" stroke-width="6" stroke-opacity="0.85"/>
-  <line x1="-100" y1="42"  x2="-14" y2="26"  stroke="white" stroke-width="6" stroke-opacity="0.85"/>
-  <!-- Hidden → Output -->
-  <line x1="-14" y1="-26" x2="100" y2="0"    stroke="white" stroke-width="6" stroke-opacity="0.85"/>
-  <line x1="-14" y1="26"  x2="100" y2="0"    stroke="white" stroke-width="6" stroke-opacity="0.85"/>
-
-  <!-- Input layer nodes (3) -->
-  <circle cx="-100" cy="-42" r="18" fill="white"/>
-  <circle cx="-100" cy="0"   r="18" fill="white"/>
-  <circle cx="-100" cy="42"  r="18" fill="white"/>
-
-  <!-- Hidden layer nodes (2) -->
-  <circle cx="-14" cy="-26" r="18" fill="white"/>
-  <circle cx="-14" cy="26"  r="18" fill="white"/>
-
-  <!-- Output node (1) -->
-  <circle cx="100" cy="0" r="22" fill="white"/>
-
-  <!-- Spark / highlight dot inside output node to indicate AI -->
-  <circle cx="100" cy="0" r="10" fill="#5b2d8e"/>
+<!-- Simple, large AI badge for palette readability -->
+<g>
+   <rect x="142" y="432" width="364" height="154" rx="24" ry="24" class="st3"/>
+   <text
+      x="324"
+      y="544"
+      text-anchor="middle"
+      font-family="Arial, Helvetica, sans-serif"
+      font-size="140"
+      font-weight="700"
+      fill="#ffffff"
+      letter-spacing="2">AI</text>
 </g>
 
 </svg>
