@@ -11,6 +11,7 @@
             server:           { value: "", type: "iob-config", required: true },
             mode:             { value: "analyze" },
             historyAdapter:   { value: "" },
+            auditPattern:     { value: "*" },
             anomalyThreshold: { value: 2.5 },
             outputProperty:   { value: "payload" }
         },
@@ -36,6 +37,7 @@
                     analyze:   "Expects: <code>msg.payload</code> = time-series array from <b>iob-history</b>.",
                     anomaly:   "Expects: <code>msg.payload</code> = time-series array from <b>iob-history</b>. Detects statistical outliers.",
                     discover:  "Expects: <code>msg.objects</code> (or <code>msg.payload</code>) from <b>iob-getobject</b>. Returns only historised states.",
+                    "history-audit": "Expects <code>msg.objects</code> from <b>iob-getobject</b>, or auto-fetches all states from server when input is missing.",
                     query:     "Expects: <code>msg.payload</code> = natural-language question. Returns query params for <b>iob-history</b>.",
                     summarize: "Expects: <code>msg.payload</code> = array of <code>{id, name, val, unit}</code> or <code>msg.states</code> object."
                 };
@@ -74,6 +76,7 @@
             <option value="analyze">analyze – time-series insight</option>
             <option value="anomaly">anomaly – detect outliers</option>
             <option value="discover">discover – find historised states</option>
+            <option value="history-audit">history-audit – find important states without history</option>
             <option value="query">query – natural language → history params</option>
             <option value="summarize">summarize – plain-language home status</option>
         </select>
@@ -85,11 +88,16 @@
     </div>
 
     <!-- Discover: optional adapter filter -->
-    <div class="form-row iob-ai-mode-field iob-ai-mode-discover" style="display:none;">
+    <div class="form-row iob-ai-mode-field iob-ai-mode-discover iob-ai-mode-history-audit" style="display:none;">
         <label for="node-input-historyAdapter"><i class="fa fa-database"></i> History Adapter</label>
         <input type="text" id="node-input-historyAdapter" style="width: 60%;" placeholder="e.g. history.0 (empty = any)">
     </div>
 
+    <!-- History audit: optional pattern and adapter filter -->
+    <div class="form-row iob-ai-mode-field iob-ai-mode-history-audit" style="display:none;">
+        <label for="node-input-auditPattern"><i class="fa fa-filter"></i> Pattern</label>
+        <input type="text" id="node-input-auditPattern" style="width: 60%;" placeholder="e.g. * or mqtt.0.z2m.*">
+    </div>
     <!-- Anomaly: threshold -->
     <div class="form-row iob-ai-mode-field iob-ai-mode-anomaly" style="display:none;">
         <label for="node-input-anomalyThreshold"><i class="fa fa-exclamation-triangle"></i> Threshold (σ)</label>
@@ -121,6 +129,11 @@
         <dd>Requires <code>msg.objects</code> (or <code>msg.payload</code>) from <b>iob-getobject</b>.
         Returns only those states that have active history recording (<code>common.custom.[adapter].enabled == true</code>),
         enriched with room/function enum assignments.</dd>
+
+        <dt>history-audit</dt>
+        <dd>Audits states for missing history. Uses <code>msg.objects</code>/<code>msg.payload</code> when provided.
+        If no input is provided, it scans server states using <code>pattern</code> (default <code>*</code>).
+        Returns prioritized lists: <code>critical</code>, <code>recommended</code>, <code>optional</code>.</dd>
 
         <dt>query</dt>
         <dd>Requires <code>msg.payload</code> = natural-language question (e.g. "How much energy did we use last week?").

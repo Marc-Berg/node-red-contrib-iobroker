@@ -20,6 +20,7 @@
 
 const { NodeHelpers } = require('../lib/utils/node-helpers');
 const { LLMClient }   = require('../lib/ai/llm-client');
+const connectionManager = require('../lib/manager/websocket-manager');
 
 // ── System prompts ────────────────────────────────────────────────────────────
 
@@ -71,6 +72,62 @@ function findAnomalies(dataPoints, threshold = 2.5) {
         .map(p => ({ ts: p.ts, val: p.val, deviation: +((p.val - mean) / stddev).toFixed(2) }));
 }
 
+function getLLMConfigInfo(llm) {
+    const provider = llm?.provider || 'none';
+    const model = llm?.model || '';
+    const hasApiKey = !!llm?.apiKey;
+    const hasBaseUrl = !!llm?.baseUrl;
+
+    let reason = 'configured';
+    if (provider === 'none' || !provider) {
+        reason = 'provider-none';
+    } else if (!model) {
+        reason = 'model-missing';
+    } else if ((provider === 'openai' || provider === 'azure' || provider === 'openai_compatible') && !hasApiKey) {
+        reason = 'api-key-missing';
+    } else if ((provider === 'azure' || provider === 'ollama' || provider === 'openai_compatible') && !hasBaseUrl) {
+        reason = 'base-url-missing';
+    }
+
+    return {
+        llmConfigured: llm && typeof llm.isConfigured === 'function' ? llm.isConfigured() : false,
+        llmProvider: provider,
+        llmModel: model,
+        llmReason: reason
+    };
+}
+
+async function ensureServerConnection(settings) {
+    const { serverId, globalConfig, nodeId } = settings;
+
+    if (!serverId || !globalConfig) {
+        throw new Error('Missing server configuration for connection setup');
+    }
+
+    const status = connectionManager.getConnectionStatus(serverId);
+    if (status?.ready) {
+        return;
+    }
+
+    const eventCallback = {
+        updateStatus: function () {},
+        onReconnect: function () {},
+        onDisconnect: function () {}
+    };
+
+    await connectionManager.registerForEvents(nodeId, serverId, eventCallback, globalConfig);
+
+    for (let attempt = 0; attempt < 10; attempt += 1) {
+        const nextStatus = connectionManager.getConnectionStatus(serverId);
+        if (nextStatus?.ready) {
+            return;
+        }
+        await new Promise(resolve => setTimeout(resolve, 200));
+    }
+
+    throw new Error(`Connection not ready for ${globalConfig.iobhost}:${globalConfig.iobport}`);
+}
+
 // ── Mode implementations ──────────────────────────────────────────────────────
 
 async function modeAnalyze(msg, settings, llm) {
@@ -87,10 +144,12 @@ async function modeAnalyze(msg, settings, llm) {
         const numeric = sample.filter(p => typeof p.val === 'number');
         const vals    = numeric.map(p => p.val);
         const { mean, stddev } = calcStats(vals);
+        const llmInfo = getLLMConfigInfo(llm);
         return {
             mode: 'analyze',
             stateId,
             llmUsed: false,
+            ...llmInfo,
             summary: `${stateId}: ${vals.length} numeric data points. Mean: ${mean.toFixed(2)}, StdDev: ${stddev.toFixed(2)}.`,
             trend: null,
             min: vals.length ? Math.min(...vals) : null,
@@ -123,11 +182,11 @@ async function modeAnomaly(msg, settings, llm) {
     const anomalies = findAnomalies(data, threshold);
 
     if (!anomalies.length) {
-        return { mode: 'anomaly', stateId, anomaliesFound: false, anomalies: [], llmUsed: false };
+        return { mode: 'anomaly', stateId, anomaliesFound: false, anomalies: [], llmUsed: false, ...getLLMConfigInfo(llm) };
     }
 
     if (!llm.isConfigured()) {
-        return { mode: 'anomaly', stateId, anomaliesFound: true, anomalies, llmUsed: false };
+        return { mode: 'anomaly', stateId, anomaliesFound: true, anomalies, llmUsed: false, ...getLLMConfigInfo(llm) };
     }
 
     const prompt   = `State: ${stateId}\nOutliers:\n${JSON.stringify(anomalies)}`;
@@ -150,16 +209,36 @@ function modeDiscover(msg, settings) {
     const historyAdapter = msg.historyAdapter || settings.historyAdapter || null;
 
     const result = [];
+    const diagnostics = {
+        totalEntries: 0,
+        nonStateObjects: 0,
+        missingId: 0,
+        missingCustomConfig: 0,
+        noActiveHistoryAdapter: 0,
+        historyAdapterFilteredOut: 0,
+        matchedStates: 0
+    };
 
     for (const [entryKey, obj] of Object.entries(objects)) {
-        if (!obj || obj.type !== 'state') continue;
+        diagnostics.totalEntries += 1;
+
+        if (!obj || obj.type !== 'state') {
+            diagnostics.nonStateObjects += 1;
+            continue;
+        }
 
         // Support both object-map and array payloads from iob-getobject.
         const id = obj._id || obj.id || entryKey;
-        if (!id || typeof id !== 'string') continue;
+        if (!id || typeof id !== 'string') {
+            diagnostics.missingId += 1;
+            continue;
+        }
 
         const custom = obj.common?.custom;
-        if (!custom || typeof custom !== 'object') continue;
+        if (!custom || typeof custom !== 'object') {
+            diagnostics.missingCustomConfig += 1;
+            continue;
+        }
 
         // Find all history adapters active on this state
         const activeAdapters = Object.entries(custom)
@@ -169,10 +248,16 @@ function modeDiscover(msg, settings) {
             })
             .map(([key]) => key);
 
-        if (!activeAdapters.length) continue;
+        if (!activeAdapters.length) {
+            diagnostics.noActiveHistoryAdapter += 1;
+            continue;
+        }
 
         // Optionally filter to a specific adapter
-        if (historyAdapter && !activeAdapters.includes(historyAdapter)) continue;
+        if (historyAdapter && !activeAdapters.includes(historyAdapter)) {
+            diagnostics.historyAdapterFilteredOut += 1;
+            continue;
+        }
 
         result.push({
             id,
@@ -185,13 +270,226 @@ function modeDiscover(msg, settings) {
             rooms:     obj.enumAssignments?.rooms?.map(r => r.name) || [],
             functions: obj.enumAssignments?.functions?.map(f => f.name) || []
         });
+
+        diagnostics.matchedStates += 1;
     }
 
     return {
         mode:    'discover',
         count:   result.length,
         states:  result,
+        diagnostics,
         llmUsed: false
+    };
+}
+
+function hasActiveHistory(custom, historyAdapter) {
+    if (!custom || typeof custom !== 'object') {
+        return { active: false, adapters: [] };
+    }
+
+    const activeAdapters = Object.entries(custom)
+        .filter(([key, val]) => {
+            const isHistoryAdapter = /^(history|sql|influxdb)\.\d+$/.test(key);
+            return isHistoryAdapter && val && val.enabled === true;
+        })
+        .map(([key]) => key);
+
+    if (!activeAdapters.length) {
+        return { active: false, adapters: [] };
+    }
+
+    if (historyAdapter && !activeAdapters.includes(historyAdapter)) {
+        return { active: false, adapters: activeAdapters };
+    }
+
+    return { active: true, adapters: activeAdapters };
+}
+
+function classifyStateImportance(obj, id) {
+    const type = obj?.common?.type || '';
+    const role = (obj?.common?.role || '').toLowerCase();
+    const unit = (obj?.common?.unit || '').toLowerCase();
+    const read = obj?.common?.read !== false;
+
+    if (!id || !role) {
+        return { level: 'optional', score: 0, reason: 'insufficient metadata' };
+    }
+
+    const roleText = `${id} ${role}`;
+
+    if (!read) {
+        return { level: 'optional', score: 1, reason: 'write-only state' };
+    }
+
+    const criticalPattern = /alarm|alert|siren|panic|smoke|fire|co(?:\b|2)|gas|leak|flood|water\.alarm|tamper|intrusion|security|lock(?:\.|$)|fault|error|battery\.low|unreachable|offline/;
+    const recommendedPattern = /temperature|humidity|energy|power|consumption|voltage|current|co2|presence|motion|window|door|battery|rain|wind|weather|switch|light|dimmer|level|setpoint|target|heating|thermostat|scene|mode/;
+    const configLikePattern = /notification|delay|timeout|threshold|sensitivity|interval|duration|debounce|hysteresis|calibration|offset|setting|config|parameter|alarm_?delay|start_?alarm|notification_?start|notification_?end/;
+
+    if (configLikePattern.test(roleText)) {
+        return { level: 'optional', score: 1, reason: 'configuration/tuning parameter' };
+    }
+
+    if (
+        criticalPattern.test(roleText)
+    ) {
+        return { level: 'critical', score: 3, reason: 'safety, security or fault indicator' };
+    }
+
+    if (
+        recommendedPattern.test(roleText) ||
+        ['°c', '°f', '%', 'w', 'kw', 'kwh', 'v', 'a', 'ppm', 'lux', 'bar'].includes(unit) ||
+        type === 'boolean' || type === 'number'
+    ) {
+        return { level: 'recommended', score: 2, reason: 'telemetry or operational state useful for analysis' };
+    }
+
+    return { level: 'optional', score: 1, reason: 'low analytical value by default' };
+}
+
+async function modeHistoryAudit(msg, settings) {
+    const historyAdapter = msg.historyAdapter || settings.historyAdapter || null;
+    const pattern = typeof msg.pattern === 'string' && msg.pattern.trim() ? msg.pattern.trim() : (settings.auditPattern || '*');
+
+    const hasObjectMap = msg.objects && typeof msg.objects === 'object';
+    const hasObjectPayload = msg.payload && typeof msg.payload === 'object';
+
+    let objects = hasObjectMap ? msg.objects : (hasObjectPayload ? msg.payload : null);
+    let source = hasObjectMap ? 'msg.objects' : (hasObjectPayload ? 'msg.payload' : 'server');
+
+    if (!objects) {
+        try {
+            await ensureServerConnection(settings);
+            const fetched = await connectionManager.getObjects(settings.serverId, pattern, 'state');
+            if (Array.isArray(fetched)) {
+                objects = {};
+                for (const obj of fetched) {
+                    if (obj && obj._id) {
+                        objects[obj._id] = obj;
+                    }
+                }
+            } else {
+                objects = fetched || {};
+            }
+            source = 'server';
+        } catch (error) {
+            return {
+                mode: 'history-audit',
+                error: `No objects in msg and fetch failed: ${error.message}`,
+                hint: 'Provide msg.objects from iob-getobject or ensure server connection is ready.',
+                llmUsed: false
+            };
+        }
+    }
+
+    if (!objects || typeof objects !== 'object') {
+        return {
+            mode: 'history-audit',
+            error: 'Expected msg.objects/msg.payload object map or array of state objects',
+            llmUsed: false
+        };
+    }
+
+    const entries = Array.isArray(objects)
+        ? objects.map(obj => [obj?._id || obj?.id || '', obj])
+        : Object.entries(objects);
+
+    const criticalMissing = [];
+    const recommendedMissing = [];
+    const optionalMissing = [];
+    const alreadyHistorized = [];
+
+    const diagnostics = {
+        totalEntries: 0,
+        nonStateObjects: 0,
+        missingId: 0,
+        missingCommon: 0,
+        historized: 0,
+        missingHistory: 0,
+        criticalMissing: 0,
+        recommendedMissing: 0,
+        optionalMissing: 0
+    };
+
+    for (const [entryKey, obj] of entries) {
+        diagnostics.totalEntries += 1;
+
+        if (!obj || obj.type !== 'state') {
+            diagnostics.nonStateObjects += 1;
+            continue;
+        }
+
+        const id = obj._id || obj.id || entryKey;
+        if (!id || typeof id !== 'string') {
+            diagnostics.missingId += 1;
+            continue;
+        }
+
+        if (!obj.common || typeof obj.common !== 'object') {
+            diagnostics.missingCommon += 1;
+            continue;
+        }
+
+        const history = hasActiveHistory(obj.common.custom, historyAdapter);
+        const importance = classifyStateImportance(obj, id);
+
+        const stateItem = {
+            id,
+            name: obj.common.name || id,
+            role: obj.common.role || '',
+            type: obj.common.type || 'mixed',
+            unit: obj.common.unit || '',
+            importance: importance.level,
+            reason: importance.reason,
+            adapters: history.adapters
+        };
+
+        if (history.active) {
+            diagnostics.historized += 1;
+            alreadyHistorized.push(stateItem);
+            continue;
+        }
+
+        diagnostics.missingHistory += 1;
+
+        if (importance.level === 'critical') {
+            diagnostics.criticalMissing += 1;
+            criticalMissing.push(stateItem);
+        } else if (importance.level === 'recommended') {
+            diagnostics.recommendedMissing += 1;
+            recommendedMissing.push(stateItem);
+        } else {
+            diagnostics.optionalMissing += 1;
+            optionalMissing.push(stateItem);
+        }
+    }
+
+    const byName = (a, b) => a.id.localeCompare(b.id);
+    criticalMissing.sort(byName);
+    recommendedMissing.sort(byName);
+    optionalMissing.sort(byName);
+
+    return {
+        mode: 'history-audit',
+        llmUsed: false,
+        source,
+        pattern,
+        historyAdapter: historyAdapter || null,
+        summary: {
+            totalStates: diagnostics.totalEntries - diagnostics.nonStateObjects,
+            historized: diagnostics.historized,
+            missingHistory: diagnostics.missingHistory,
+            criticalMissing: diagnostics.criticalMissing,
+            recommendedMissing: diagnostics.recommendedMissing,
+            optionalMissing: diagnostics.optionalMissing
+        },
+        missingHistory: {
+            critical: criticalMissing,
+            recommended: recommendedMissing,
+            optional: optionalMissing
+        },
+        alreadyHistorizedCount: alreadyHistorized.length,
+        diagnostics
     };
 }
 
@@ -326,14 +624,17 @@ module.exports = function (RED) {
         // Resolve iob-config node
         const serverConfig = NodeHelpers.validateServerConfig(RED, config, setError);
         if (!serverConfig) return;
-        const { globalConfig } = serverConfig;
+        const { globalConfig, serverId } = serverConfig;
 
         const settings = {
             mode:             config.mode             || 'analyze',
             historyAdapter:   config.historyAdapter   || '',
+            auditPattern:     config.auditPattern     || '*',
             anomalyThreshold: parseFloat(config.anomalyThreshold) || 2.5,
             outputProperty:   config.outputProperty?.trim() || 'payload',
-            nodeId:           node.id
+            nodeId:           node.id,
+            serverId,
+            globalConfig
         };
 
         // Build LLM client from config-node credentials
@@ -373,6 +674,9 @@ module.exports = function (RED) {
                     case 'discover':
                         result = modeDiscover(msg, settings);
                         break;
+                    case 'history-audit':
+                        result = await modeHistoryAudit(msg, settings);
+                        break;
                     case 'query':
                         result = await modeQuery(msg, settings, llm);
                         break;
@@ -386,9 +690,14 @@ module.exports = function (RED) {
                 if (result.error) {
                     setStatus('yellow', 'ring', result.error.slice(0, 50));
                 } else {
-                    const statusText = result.llmUsed
-                        ? `✓ ${mode} (${result.usage?.total_tokens || '?'} tokens)`
-                        : `✓ ${mode}`;
+                    let statusText;
+                    if (result.llmUsed) {
+                        statusText = `✓ ${mode} (${result.usage?.total_tokens || '?'} tokens)`;
+                    } else if (result.llmConfigured === false) {
+                        statusText = `✓ ${mode} (local: ${result.llmReason || 'llm-not-configured'})`;
+                    } else {
+                        statusText = `✓ ${mode}`;
+                    }
                     setStatus('green', 'dot', statusText);
                 }
 
