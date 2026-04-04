@@ -4,7 +4,11 @@
 
 ### **Changed**
 - Refactored editor-side auto-selection of single `iob-config` into a shared helper (`window.ioBrokerEditorUtils.autoSelectSingleServerConfig`) used by all affected nodes
-- Unified auto-selection notification text across node editors
+- Extended profile auto-selection so the only existing `iob-config` is still selected automatically, while multiple profiles now use the one marked as default
+- Unified auto-selection notification text across node editors and distinguish between single-profile and default-profile selection
+
+### **Added**
+- Added a `Use as default profile` option to `iob-config` so one profile can be chosen for automatic selection when multiple profiles exist
 
 ## [1.3.4] - 2026-04-01
 

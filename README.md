@@ -106,10 +106,13 @@ The diagram shows the recommended architecture with a dedicated Admin adapter in
 - **Host**: IP address (e.g., 192.168.1.100) or hostname (e.g., iobroker.local)
 - **Port**: Your dedicated Admin instance port (e.g., 8091)
 - **Use SSL**: Enable for HTTPS/WSS connections
+- **Default profile**: If multiple iob-config profiles exist, mark one as default for automatic selection in the editor
 
 **Authentication Settings:**
 - **No Authentication** (default): Leave username/password empty
 - **OAuth2**: Enter valid ioBroker username/password
+
+If only one iob-config profile exists, it is selected automatically. If multiple profiles exist, only the profile marked as default is selected automatically.
 
 ### Alternative Adapter Options
 

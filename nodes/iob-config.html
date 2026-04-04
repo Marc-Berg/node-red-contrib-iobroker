@@ -12,15 +12,39 @@
             }
         });
 
-        if (configNodes.length !== 1) {
+        if (!configNodes.length) {
             return false;
         }
 
-        node.server = configNodes[0].id;
+        var selectedConfig = null;
+
+        if (configNodes.length === 1) {
+            selectedConfig = configNodes[0];
+        } else {
+            var defaultConfigs = configNodes.filter(function (config) {
+                return !!config.isDefault;
+            });
+
+            if (defaultConfigs.length === 1) {
+                selectedConfig = defaultConfigs[0];
+            } else if (defaultConfigs.length > 1) {
+                selectedConfig = defaultConfigs[0];
+            }
+        }
+
+        if (!selectedConfig) {
+            return false;
+        }
+
+        node.server = selectedConfig.id;
         serverInput.val(node.server);
 
         setTimeout(function () {
-            RED.notify('Automatically selected server: ' + (configNodes[0].name || configNodes[0].iobhost), {
+            var messagePrefix = configNodes.length === 1
+                ? 'Automatically selected the only server profile: '
+                : 'Automatically selected the default server profile: ';
+
+            RED.notify(messagePrefix + (selectedConfig.name || selectedConfig.iobhost), {
                 type: 'info',
                 timeout: 1500
             });
@@ -35,7 +59,8 @@
             name: { value: "config1", required: true },
             iobhost: { value: "iobroker.local", required: true },
             iobport: { value: 8082, required: true, validate: RED.validators.number() },
-            usessl: { value: false }
+            usessl: { value: false },
+            isDefault: { value: false }
         },
         credentials: {
             user: { type: "text" },
@@ -84,6 +109,19 @@
             $("#node-config-input-usessl").on('change', function () {
                 updateSSLInfo();
             });
+        },
+        oneditsave: function () {
+            if (!this.isDefault) {
+                return;
+            }
+
+            var currentNodeId = this.id;
+
+            RED.nodes.eachConfig(function (config) {
+                if (config.type === 'iob-config' && config.id !== currentNodeId && config.isDefault) {
+                    config.isDefault = false;
+                }
+            });
         }
     });
 </script>
@@ -114,6 +152,12 @@
     <div class="form-row">
         <label for="node-config-input-password"><i class="fa fa-lock"></i> Password</label>
         <input type="password" id="node-config-input-password" placeholder="Optional">
+    </div>
+    <div class="form-row">
+        <label for="node-config-input-isDefault" style="width: auto;">
+            <input type="checkbox" id="node-config-input-isDefault" style="width: auto; margin-right: 5px;">
+            <i class="fa fa-star"></i> Use as default profile
+        </label>
     </div>
     
     <!-- SSL Information -->
@@ -149,8 +193,10 @@
         <li><b>ioBroker Host/Port:</b> Address and port of your ioBroker server.</li>
         <li><b>Use SSL/TLS:</b> Enable encrypted communication (HTTPS/WSS).</li>
         <li><b>Username/Password:</b> Optional. Only required if the ioBroker adapter requires authentication.</li>
+        <li><b>Use as default profile:</b> Automatically selected when multiple profiles are available.</li>
     </ul>
     <p>The authentication credentials are automatically used by all connected nodes.</p>
+    <p>If only one profile exists, it is still selected automatically.</p>
     
     <h3>SSL/TLS Support</h3>
     <p>When SSL/TLS is enabled:</p>
