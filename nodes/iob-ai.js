@@ -546,6 +546,278 @@ function normalizeQueryForHistory(query) {
     return normalized;
 }
 
+function wildcardToRegExp(pattern) {
+    const escaped = String(pattern || '')
+        .replace(/[.+^${}()|[\]\\]/g, '\\$&')
+        .replace(/\*/g, '.*')
+        .replace(/\?/g, '.');
+    return new RegExp(`^${escaped}$`, 'i');
+}
+
+function extractStateIdsFromObjects(objects) {
+    if (!objects || typeof objects !== 'object') return [];
+
+    const entries = Array.isArray(objects)
+        ? objects.map(obj => [obj?._id || obj?.id || '', obj])
+        : Object.entries(objects);
+
+    const ids = [];
+    for (const [entryKey, obj] of entries) {
+        if (!obj || obj.type !== 'state') continue;
+        const id = obj._id || obj.id || entryKey;
+        if (typeof id === 'string' && id) ids.push(id);
+    }
+    return ids;
+}
+
+function uniqueSortedIds(ids) {
+    return Array.from(new Set((ids || []).filter(Boolean))).sort((a, b) => a.localeCompare(b));
+}
+
+function normalizeStateCandidatesFromFetchedObjects(fetched) {
+    if (!fetched) return [];
+
+    if (Array.isArray(fetched)) {
+        const result = fetched
+            .map(item => ({ id: item?._id || item?.id || null, obj: item }))
+            .filter(entry => typeof entry.id === 'string' && entry.id);
+        return result;
+    }
+
+    if (typeof fetched === 'object') {
+        const entries = Object.entries(fetched);
+        const result = entries
+            .map(([key, value]) => {
+                if (value && typeof value === 'object' && value.type === 'state') {
+                    return { id: value._id || value.id || key, obj: value };
+                }
+                if (typeof key === 'string' && key.includes('.')) {
+                    return { id: key, obj: (value && typeof value === 'object') ? value : null };
+                }
+                return null;
+            })
+            .filter(Boolean)
+            .filter(entry => typeof entry.id === 'string' && entry.id);
+
+        return result;
+    }
+
+    return [];
+}
+
+function uniqueCandidates(candidates) {
+    const map = new Map();
+    for (const entry of (candidates || [])) {
+        if (!entry || typeof entry.id !== 'string' || !entry.id) continue;
+        if (!map.has(entry.id)) {
+            map.set(entry.id, { id: entry.id, obj: entry.obj || null });
+        }
+    }
+    return Array.from(map.values()).sort((a, b) => a.id.localeCompare(b.id));
+}
+
+function candidateIds(candidates) {
+    return (candidates || []).map(entry => entry.id);
+}
+
+function hasAnyHistoryEnabled(obj) {
+    const custom = obj?.common?.custom;
+    if (!custom || typeof custom !== 'object') return false;
+
+    return Object.entries(custom).some(([adapter, cfg]) => /^(history|sql|influxdb)\.\d+$/.test(adapter) && cfg && cfg.enabled === true);
+}
+
+function tokenizeForSimilarity(value) {
+    return String(value || '')
+        .toLowerCase()
+        .split(/[^a-z0-9]+/)
+        .filter(token => token.length >= 2);
+}
+
+function scoreStateIdCandidate(candidateEntry, intentText, queryPattern) {
+    const candidateId = typeof candidateEntry === 'string' ? candidateEntry : candidateEntry?.id;
+    const obj = typeof candidateEntry === 'string' ? null : candidateEntry?.obj;
+    const candidate = String(candidateId || '').toLowerCase();
+    if (!candidate) return 0;
+
+    const intentTokens = tokenizeForSimilarity(intentText);
+    const patternTokens = tokenizeForSimilarity(queryPattern);
+    const tokens = uniqueSortedIds(intentTokens.concat(patternTokens));
+    const role = String(obj?.common?.role || '').toLowerCase();
+    const unit = String(obj?.common?.unit || '').toLowerCase();
+    const type = String(obj?.common?.type || '').toLowerCase();
+    const notesText = `${intentText} ${queryPattern}`.toLowerCase();
+    const wantsRecordedSeries = /recorded|history|histor|average|avg|mean|january|february|march|april|may|june|july|august|september|october|november|december|last|past|week|month|year/.test(notesText);
+    const wantsTemperature = /temperature|temp|celsius|°c/.test(notesText);
+    const wantsHumidity = /humidity|feuchte|humid/.test(notesText);
+    const wantsEnergy = /energy|consumption|verbrauch|kwh|power|leistung/.test(notesText);
+
+    let score = 0;
+    for (const token of tokens) {
+        if (!token) continue;
+        if (candidate === token) score += 20;
+        else if (candidate.endsWith(`.${token}`)) score += 12;
+        else if (candidate.includes(`.${token}.`)) score += 10;
+        else if (candidate.includes(token)) score += 6;
+    }
+
+    if (intentTokens.includes('temperature') || patternTokens.includes('temperature') || patternTokens.includes('temp')) {
+        if (/temperature|temp/.test(candidate)) score += 12;
+    }
+    if (intentTokens.includes('humidity') || patternTokens.includes('humidity')) {
+        if (/humidity|hum/.test(candidate)) score += 10;
+    }
+    if (intentTokens.includes('energy') || patternTokens.includes('energy') || patternTokens.includes('consumption')) {
+        if (/energy|consumption|kwh|power/.test(candidate)) score += 10;
+    }
+
+    if (wantsTemperature && /\.temperature(?:\.|$)/.test(candidate)) score += 14;
+    if (wantsTemperature && /temperaturemin|temperaturemax/.test(candidate)) score -= 8;
+    if (wantsTemperature && (unit === '°c' || unit === '°f' || /temperature/.test(role))) score += 10;
+
+    if (wantsHumidity && (/humidity|hum/.test(candidate) || unit === '%' || /humidity/.test(role))) score += 10;
+    if (wantsEnergy && (/energy|consumption|kwh|power/.test(candidate) || ['w', 'kw', 'kwh'].includes(unit))) score += 10;
+
+    if (wantsRecordedSeries && hasAnyHistoryEnabled(obj)) score += 18;
+    if (wantsRecordedSeries && /openweathermap|forecast/.test(candidate) && !hasAnyHistoryEnabled(obj)) score -= 10;
+
+    if (/^0_userdata\./.test(candidate)) score -= 12;
+    if (/profiles?\.|periods?\.|schedule|calendar|abfallkalender|example_state|test\b/.test(candidate)) score -= 14;
+    if (/setpoint|target|desired|soll/.test(candidate)) score -= 10;
+    if (/sensor/.test(candidate) && /temperature/.test(candidate)) score += 4;
+    if (/\.temperature$/.test(candidate)) score += 6;
+
+    if (/\.set(point)?\b|\.target\b|\.cmd\b|\.command\b/.test(candidate)) score -= 6;
+    if (/\.ack\b|\.q\b|\.ts\b|\.lc\b/.test(candidate)) score -= 4;
+    if (type && type !== 'number' && (wantsTemperature || wantsHumidity || wantsEnergy)) score -= 3;
+
+    return score;
+}
+
+function findBestStateIdCandidate(allCandidates, queryPattern, intentText) {
+    const scored = (allCandidates || [])
+        .map(candidate => ({ id: candidate.id, score: scoreStateIdCandidate(candidate, intentText, queryPattern) }))
+        .filter(item => item.score > 0)
+        .sort((a, b) => b.score - a.score || a.id.localeCompare(b.id));
+
+    if (!scored.length) {
+        return { bestId: null, score: 0, topMatches: [] };
+    }
+
+    return {
+        bestId: scored[0].id,
+        score: scored[0].score,
+        topMatches: scored.slice(0, 10)
+    };
+}
+
+function resolveBestCandidateWithConfidence(bestResult) {
+    const top = Array.isArray(bestResult?.topMatches) ? bestResult.topMatches : [];
+    if (!top.length || !bestResult?.bestId) {
+        return { resolved: false, reason: 'no-candidate', selectedId: null, scoreGap: 0, topMatches: top };
+    }
+
+    if (top.length === 1) {
+        return { resolved: true, reason: 'single-candidate', selectedId: top[0].id, scoreGap: 999, topMatches: top };
+    }
+
+    const first = top[0];
+    const second = top[1];
+    const gap = first.score - second.score;
+
+    if (gap >= 6) {
+        return { resolved: true, reason: 'clear-winner', selectedId: first.id, scoreGap: gap, topMatches: top };
+    }
+
+    return { resolved: false, reason: 'ambiguous-candidates', selectedId: null, scoreGap: gap, topMatches: top };
+}
+
+function selectSuggestionIds(allCandidates, queryPattern, intentText, limit = 20) {
+    const scored = (allCandidates || [])
+        .map(candidate => ({ id: candidate.id, score: scoreStateIdCandidate(candidate, intentText, queryPattern) }))
+        .filter(item => item.score > 0)
+        .sort((a, b) => b.score - a.score || a.id.localeCompare(b.id));
+
+    if (scored.length) {
+        return scored.slice(0, limit).map(item => item.id);
+    }
+
+    return uniqueSortedIds(candidateIds(allCandidates)).slice(0, limit);
+}
+
+async function validateQueryStateId(stateIdPattern, msg, settings) {
+    const regex = wildcardToRegExp(stateIdPattern || '*');
+
+    const msgObjectIds = extractStateIdsFromObjects(msg.objects || msg.payload);
+    if (msgObjectIds.length) {
+        const allCandidates = uniqueCandidates(msgObjectIds.map(id => ({ id, obj: null })));
+        const allIds = candidateIds(allCandidates);
+        const matched = allIds.filter(id => regex.test(id));
+        return {
+            validated: true,
+            source: 'msg.objects',
+            totalCandidates: allIds.length,
+            matchCount: matched.length,
+            matchedIds: matched,
+            allCandidateIds: allCandidates
+        };
+    }
+
+    if (Array.isArray(msg.availableStateIds) && msg.availableStateIds.length) {
+        const all = uniqueSortedIds(msg.availableStateIds.filter(id => typeof id === 'string'));
+        const matched = all.filter(id => regex.test(id));
+        return {
+            validated: true,
+            source: 'msg.availableStateIds',
+            totalCandidates: all.length,
+            matchCount: matched.length,
+            matchedIds: matched,
+            allCandidateIds: all.map(id => ({ id, obj: null }))
+        };
+    }
+
+    try {
+        await ensureServerConnection(settings);
+        const fetched = await connectionManager.getObjects(settings.serverId, stateIdPattern || '*', 'state');
+        const fetchedCandidates = uniqueCandidates(normalizeStateCandidatesFromFetchedObjects(fetched));
+        const fetchedIds = candidateIds(fetchedCandidates);
+
+        if (fetchedIds.length) {
+            return {
+                validated: true,
+                source: 'server',
+                totalCandidates: fetchedIds.length,
+                matchCount: fetchedIds.length,
+                matchedIds: fetchedIds,
+                allCandidateIds: fetchedCandidates
+            };
+        }
+
+        const fallbackAll = await connectionManager.getObjects(settings.serverId, '*', 'state');
+        const allCandidates = uniqueCandidates(normalizeStateCandidatesFromFetchedObjects(fallbackAll));
+        const allIds = candidateIds(allCandidates);
+        const matched = allIds.filter(id => regex.test(id));
+
+        return {
+            validated: true,
+            source: 'server',
+            totalCandidates: allIds.length,
+            matchCount: matched.length,
+            matchedIds: matched,
+            allCandidateIds: allCandidates
+        };
+    } catch (error) {
+        return {
+            validated: false,
+            source: 'unavailable',
+            reason: error.message,
+            matchCount: 0,
+            matchedIds: [],
+            allCandidateIds: []
+        };
+    }
+}
+
 async function modeQuery(msg, settings, llm) {
     const question = (typeof msg.payload === 'string' ? msg.payload : '') ||
                      (typeof msg.question === 'string' ? msg.question : '');
@@ -588,7 +860,74 @@ async function modeQuery(msg, settings, llm) {
         };
     }
 
-    return { mode: 'query', llmUsed: true, usage: response.usage, query };
+    const validation = await validateQueryStateId(query.stateId, msg, settings);
+    const intentText = `${question} ${query.notes || ''} ${query.stateId || ''}`;
+    const suggestionIds = selectSuggestionIds(validation.allCandidateIds || [], query.stateId, intentText, 20);
+
+    if (validation.validated && validation.matchCount === 0) {
+        const best = findBestStateIdCandidate(validation.allCandidateIds || [], query.stateId, intentText);
+        const resolved = resolveBestCandidateWithConfidence(best);
+
+        if (resolved.resolved && resolved.selectedId) {
+            query.stateId = resolved.selectedId;
+            return {
+                mode: 'query',
+                llmUsed: true,
+                usage: response.usage,
+                query,
+                queryValidation: {
+                    validated: validation.validated,
+                    source: validation.source,
+                    matchCount: validation.matchCount,
+                    totalCandidates: validation.totalCandidates || 0,
+                    resolvedStateIds: [resolved.selectedId],
+                    fallbackResolution: 'best-candidate',
+                    confidenceReason: resolved.reason,
+                    scoreGap: resolved.scoreGap,
+                    topMatches: resolved.topMatches,
+                    suggestions: suggestionIds,
+                    reason: validation.reason || null
+                }
+            };
+        }
+
+        return {
+            mode: 'query',
+            llmUsed: true,
+            usage: response.usage,
+            error: `No matching state IDs found for query.stateId="${query.stateId}" and candidate resolution is ambiguous.`,
+            hint: 'Bitte Device/Raum präzisieren (z. B. "Wohnzimmer", "Lora esp03") oder msg.objects inkl. Enums zuführen.',
+            query,
+            queryValidation: {
+                ...validation,
+                fallbackResolution: 'ambiguous',
+                confidenceReason: resolved.reason,
+                scoreGap: resolved.scoreGap,
+                topMatches: resolved.topMatches,
+                suggestions: suggestionIds
+            }
+        };
+    }
+
+    if (validation.validated && validation.matchCount === 1) {
+        query.stateId = validation.matchedIds[0];
+    }
+
+    return {
+        mode: 'query',
+        llmUsed: true,
+        usage: response.usage,
+        query,
+        queryValidation: {
+            validated: validation.validated,
+            source: validation.source,
+            matchCount: validation.matchCount,
+            totalCandidates: validation.totalCandidates || 0,
+            resolvedStateIds: (validation.matchedIds || []).slice(0, 50),
+            suggestions: suggestionIds,
+            reason: validation.reason || null
+        }
+    };
 }
 
 async function modeSummarize(msg, settings, llm) {
