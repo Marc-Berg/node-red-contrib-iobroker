@@ -32,8 +32,8 @@ The WS ioB setObject node allows you to create or modify ioBroker object definit
 - Supports nested properties with dot notation
 
 **Mode**
-- **Replace:** Completely overwrites the object with your definition
-- **Merge:** Fetches existing object and merges only your changes
+- **Merge:** Fetches existing object and merges only your changes. This is the default and recommended mode.
+- **Replace:** Completely overwrites the object with your definition. Use this only deliberately when you have a complete object definition.
 
 **Validate object structure**
 - Ensures object has required properties (`type`, `common`) before writing
@@ -117,6 +117,8 @@ msg.payload = {
 ```
 
 ### Merge Mode
+
+This is the default mode.
 
 **When to use:**
 - Changing single properties
@@ -430,7 +432,8 @@ The `_id` property is automatically removed from object definitions before writi
 ## Performance Considerations
 
 - **Merge mode** requires an additional read operation (getObject) before writing
-- Use **replace mode** when creating new objects in allowed namespaces (for example `0_userdata.0`) or when you have complete definitions
+- **Merge mode** is the safe default for existing objects
+- Use **replace mode** only when creating new objects in allowed namespaces (for example `0_userdata.0`) or when you have complete definitions
 - Batch updates using loops may take time - consider rate limiting for many objects
 - Object writes are generally fast (<100ms) but depend on server load
 

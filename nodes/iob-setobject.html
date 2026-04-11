@@ -37,7 +37,7 @@
             objectId: { value: "" },
             objectSource: { value: "msg" },
             objectProperty: { value: "payload" },
-            mergeMode: { value: "replace" },
+            mergeMode: { value: "merge" },
             validateObject: { value: true },
             server: { value: "", type: "iob-config" }
         },
@@ -85,7 +85,7 @@
             });
 
             // Initial merge mode display
-            const currentMergeMode = $('#node-input-mergeMode').val() || "replace";
+            const currentMergeMode = $('#node-input-mergeMode').val() || "merge";
             $('.merge-mode-info').hide();
             $(`.merge-mode-info.${currentMergeMode}`).show();
 
