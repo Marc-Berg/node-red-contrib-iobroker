@@ -111,7 +111,7 @@ Das Diagramm zeigt die empfohlene Architektur mit einer dedizierten Admin Adapte
 - **Keine Authentifizierung** (Standard): Benutzername/Passwort leer lassen
 - **OAuth2**: Gültigen ioBroker Benutzername/Passwort eingeben
 
-Wenn nur ein iob-config Profil vorhanden ist, wird es weiterhin automatisch ausgewählt. Wenn mehrere Profile vorhanden sind, wird nur das als Standard markierte Profil automatisch ausgewählt.
+Wenn nur ein iob-config Profil vorhanden ist, wird es automatisch ausgewählt. Wenn mehrere Profile vorhanden sind, wird nur das als Standard markierte Profil automatisch ausgewählt.
 
 ### Alternative Adapter Optionen
 
