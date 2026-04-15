@@ -29,10 +29,10 @@ ERROR [SocketClient] WebSocket error: Connection timeout
 
 #### Connection Drops Frequently
 **Solutions:**
-1. Increase session duration to ≥3600 seconds in ioBroker settings
-2. Check network stability between servers
-3. Verify ioBroker adapter configuration
-4. Monitor system load on both servers
+1. Check network stability between servers
+2. Verify ioBroker adapter configuration
+3. Monitor system load on both servers
+4. Review connection and authentication logs for recurring renewal or reconnect failures
 
 **Expected Recovery Log:**
 ```
@@ -80,9 +80,9 @@ ERROR [AuthManager] OAuth authentication failed: unauthorized
 
 #### Token Expired Error
 **Solutions:**
-1. Increase session duration to ≥3600 seconds in ioBroker
-2. Check system time synchronization between servers
-3. Monitor token refresh process in logs
+1. Check system time synchronization between servers
+2. Monitor token refresh process in logs
+3. Update ioBroker admin, web, or ws adapters to versions that include `@iobroker/socket-classes >= 2.3.1`
 
 **Expected Token Refresh:**
 ```

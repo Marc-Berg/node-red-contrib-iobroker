@@ -97,7 +97,6 @@ The diagram shows the recommended architecture with a dedicated Admin adapter in
 2. **Configure security** for Node-RED access:
    - Create dedicated user for Node-RED
    - Set appropriate permissions
-   - Configure session duration ≥3600 seconds
 
 ### Server Configuration (iob-config)
 
@@ -123,10 +122,6 @@ If you prefer not to use a Admin instance:
 
 **⚠️ Important Limitations with Alternative Adapters:**
 - **WS ioB log node does not work** with WebSocket or Web adapter (requires Admin adapter)
-
-## ⚠️ Important Notes
-
-🔧 **Known Issue - Authentication Token Expiry**: There is currently a known issue with authentication and expiring tokens that can cause connection drops. **Do not use login session durations shorter than 3600 seconds** (1 hour) in your ioBroker adapter settings!
 
 ## 📚 Additional Resources
 

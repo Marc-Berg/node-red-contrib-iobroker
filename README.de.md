@@ -96,7 +96,6 @@ Das Diagramm zeigt die empfohlene Architektur mit einer dedizierten Admin Adapte
 2. **Sicherheit für Node-RED Zugriff konfigurieren**:
    - Dedizierten Benutzer für Node-RED erstellen
    - Angemessene Berechtigungen setzen
-   - Session-Dauer ≥3600 Sekunden konfigurieren
 
 ### Server Konfiguration (iob-config)
 
@@ -122,10 +121,6 @@ Falls du keine Admin Instanz verwenden möchtest:
 
 **⚠️ Wichtige Einschränkungen bei alternativen Adaptern:**
 - **WS ioB log Node funktioniert nicht** mit WebSocket oder Web Adapter (erfordert Admin Adapter)
-
-## ⚠️ Wichtige Hinweise
-
-🔧 **Bekanntes Problem: Token Ablauf**: Es gibt derzeit ein bekanntes Problem mit der Authentifizierung und ablaufenden Tokens, das zu Verbindungsabbrüchen führen kann. **Verwenden Sie keine Anmelde-Session-Dauer kürzer als 3600 Sekunden** (1 Stunde) in Ihren ioBroker Adapter-/Instanz-Einstellungen!
 
 ## 📚 Zusätzliche Ressourcen
 

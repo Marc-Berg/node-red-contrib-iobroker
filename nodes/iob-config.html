@@ -70,20 +70,6 @@
             return this.name;
         },
         oneditprepare: function () {
-            var node = this;
-
-            // Function to toggle the token expiry warning
-            function toggleTokenWarning() {
-                var username = $("#node-config-input-user").val().trim();
-                var warningDiv = $("#token-expiry-warning");
-
-                if (username) {
-                    warningDiv.show();
-                } else {
-                    warningDiv.hide();
-                }
-            }
-
             // Function to show SSL info based on current settings
             function updateSSLInfo() {
                 var useSSL = $("#node-config-input-usessl").prop('checked');
@@ -96,14 +82,7 @@
                 }
             }
 
-            // Initial checks
-            toggleTokenWarning();
             updateSSLInfo();
-
-            // Watch for changes in the username field
-            $("#node-config-input-user").on('input keyup change', function () {
-                toggleTokenWarning();
-            });
 
             // Watch for changes in SSL checkbox
             $("#node-config-input-usessl").on('change', function () {
@@ -172,18 +151,6 @@
                 <li>WebSocket will use WSS protocol</li>
                 <li>OAuth authentication will use HTTPS</li>
                 <li>Self-signed certificates are accepted</li>
-            </ul>
-        </div>
-    </div>
-    
-    <!-- Token Expiry Warning -->
-    <div id="token-expiry-warning" class="form-row" style="display: none; margin-top: 15px; padding: 10px; background-color: #fff3cd; border: 1px solid #ffeaa7; border-radius: 4px;">
-        <div style="color: #856404; font-size: 13px;">
-            <i class="fa fa-exclamation-triangle" style="color: #f39c12; margin-right: 5px;"></i>
-            <strong>Authentication Token Issue:</strong><br>
-            There's a known issue with expiring authentication tokens.
-            <ul style="margin: 8px 0 0 20px; padding: 0;">
-                <li>Use session duration of at least 3600 seconds (1 hour)!</li>
             </ul>
         </div>
     </div>
