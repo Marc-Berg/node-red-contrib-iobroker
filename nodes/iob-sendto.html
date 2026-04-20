@@ -205,11 +205,11 @@ RED.nodes.registerType('iobsendto', {
 </script>
 
 <script type="text/html" data-help-name="iobsendto">
-    <p>Send commands and messages to ioBroker adapter instances via WebSocket using the sendTo functionality for service integration and automation.</p>
+    <p>Send commands and messages to ioBroker adapter instances or hosts via WebSocket using <code>sendTo</code> and <code>sendToHost</code>.</p>
     
     <h3>Configuration</h3>
     <ul>
-    <li><b>Target Instance:</b> Select from dropdown. If empty, <code>msg.instance</code> is used.</li>
+    <li><b>Target Instance:</b> Select from dropdown. If empty, <code>msg.instance</code> is used. Leave empty for host commands via <code>msg.host</code>.</li>
         <li><b>Command:</b> Optional command parameter. Some instances require this, others don't.</li>
         <li><b>Static Message:</b> Optional JSON message to send. If empty, <code>msg.payload</code> is used.</li>
         <li><b>Wait for Response:</b> Enable to receive instance response as output message.</li>
@@ -223,11 +223,20 @@ RED.nodes.registerType('iobsendto', {
     <h3>Input Message</h3>
     <p>Message properties that can override node configuration:</p>
     <ul>
+        <li><code>msg.host</code> - Target host for host commands such as <code>getLogs</code>, <code>getLogFiles</code> and <code>getLogFile</code></li>
         <li><code>msg.instance</code> - Target instance (overrides node setting)</li>
         <li><code>msg.command</code> - Command parameter (overrides node setting)</li>
         <li><code>msg.message</code> - Message content (overrides node setting and msg.payload)</li>
         <li><code>msg.payload</code> - Used as message if no static message configured</li>
         <li><code>msg.timeout</code> - Response timeout in milliseconds (overrides node setting)</li>
+    </ul>
+
+    <h3>Host Log Commands</h3>
+    <p>With <code>msg.host</code> set, the node uses <code>sendToHost</code>. Common controller commands are:</p>
+    <ul>
+        <li><code>getLogs</code> - Read the currently active log file. Output is normalized to <code>{ lines, size }</code>.</li>
+        <li><code>getLogFiles</code> - List available log files. Output is normalized to <code>{ files, count }</code>.</li>
+        <li><code>getLogFile</code> - Read a specific log file. For <code>.gz</code> files the output is automatically decompressed into <code>payload.text</code>.</li>
     </ul>
     
     <h3>Common Use Cases</h3>
@@ -256,6 +265,24 @@ msg.payload = "SELECT * FROM datapoints WHERE ts > NOW() - INTERVAL 1 DAY"</pre>
 msg.payload = {
     script: "myScript",
     message: { action: "cleanup", data: [1,2,3] }
+}</pre>
+
+    <h4>Read Active Host Log</h4>
+    <pre>msg.host = "iobroker"
+msg.command = "getLogs"
+msg.payload = 200</pre>
+
+    <h4>List Host Log Files</h4>
+    <pre>msg.host = "iobroker"
+msg.command = "getLogFiles"
+msg.payload = {}</pre>
+
+    <h4>Read A Specific Log File</h4>
+    <pre>msg.host = "iobroker"
+msg.command = "getLogFile"
+msg.payload = {
+    transport: "file1",
+    filename: "iobroker.2026-04-19.log.gz"
 }</pre>
     
     <h4>Media Control</h4>
