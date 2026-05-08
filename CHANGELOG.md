@@ -1,5 +1,15 @@
 # Changelog
 
+## [1.3.6] - xx-xx-2026
+
+### **Changed**
+- Standardized inObj documentation naming
+- Updated README documentation links (English and German) for **WS ioB inObj**
+- remove token expiry warning and session duration references from README and troubleshooting guide
+
+### **Fixed**
+- Corrected `iob-history` node help output field from `msg.adapter` to `msg.instance` to match runtime behavior and documentation
+
 ## [1.3.5] - 2026-04-15
 
 ### **Changed**
