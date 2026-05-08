@@ -1,6 +1,6 @@
 # Changelog
 
-## [1.3.6] - xx-xx-2026
+## [1.3.6] - 2026-xx-xx
 
 ### **Changed**
 - Standardized inObj documentation naming
