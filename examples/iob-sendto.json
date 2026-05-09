@@ -21,7 +21,7 @@
         "type": "comment",
         "z": "sendto-examples-tab",
         "name": "ioBroker SendTo Command Examples",
-        "info": "This flow demonstrates various sendTo patterns:\n\n**Notification Services:**\n- Telegram messages with user targeting\n- Email alerts with attachments\n- Pushover notifications with priority levels\n\n**Database Operations:**\n- SQL queries with response handling\n- History data retrieval\n- InfluxDB time-series queries\n\n**Script Execution:**\n- JavaScript adapter integration\n- Custom script execution with parameters\n- Data processing and transformation\n\n**Media Control:**\n- Spotify playlist control\n- Volume and device management\n- Dynamic content selection\n\n**System Operations:**\n- History queries for monitoring\n- Simple API state operations\n- Live system status checks\n\n**Response Modes:**\n- Fire-and-forget for simple notifications\n- Response mode for data queries\n- Error handling and timeouts\n\n**Dynamic Configuration:**\n- Adapter selection via message properties\n- Command parameter injection\n- Conditional message routing\n\nNote: Only adapters with sendTo API support are included. Adapters like backitup do not support sendTo commands.",
+        "info": "This flow demonstrates various sendTo patterns:\n\n**Notification Services:**\n- Telegram messages with user targeting\n- Email alerts with attachments\n- Pushover notifications with priority levels\n\n**Database Operations:**\n- SQL queries with response handling\n- History data retrieval\n- InfluxDB time-series queries\n\n**Script Execution:**\n- JavaScript adapter integration\n- Custom script execution with parameters\n- Data processing and transformation\n\n**Media Control:**\n- Spotify playlist control\n- Volume and device management\n- Dynamic content selection\n\n**Host Operations (sendToHost):**\n- Read active host logs\n- List available log files\n- Read specific archived (.gz) log files\n\n**Response Modes:**\n- Fire-and-forget for simple notifications\n- Response mode for data queries\n- Error handling and timeouts\n\n**Dynamic Configuration:**\n- Adapter selection via message properties\n- Command parameter injection\n- Conditional message routing\n\nNote: Only adapters with sendTo API support are included. Adapters like backitup do not support sendTo commands.",
         "x": 200,
         "y": 40,
         "wires": []
@@ -238,8 +238,8 @@
         "props": [
             {
                 "p": "payload",
-                "v": "{\"id\":\"hm-rpc.0.living.TEMPERATURE\",\"options\":{\"start\":{{timestamp-86400000}},\"end\":{{timestamp}},\"count\":100,\"aggregate\":\"average\"}}",
-                "vt": "json"
+                "v": "{\"id\":\"hm-rpc.0.living.TEMPERATURE\",\"options\":{\"start\":$millis()-86400000,\"end\":$millis(),\"count\":100,\"aggregate\":\"average\"}}",
+                "vt": "jsonata"
             }
         ],
         "repeat": "",
@@ -465,6 +465,131 @@
         "statusType": "auto",
         "x": 540,
         "y": 640,
+        "wires": []
+    },
+    {
+        "id": "host.log.command",
+        "type": "iobsendto",
+        "z": "sendto-examples-tab",
+        "name": "Host Log Command",
+        "adapter": "",
+        "command": "",
+        "message": "",
+        "waitForResponse": true,
+        "responseTimeout": 15000,
+        "server": "iobroker-config",
+        "x": 300,
+        "y": 740,
+        "wires": [["host.result"]]
+    },
+    {
+        "id": "inject.host.logs",
+        "type": "inject",
+        "z": "sendto-examples-tab",
+        "name": "Host: Active Logs",
+        "props": [
+            {
+                "p": "host",
+                "v": "iobroker",
+                "vt": "str"
+            },
+            {
+                "p": "command",
+                "v": "getLogs",
+                "vt": "str"
+            },
+            {
+                "p": "payload",
+                "v": 200,
+                "vt": "num"
+            }
+        ],
+        "repeat": "",
+        "crontab": "",
+        "once": false,
+        "onceDelay": 0.1,
+        "topic": "",
+        "x": 110,
+        "y": 700,
+        "wires": [["host.log.command"]]
+    },
+    {
+        "id": "inject.host.logfiles",
+        "type": "inject",
+        "z": "sendto-examples-tab",
+        "name": "Host: List Log Files",
+        "props": [
+            {
+                "p": "host",
+                "v": "iobroker",
+                "vt": "str"
+            },
+            {
+                "p": "command",
+                "v": "getLogFiles",
+                "vt": "str"
+            },
+            {
+                "p": "payload",
+                "v": "{}",
+                "vt": "json"
+            }
+        ],
+        "repeat": "",
+        "crontab": "",
+        "once": false,
+        "onceDelay": 0.1,
+        "topic": "",
+        "x": 120,
+        "y": 740,
+        "wires": [["host.log.command"]]
+    },
+    {
+        "id": "inject.host.logfile",
+        "type": "inject",
+        "z": "sendto-examples-tab",
+        "name": "Host: Read Log File",
+        "props": [
+            {
+                "p": "host",
+                "v": "iobroker",
+                "vt": "str"
+            },
+            {
+                "p": "command",
+                "v": "getLogFile",
+                "vt": "str"
+            },
+            {
+                "p": "payload",
+                "v": "{\"transport\":\"file1\",\"filename\":\"iobroker.2026-04-19.log.gz\"}",
+                "vt": "json"
+            }
+        ],
+        "repeat": "",
+        "crontab": "",
+        "once": false,
+        "onceDelay": 0.1,
+        "topic": "",
+        "x": 120,
+        "y": 780,
+        "wires": [["host.log.command"]]
+    },
+    {
+        "id": "host.result",
+        "type": "debug",
+        "z": "sendto-examples-tab",
+        "name": "Host Log Results",
+        "active": true,
+        "tosidebar": true,
+        "console": false,
+        "tostatus": false,
+        "complete": "true",
+        "targetType": "full",
+        "statusVal": "",
+        "statusType": "auto",
+        "x": 540,
+        "y": 740,
         "wires": []
     }
 ]
