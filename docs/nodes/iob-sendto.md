@@ -13,7 +13,7 @@ The WS ioB sendTo node allows you to send commands directly to ioBroker adapter 
 **Target Instance**
 - Dropdown list of available adapter instances
 - Leave empty to use `msg.instance` for dynamic targeting
-- Leave empty when using host commands via `msg.host`
+- Leave empty when using host commands via `msg.host`; in that case the node switches to `sendToHost`
 - Examples: `telegram.0`, `email`, `sql.0`, `javascript.0`
 
 **Command**
@@ -27,6 +27,7 @@ The WS ioB sendTo node allows you to send commands directly to ioBroker adapter 
 - If empty, `msg.payload` will be used as the message content
 - Must be valid JSON when specified
 - Can be overridden by `msg.message`
+- For dynamic timestamps in Inject nodes, use `jsonata` value type (e.g. `$millis()`) instead of invalid JSON placeholders like `{{...}}`
 
 **Wait for Response**
 - **Disabled (Fire-and-forget)**: Send command without waiting for response
@@ -48,7 +49,7 @@ msg.command = "getLogs";
 msg.payload = 200;
 ```
 
-If `msg.host` is set, the node uses `sendToHost` instead of `sendTo`.
+If `msg.host` is set, the node uses `sendToHost` instead of `sendTo`. Leave the configured target instance empty when you want the input message to select host mode.
 
 ### Dynamic Instance Targeting
 ```javascript
@@ -239,6 +240,20 @@ When an error occurs, the output includes:
 - **WS ioB log**: Monitor instance log messages for debugging
 
 ## Examples
+
+### Temperature History (Inject JSONata Payload)
+```javascript
+// Inject payload property with vt = "jsonata"
+{
+  "id": "hm-rpc.0.living.TEMPERATURE",
+  "options": {
+    "start": $millis()-86400000,
+    "end": $millis(),
+    "count": 100,
+    "aggregate": "average"
+  }
+}
+```
 
 ### Read Active Host Log
 ```javascript

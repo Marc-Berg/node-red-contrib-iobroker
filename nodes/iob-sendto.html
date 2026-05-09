@@ -159,7 +159,7 @@ RED.nodes.registerType('iobsendto', {
             <option value="">-- Select instance or use msg.instance --</option>
         </select>
         <div style="margin-top: 5px; font-size: 12px; color: #666;">
-            If no instance is selected, <code>msg.instance</code> will be used.
+            If no instance is selected, <code>msg.instance</code> will be used. For host commands, leave this empty and set <code>msg.host</code>; the node will use <code>sendToHost</code>.
         </div>
     </div>
     
@@ -190,12 +190,12 @@ RED.nodes.registerType('iobsendto', {
     
     <div id="response-info" style="display: none; margin-top: 5px; padding: 8px; background-color: #e8f4fd; border: 1px solid #bee5eb; border-radius: 4px; font-size: 12px; color: #0c5460;">
         <i class="fa fa-info-circle"></i> <strong>Response Mode:</strong><br>
-        Node will wait for adapter response and send it as output message. Useful for queries and commands that return data.
+        Node will wait for the adapter or host response and send it as output message. Useful for queries and commands that return data.
     </div>
     
     <div id="no-response-info" style="margin-top: 5px; padding: 8px; background-color: #fff3cd; border: 1px solid #ffeaa7; border-radius: 4px; font-size: 12px; color: #856404;">
         <i class="fa fa-info-circle"></i> <strong>Fire-and-forget Mode:</strong><br>
-        Node will send the command and not wait for response. No output will be generated.
+        Node will send the command to the adapter or host and not wait for response. No output will be generated.
     </div>
     
     <div class="form-row">
@@ -206,6 +206,7 @@ RED.nodes.registerType('iobsendto', {
 
 <script type="text/html" data-help-name="iobsendto">
     <p>Send commands and messages to ioBroker adapter instances or hosts via WebSocket using <code>sendTo</code> and <code>sendToHost</code>.</p>
+    <p>For host commands, leave <b>Target Instance</b> empty and set <code>msg.host</code> on the input message.</p>
     
     <h3>Configuration</h3>
     <ul>
