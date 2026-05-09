@@ -1,14 +1,21 @@
 # Changelog
 
-## [1.3.6] - 2026-xx-xx
+## [1.3.6] - 2026-05-09
+
+### **Added**
+- Added full `sendToHost` support in **WS ioB sendTo** for host-level commands via `msg.host`
+- Added host log command handling and response normalization for `getLogs`, `getLogFiles`, and `getLogFile`
+- Added new `sendToHost` examples in `examples/iob-sendto.json` (active logs, log file list, specific log file)
 
 ### **Changed**
 - Standardized inObj documentation naming
 - Updated README documentation links (English and German) for **WS ioB inObj**
 - remove token expiry warning and session duration references from README and troubleshooting guide
+- Extended **WS ioB sendTo** documentation with host command usage and dynamic payload guidance
 
 ### **Fixed**
 - Corrected `iob-history` node help output field from `msg.adapter` to `msg.instance` to match runtime behavior and documentation
+- Fixed invalid JSON in the `Temperature History` sendTo example by switching to JSONata-based dynamic timestamps
 
 ## [1.3.5] - 2026-04-15
 
