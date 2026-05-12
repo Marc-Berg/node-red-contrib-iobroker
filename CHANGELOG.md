@@ -1,5 +1,15 @@
 # Changelog
 
+## [1.4.0] - 2026-xx-xx
+
+### **Added**
+- New **WS ioB delObj** node for deleting ioBroker objects via WebSocket
+  - Supports single and recursive deletion (`msg.recursive`)
+  - Supports maintenance mode for non-standard/invalid IDs (`msg.maintenance`)
+
+### **Fixed**
+- `iob-in`: tombstone/delete events (null state) during recursive object deletion are now handled as debug messages instead of warnings
+
 ## [1.3.6] - 2026-05-09
 
 ### **Added**

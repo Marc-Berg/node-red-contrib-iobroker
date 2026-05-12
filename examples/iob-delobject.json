@@ -1,0 +1,143 @@
+[
+  {
+    "id": "example_delobject_flow",
+    "type": "tab",
+    "label": "iob-delobject Examples",
+    "disabled": false,
+    "info": "Demonstrates deleting single objects and recursive object trees."
+  },
+  {
+    "id": "inject_delete_single",
+    "type": "inject",
+    "z": "example_delobject_flow",
+    "name": "Delete Single Object",
+    "props": [
+      {
+        "p": "objectId",
+        "v": "0_userdata.0.cleanup.demo",
+        "vt": "str"
+      }
+    ],
+    "repeat": "",
+    "crontab": "",
+    "once": false,
+    "onceDelay": 0.1,
+    "topic": "",
+    "x": 150,
+    "y": 100,
+    "wires": [
+      [
+        "delobject_single"
+      ]
+    ]
+  },
+  {
+    "id": "delobject_single",
+    "type": "iobdelobject",
+    "z": "example_delobject_flow",
+    "name": "Delete Single Object",
+    "objectId": "",
+    "recursive": false,
+    "maintenance": false,
+    "server": "iob_server",
+    "x": 400,
+    "y": 100,
+    "wires": [
+      [
+        "debug_delobject_single"
+      ]
+    ]
+  },
+  {
+    "id": "debug_delobject_single",
+    "type": "debug",
+    "z": "example_delobject_flow",
+    "name": "Delete Result",
+    "active": true,
+    "tosidebar": true,
+    "console": false,
+    "tostatus": false,
+    "complete": "true",
+    "targetType": "full",
+    "statusVal": "",
+    "statusType": "auto",
+    "x": 650,
+    "y": 100,
+    "wires": []
+  },
+  {
+    "id": "inject_delete_recursive",
+    "type": "inject",
+    "z": "example_delobject_flow",
+    "name": "Delete Object Tree",
+    "props": [
+      {
+        "p": "objectId",
+        "v": "0_userdata.0.cleanup",
+        "vt": "str"
+      },
+      {
+        "p": "recursive",
+        "v": "true",
+        "vt": "bool"
+      }
+    ],
+    "repeat": "",
+    "crontab": "",
+    "once": false,
+    "onceDelay": 0.1,
+    "topic": "",
+    "x": 150,
+    "y": 180,
+    "wires": [
+      [
+        "delobject_recursive"
+      ]
+    ]
+  },
+  {
+    "id": "delobject_recursive",
+    "type": "iobdelobject",
+    "z": "example_delobject_flow",
+    "name": "Delete Tree",
+    "objectId": "",
+    "recursive": true,
+    "maintenance": false,
+    "server": "iob_server",
+    "x": 400,
+    "y": 180,
+    "wires": [
+      [
+        "debug_delobject_recursive"
+      ]
+    ]
+  },
+  {
+    "id": "debug_delobject_recursive",
+    "type": "debug",
+    "z": "example_delobject_flow",
+    "name": "Recursive Delete Result",
+    "active": true,
+    "tosidebar": true,
+    "console": false,
+    "tostatus": false,
+    "complete": "true",
+    "targetType": "full",
+    "statusVal": "",
+    "statusType": "auto",
+    "x": 670,
+    "y": 180,
+    "wires": []
+  },
+  {
+    "id": "iob_server",
+    "type": "iob-config",
+    "name": "ioBroker Server",
+    "iobhost": "127.0.0.1",
+    "iobport": "8091",
+    "user": "",
+    "password": "",
+    "usessl": false,
+    "isdefault": false
+  }
+]

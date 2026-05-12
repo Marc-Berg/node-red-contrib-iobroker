@@ -411,8 +411,26 @@ module.exports = function (RED) {
 
         function onStateChange(stateId, state, isInitialValue = false) {
             try {
-                if (!state || state.val === undefined) {
-                    node.warn(`Invalid state data received for ${stateId}`);
+                if (state === null || state === undefined) {
+                    node.currentStateValues.delete(stateId);
+                    node.previous.delete(stateId);
+                    if (isSingleState && stateId === subscriptionPattern) {
+                        node.lastValue = undefined;
+                        node.hasReceivedValue = false;
+                    }
+                    node.debug(`State deleted/invalidated for ${stateId}`);
+                    return;
+                }
+
+                if (typeof state !== 'object' || Array.isArray(state)) {
+                    node.warn(`Invalid state payload type received for ${stateId}`);
+                    return;
+                }
+
+                if (state.val === undefined) {
+                    node.currentStateValues.delete(stateId);
+                    node.previous.delete(stateId);
+                    node.debug(`State without value ignored for ${stateId}`);
                     return;
                 }
 
@@ -494,6 +512,10 @@ module.exports = function (RED) {
 
             callback.onInitialValue = function (stateId, state) {
                 try {
+                    if (!state || typeof state !== 'object' || state.val === undefined) {
+                        return;
+                    }
+
                     if (!shouldSendMessage(state.ack, settings.ackFilter)) {
                         return;
                     }
