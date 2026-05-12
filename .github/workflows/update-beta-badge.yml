@@ -1,0 +1,49 @@
+name: Update Beta Badge
+
+on:
+  workflow_dispatch:
+  push:
+    branches:
+      - main
+  release:
+    types:
+      - published
+      - unpublished
+      - edited
+      - prereleased
+      - released
+      - deleted
+
+permissions:
+  contents: write
+
+jobs:
+  update-beta-badge:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+
+      - name: Generate beta badge JSON
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: node .github/scripts/generate-beta-badge.mjs
+
+      - name: Commit and push badge update
+        run: |
+          if git diff --quiet .github/badges/beta.json; then
+            echo "No badge changes detected"
+            exit 0
+          fi
+
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add .github/badges/beta.json
+          git commit -m "chore: update beta badge"
+          git push
