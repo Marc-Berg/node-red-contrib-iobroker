@@ -1,0 +1,139 @@
+<script type="text/javascript">
+    function loadSharedTreeView() {
+        return new Promise((resolve, reject) => {
+            if (window.ioBrokerSharedTreeView && window.ioBrokerSharedTreeView.initialized) {
+                resolve();
+                return;
+            }
+
+            const script = document.createElement('script');
+            script.src = 'iobroker/shared/iobroker-treeview.js?v=1.3.0';
+            script.async = true;
+
+            script.onload = () => {
+                if (window.ioBrokerSharedTreeView && window.ioBrokerSharedTreeView.initialized) {
+                    resolve();
+                } else {
+                    reject(new Error('TreeView component failed to initialize'));
+                }
+            };
+
+            script.onerror = () => reject(new Error('TreeView component script not found'));
+            document.head.appendChild(script);
+        });
+    }
+
+    RED.nodes.registerType('iobdelobject', {
+        category: 'ioBroker WS',
+        color: '#a6bbcf',
+        defaults: {
+            name: { value: '' },
+            objectId: { value: '' },
+            recursive: { value: false },
+            maintenance: { value: false },
+            server: { value: '', type: 'iob-config' }
+        },
+        inputs: 1,
+        outputs: 1,
+        icon: 'iobroker_delobject.svg',
+        paletteLabel: 'WS ioB delObj',
+        label: function() {
+            if (this.name) return this.name;
+            let label = this.objectId || 'iob-delobject';
+            if (this.recursive) {
+                label += ' (recursive)';
+            }
+            return label;
+        },
+
+        oneditprepare: function() {
+            const serverInput = $('#node-input-server');
+            window.ioBrokerEditorUtils.autoSelectSingleServerConfig(RED, this, serverInput);
+
+            loadSharedTreeView().then(() => {
+                this.treeController = window.ioBrokerSharedTreeView.setup({
+                    nodeType: 'iobdelobject',
+                    inputId: 'node-input-objectId',
+                    serverInputId: 'node-input-server',
+                    searchPlaceholder: 'Search objects to delete...',
+                    itemType: 'all',
+                    dataEndpoint: '/iobroker/ws/objects',
+                    enableWildcardDetection: false,
+                    wildcardInputId: null
+                });
+            }).catch(error => {
+                console.error('Failed to load TreeView component:', error);
+            });
+        }
+    });
+</script>
+
+<script type="text/html" data-template-name="iobdelobject">
+    <div style="margin-bottom: 15px; padding: 12px; background-color: #c62828; color: white; border: 2px solid #8e0000; border-radius: 4px; font-weight: bold;">
+        <i class="fa fa-exclamation-triangle" style="font-size: 20px; margin-right: 8px;"></i>
+        <span style="font-size: 14px;">WARNING: This node deletes ioBroker objects permanently.</span>
+        <div style="margin-top: 8px; font-size: 12px; font-weight: normal;">
+            Use it only for deliberate cleanup. Recursive deletion can remove whole object trees.
+        </div>
+    </div>
+
+    <div class="form-row">
+        <label for="node-input-name"><i class="fa fa-tag"></i> Name</label>
+        <input type="text" id="node-input-name" placeholder="Name">
+    </div>
+
+    <div class="form-row">
+        <label for="node-input-objectId"><i class="fa fa-dot-circle-o"></i> Object ID</label>
+        <input type="text" id="node-input-objectId" placeholder="Leave empty to use msg.objectId">
+    </div>
+
+    <div class="form-row">
+        <label>&nbsp;</label>
+        <input type="checkbox" id="node-input-recursive" style="display: inline-block; width: auto; vertical-align: top;">
+        <label for="node-input-recursive" style="width: auto; margin-left: 5px;">Delete children recursively</label>
+    </div>
+
+    <div class="form-row">
+        <label>&nbsp;</label>
+        <input type="checkbox" id="node-input-maintenance" style="display: inline-block; width: auto; vertical-align: top;">
+        <label for="node-input-maintenance" style="width: auto; margin-left: 5px;">Maintenance mode</label>
+    </div>
+
+    <div class="form-row">
+        <label for="node-input-server"><i class="fa fa-server"></i> Server</label>
+        <input type="text" id="node-input-server">
+    </div>
+</script>
+
+<script type="text/html" data-help-name="iobdelobject">
+    <p>Delete ioBroker objects via WebSocket using <code>delObject</code> or <code>delObjects</code>.</p>
+
+    <h3>Configuration</h3>
+    <ul>
+        <li><b>Object ID:</b> Object ID to delete. Can be overridden by <code>msg.objectId</code>.</li>
+        <li><b>Delete children recursively:</b> Deletes the selected object and all child objects below it.</li>
+        <li><b>Maintenance mode:</b> Passes the maintenance flag to the backend.</li>
+        <li><b>Server:</b> The ioBroker server configuration.</li>
+    </ul>
+
+    <h3>Input</h3>
+    <ul>
+        <li><code>msg.objectId</code>: optional object ID override</li>
+        <li><code>msg.recursive</code>: optional boolean override for recursive deletion</li>
+        <li><code>msg.maintenance</code>: optional boolean override for maintenance mode. When <code>true</code>, the backend may allow deletion of invalid or non-standard IDs that would normally be rejected by validation.</li>
+    </ul>
+
+    <h3>Output</h3>
+    <p>On success the node emits a message with deletion metadata:</p>
+    <pre>{
+  payload: {
+    success: true,
+    objectId: '0_userdata.0.test',
+    recursive: false,
+    maintenance: false
+  }
+}</pre>
+
+    <h3>Warning</h3>
+    <p>Deleting an object also removes its definition from ioBroker. For state objects this is more than clearing a value.</p>
+</script>
