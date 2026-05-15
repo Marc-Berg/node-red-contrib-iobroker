@@ -1,6 +1,6 @@
 {
   "name": "node-red-contrib-iobroker",
-  "version": "1.4.0-beta.1",
+  "version": "1.4.0-beta.3",
   "description": "Node-RED nodes for ioBroker integration via WebSocket. Provides input, output, get, object management, historical data access, and live log monitoring capabilities.",
   "keywords": [
     "node-red",
@@ -51,6 +51,7 @@
       "iobget": "nodes/iob-get.js",
       "iobgetobject": "nodes/iob-getobject.js",
       "iobsetobject": "nodes/iob-setobject.js",
+      "iobdelobject": "nodes/iob-delobject.js",
       "iobhistory": "nodes/iob-history.js",
       "ioblog": "nodes/iob-log.js",
       "iobsendto": "nodes/iob-sendto.js",
@@ -60,6 +61,7 @@
       "examples/iob-get.json",
       "examples/iob-getobject.json",
       "examples/iob-setobject.json",
+      "examples/iob-delobject.json",
       "examples/iob-history.json",
       "examples/iob-in.json",
       "examples/iob-inobject.json",

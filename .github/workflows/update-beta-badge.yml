@@ -33,18 +33,14 @@ jobs:
         with:
           node-version: '24'
 
-      - name: Generate beta badge JSON
+      - name: Commit and push badge update
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-        run: node .github/scripts/generate-beta-badge.mjs
-
-      - name: Commit and push badge update
         run: |
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
           git fetch origin main
-          git checkout main
-          # Re-generate badge on the correct branch to avoid conflicts
+          git checkout -B main origin/main
           node .github/scripts/generate-beta-badge.mjs
           if git diff --quiet .github/badges/beta.json; then
             echo "No badge changes after re-check on main"
