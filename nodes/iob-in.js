@@ -417,6 +417,7 @@ module.exports = function (RED) {
                     if (isSingleState && stateId === subscriptionPattern) {
                         node.lastValue = undefined;
                         node.hasReceivedValue = false;
+                        updateStatusWithValue();
                     }
                     node.debug(`State deleted/invalidated for ${stateId}`);
                     return;
@@ -430,6 +431,11 @@ module.exports = function (RED) {
                 if (state.val === undefined) {
                     node.currentStateValues.delete(stateId);
                     node.previous.delete(stateId);
+                    if (isSingleState && stateId === subscriptionPattern) {
+                        node.lastValue = undefined;
+                        node.hasReceivedValue = false;
+                        updateStatusWithValue();
+                    }
                     node.debug(`State without value ignored for ${stateId}`);
                     return;
                 }
