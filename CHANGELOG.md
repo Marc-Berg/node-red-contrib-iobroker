@@ -1,6 +1,6 @@
 # Changelog
 
-## [1.4.0] - 2026-xx-xx
+## [1.4.0] - 2026-05-15
 
 ### **Added**
 - New **WS ioB delObj** node for deleting ioBroker objects via WebSocket
