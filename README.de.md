@@ -73,6 +73,7 @@ Das Diagramm zeigt die empfohlene Architektur mit einer dedizierten Admin Adapte
 | **WS ioB get** | Aktuelle State-Werte lesen | Sensormesswerte bei Bedarf abrufen | [📖 Details](docs/nodes/iob-get.md) |
 | **WS ioB getObj** | Objektdefinitionen abrufen | Geräte-Metadaten zugreifen | [📖 Details](docs/nodes/iob-getobject.md) |
 | **WS ioB setObj** | Objektdefinitionen schreiben/ändern | Instanz-Einstellungen aktualisieren, Objekteigenschaften ändern | [📖 Details](docs/nodes/iob-setobject.md) |
+| **WS ioB delObj** | Objektdefinitionen löschen (optional rekursiv) | Veraltete Devices, Channels oder States entfernen | [📖 Details](docs/nodes/iob-delobject.md) |
 | **WS ioB inObj** | Objektänderungen überwachen | Adapter-Installationen verfolgen | [📖 Details](docs/nodes/iob-inobject.md) |
 | **WS ioB history** | Auf historische Daten zugreifen | Energieverbrauchsanalyse | [📖 Details](docs/nodes/iob-history.md) |
 | **WS ioB log** | Live-Log Überwachung | Systemzustand überwachen | [📖 Details](docs/nodes/iob-log.md) |
