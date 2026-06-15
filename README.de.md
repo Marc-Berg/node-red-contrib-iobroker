@@ -1,6 +1,6 @@
 # Node-RED Nodes für ioBroker Integration
 
-[![Latest](https://img.shields.io/github/v/release/Marc-Berg/node-red-contrib-iobroker)](https://github.com/Marc-Berg/node-red-contrib-iobroker/releases/latest)
+[![npm version](https://img.shields.io/npm/v/node-red-contrib-iobroker)](https://www.npmjs.com/package/node-red-contrib-iobroker)
 [![Pre-Release](https://img.shields.io/endpoint?url=https://raw.githubusercontent.com/Marc-Berg/node-red-contrib-iobroker/main/.github/badges/beta.json&cacheSeconds=300)](https://github.com/Marc-Berg/node-red-contrib-iobroker/releases)
 ![License](https://img.shields.io/badge/license-MIT-blue.svg)
 ![Node-RED](https://img.shields.io/badge/Node--RED-compatible-red.svg)
