@@ -1,0 +1,364 @@
+[
+    {
+        "id": "example.subflow.dynamic.trigger",
+        "type": "tab",
+        "label": "External Trigger - Subflow Helper",
+        "disabled": false,
+        "info": "Example flow that uses a reusable subflow for external iob-in triggering.\n\nInputs:\n- msg.action: cached | topic | array\n- msg.targetName or msg.targetId (optional)\n- msg.topic for action=topic\n- msg.payload (array) or msg.topics for action=array\n- msg.outputMode (optional): individual | grouped\n\nOutputs:\n- Output 1: success\n- Output 2: error"
+    },
+    {
+        "id": "subflow.iob.dynamic.trigger",
+        "type": "subflow",
+        "name": "ioBroker External Trigger Helper",
+        "info": "Reusable helper for external iob-in triggering.\n\nSelection strategy:\n1) msg.targetId\n2) msg.targetName\n3) first compatible registered node\n\nActions:\n- cached\n- topic\n- array",
+        "category": "function",
+        "in": [
+            {
+                "x": 60,
+                "y": 100,
+                "wires": [
+                    {
+                        "id": "subflow.fn.trigger",
+                        "port": 0
+                    }
+                ]
+            }
+        ],
+        "out": [
+            {
+                "x": 620,
+                "y": 80,
+                "wires": [
+                    {
+                        "id": "subflow.out.success",
+                        "port": 0
+                    }
+                ]
+            },
+            {
+                "x": 620,
+                "y": 140,
+                "wires": [
+                    {
+                        "id": "subflow.out.error",
+                        "port": 0
+                    }
+                ]
+            }
+        ],
+        "env": [],
+        "meta": {},
+        "color": "#D8BFD8"
+    },
+    {
+        "id": "subflow.in.1",
+        "type": "subflow-input",
+        "z": "subflow.iob.dynamic.trigger",
+        "name": "in",
+        "x": 140,
+        "y": 100,
+        "wires": [
+            [
+                "subflow.fn.trigger"
+            ]
+        ]
+    },
+    {
+        "id": "subflow.fn.trigger",
+        "type": "function",
+        "z": "subflow.iob.dynamic.trigger",
+        "name": "resolve + trigger",
+        "func": "const triggerGroup = typeof msg.triggerGroup === 'string' && msg.triggerGroup.trim() ? msg.triggerGroup.trim() : 'iobroker_in_nodes';\nconst registered = flow.get(triggerGroup) || {};\nconst targetId = typeof msg.targetId === 'string' ? msg.targetId.trim() : '';\nconst targetName = typeof msg.targetName === 'string' ? msg.targetName.trim() : '';\nconst action = String(msg.action || 'cached').trim().toLowerCase();\n\nconst allNodes = Object.entries(registered).map(([id, node]) => ({ id, node }));\n\nfunction supports(node, selectedAction) {\n    if (selectedAction === 'cached') return typeof node.triggerCached === 'function';\n    if (selectedAction === 'topic') return node.supportsDynamicTopic && typeof node.triggerWithTopic === 'function';\n    if (selectedAction === 'array') return node.supportsDynamicArray && typeof node.triggerWithTopicArray === 'function';\n    return false;\n}\n\nfunction pickCandidate(selectedAction) {\n    if (targetId && registered[targetId] && supports(registered[targetId], selectedAction)) {\n        return { id: targetId, node: registered[targetId] };\n    }\n\n    if (targetName) {\n        const byName = allNodes.find((entry) => entry.node && entry.node.name === targetName && supports(entry.node, selectedAction));\n        if (byName) return byName;\n    }\n\n    return allNodes.find((entry) => entry.node && supports(entry.node, selectedAction));\n}\n\nfunction sendSuccess(candidate, extra) {\n    msg.dynamicTrigger = Object.assign({\n        action,\n        triggerGroup,\n        targetId: candidate.id,\n        targetName: candidate.node.name || '',\n        mode: candidate.node.mode || ''\n    }, extra || {});\n\n    node.status({ fill: 'green', shape: 'dot', text: `${action} ok` });\n    node.send([msg, null]);\n    node.done();\n}\n\nfunction sendError(reason) {\n    const errMsg = RED.util.cloneMessage(msg);\n    errMsg.error = { message: reason, action, triggerGroup, targetId, targetName };\n    node.status({ fill: 'red', shape: 'ring', text: reason });\n    node.send([null, errMsg]);\n    node.done();\n}\n\nif (!['cached', 'topic', 'array'].includes(action)) {\n    sendError('msg.action must be cached, topic or array');\n    return;\n}\n\nconst candidate = pickCandidate(action);\nif (!candidate || !candidate.node) {\n    sendError('No compatible iob-in node found for requested action');\n    return;\n}\n\nif (action === 'cached') {\n    try {\n        candidate.node.triggerCached();\n        sendSuccess(candidate);\n    } catch (error) {\n        sendError(`Cached trigger failed: ${error.message}`);\n    }\n    return;\n}\n\nif (action === 'topic') {\n    const topic = typeof msg.topic === 'string' ? msg.topic.trim() : '';\n    if (!topic) {\n        sendError('msg.topic must be a non-empty string for action=topic');\n        return;\n    }\n\n    candidate.node.triggerWithTopic(topic)\n        .then(() => sendSuccess(candidate, { topic }))\n        .catch((error) => sendError(`Topic switch failed: ${error.message}`));\n    return;\n}\n\nconst rawTopics = Array.isArray(msg.payload) ? msg.payload : (Array.isArray(msg.topics) ? msg.topics : []);\nconst topics = rawTopics.filter((item) => typeof item === 'string').map((item) => item.trim()).filter(Boolean);\nif (topics.length === 0) {\n    sendError('Provide topics as non-empty string array in msg.payload or msg.topics for action=array');\n    return;\n}\n\nconst outputMode = msg.outputMode === 'individual' || msg.outputMode === 'grouped' ? msg.outputMode : undefined;\ncandidate.node.triggerWithTopicArray(topics, outputMode)\n    .then(() => sendSuccess(candidate, { topicsCount: topics.length, outputMode: outputMode || 'unchanged' }))\n    .catch((error) => sendError(`Array switch failed: ${error.message}`));",
+        "outputs": 2,
+        "timeout": "",
+        "noerr": 0,
+        "initialize": "",
+        "finalize": "",
+        "libs": [],
+        "x": 360,
+        "y": 100,
+        "wires": [
+            [
+                "subflow.out.success"
+            ],
+            [
+                "subflow.out.error"
+            ]
+        ]
+    },
+    {
+        "id": "subflow.out.success",
+        "type": "subflow-output",
+        "z": "subflow.iob.dynamic.trigger",
+        "name": "success",
+        "x": 540,
+        "y": 80,
+        "wires": [
+            []
+        ]
+    },
+    {
+        "id": "subflow.out.error",
+        "type": "subflow-output",
+        "z": "subflow.iob.dynamic.trigger",
+        "name": "error",
+        "x": 540,
+        "y": 140,
+        "wires": [
+            []
+        ]
+    },
+    {
+        "id": "iob.in.single.example",
+        "type": "iobin",
+        "z": "example.subflow.dynamic.trigger",
+        "name": "Dynamic ioBroker State",
+        "server": "iob.config.1",
+        "state": "system.adapter.admin.0.alive",
+        "multipleStates": "",
+        "inputMode": "single",
+        "outputProperty": "payload",
+        "ackFilter": "both",
+        "sendInitialValue": true,
+        "useWildcard": false,
+        "outputMode": "individual",
+        "filterMode": "all",
+        "enableExternalTrigger": true,
+        "triggerGroup": "iobroker_in_nodes",
+        "x": 310,
+        "y": 180,
+        "wires": [
+            [
+                "debug.iob.single"
+            ]
+        ]
+    },
+    {
+        "id": "iob.in.multiple.example",
+        "type": "iobin",
+        "z": "example.subflow.dynamic.trigger",
+        "name": "Dynamic Multiple States",
+        "server": "iob.config.1",
+        "state": "",
+        "multipleStates": "system.adapter.admin.0.alive\nsystem.adapter.admin.0.connected",
+        "inputMode": "multiple",
+        "outputProperty": "payload",
+        "ackFilter": "both",
+        "sendInitialValue": true,
+        "useWildcard": false,
+        "outputMode": "individual",
+        "filterMode": "all",
+        "enableExternalTrigger": true,
+        "triggerGroup": "iobroker_in_nodes",
+        "x": 320,
+        "y": 240,
+        "wires": [
+            [
+                "debug.iob.multiple"
+            ]
+        ]
+    },
+    {
+        "id": "inject.cached",
+        "type": "inject",
+        "z": "example.subflow.dynamic.trigger",
+        "name": "Cached: single node",
+        "props": [
+            {
+                "p": "action",
+                "v": "cached",
+                "vt": "str"
+            },
+            {
+                "p": "targetName",
+                "v": "Dynamic ioBroker State",
+                "vt": "str"
+            }
+        ],
+        "repeat": "",
+        "crontab": "",
+        "once": false,
+        "onceDelay": 0.1,
+        "topic": "",
+        "x": 130,
+        "y": 340,
+        "wires": [
+            [
+                "subflow.instance.1"
+            ]
+        ]
+    },
+    {
+        "id": "inject.topic.switch",
+        "type": "inject",
+        "z": "example.subflow.dynamic.trigger",
+        "name": "Topic: hm-rpc.0.alive",
+        "props": [
+            {
+                "p": "action",
+                "v": "topic",
+                "vt": "str"
+            },
+            {
+                "p": "targetName",
+                "v": "Dynamic ioBroker State",
+                "vt": "str"
+            },
+            {
+                "p": "topic",
+                "v": "system.adapter.hm-rpc.0.alive",
+                "vt": "str"
+            }
+        ],
+        "repeat": "",
+        "crontab": "",
+        "once": false,
+        "onceDelay": 0.1,
+        "x": 120,
+        "y": 380,
+        "wires": [
+            [
+                "subflow.instance.1"
+            ]
+        ]
+    },
+    {
+        "id": "inject.array.switch",
+        "type": "inject",
+        "z": "example.subflow.dynamic.trigger",
+        "name": "Array: adapter states",
+        "props": [
+            {
+                "p": "action",
+                "v": "array",
+                "vt": "str"
+            },
+            {
+                "p": "targetName",
+                "v": "Dynamic Multiple States",
+                "vt": "str"
+            },
+            {
+                "p": "payload",
+                "v": "[\"system.adapter.admin.0.alive\",\"system.adapter.admin.0.connected\",\"system.adapter.admin.0.memRss\"]",
+                "vt": "json"
+            },
+            {
+                "p": "outputMode",
+                "v": "grouped",
+                "vt": "str"
+            }
+        ],
+        "repeat": "",
+        "crontab": "",
+        "once": false,
+        "onceDelay": 0.1,
+        "x": 120,
+        "y": 420,
+        "wires": [
+            [
+                "subflow.instance.1"
+            ]
+        ]
+    },
+    {
+        "id": "subflow.instance.1",
+        "type": "subflow:subflow.iob.dynamic.trigger",
+        "z": "example.subflow.dynamic.trigger",
+        "name": "Trigger Helper",
+        "x": 370,
+        "y": 380,
+        "wires": [
+            [
+                "debug.success"
+            ],
+            [
+                "debug.error"
+            ]
+        ]
+    },
+    {
+        "id": "debug.success",
+        "type": "debug",
+        "z": "example.subflow.dynamic.trigger",
+        "name": "Trigger Success",
+        "active": true,
+        "tosidebar": true,
+        "console": false,
+        "tostatus": false,
+        "complete": "dynamicTrigger",
+        "targetType": "msg",
+        "x": 580,
+        "y": 360,
+        "wires": []
+    },
+    {
+        "id": "debug.error",
+        "type": "debug",
+        "z": "example.subflow.dynamic.trigger",
+        "name": "Trigger Error",
+        "active": true,
+        "tosidebar": true,
+        "console": false,
+        "tostatus": false,
+        "complete": "error",
+        "targetType": "msg",
+        "x": 570,
+        "y": 420,
+        "wires": []
+    },
+    {
+        "id": "debug.iob.single",
+        "type": "debug",
+        "z": "example.subflow.dynamic.trigger",
+        "name": "Single iob-in Output",
+        "active": true,
+        "tosidebar": true,
+        "console": false,
+        "tostatus": false,
+        "complete": "true",
+        "targetType": "full",
+        "x": 560,
+        "y": 180,
+        "wires": []
+    },
+    {
+        "id": "debug.iob.multiple",
+        "type": "debug",
+        "z": "example.subflow.dynamic.trigger",
+        "name": "Multiple iob-in Output",
+        "active": true,
+        "tosidebar": true,
+        "console": false,
+        "tostatus": false,
+        "complete": "true",
+        "targetType": "full",
+        "x": 570,
+        "y": 240,
+        "wires": []
+    },
+    {
+        "id": "comment.subflow",
+        "type": "comment",
+        "z": "example.subflow.dynamic.trigger",
+        "name": "Reusable Subflow-based Triggering",
+        "info": "This flow shows how to encapsulate external triggering logic in a reusable subflow.\n\nSet msg.action to one of:\n- cached\n- topic\n- array\n\nOptional target selection:\n- msg.targetId\n- msg.targetName\n\nThe helper emits success/error on separate outputs.",
+        "x": 170,
+        "y": 300,
+        "wires": []
+    },
+    {
+        "id": "iob.config.1",
+        "type": "iob-config",
+        "host": "localhost",
+        "port": "8082",
+        "protocol": "socketio",
+        "secure": false,
+        "auth": false,
+        "username": "",
+        "password": "",
+        "reconnectInterval": "5000",
+        "connectionTimeout": "10000",
+        "enableDefaultErrorLog": true
+    }
+]
