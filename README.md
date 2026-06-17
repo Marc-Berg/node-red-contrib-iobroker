@@ -129,6 +129,7 @@ If you prefer not to use a Admin instance:
 - **📋 Release Notes**: [Changelog](https://github.com/Marc-Berg/node-red-contrib-iobroker/blob/main/CHANGELOG.md)
 - **🔍 Troubleshooting**: [Troubleshooting Guide](https://github.com/Marc-Berg/node-red-contrib-iobroker/blob/main/docs/troubleshooting.md)
 - **📊 Logging**: [Logging Guide](https://github.com/Marc-Berg/node-red-contrib-iobroker/blob/main/docs/logging.md) - Understanding log messages and troubleshooting
+- **⚡ External Triggering**: [Dynamic Topic Switching](https://github.com/Marc-Berg/node-red-contrib-iobroker/blob/main/docs/external-triggering-dynamic.md)
 - **🎯 Use Cases**: [Common Use Cases](https://github.com/Marc-Berg/node-red-contrib-iobroker/blob/main/docs/use-cases.md)
 - **📖 Full Documentation**: [GitHub Repository](https://github.com/Marc-Berg/node-red-contrib-iobroker)
 - **🐛 Bug Reports**: [GitHub Issues](https://github.com/Marc-Berg/node-red-contrib-iobroker/issues)

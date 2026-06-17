@@ -183,6 +183,8 @@ Send only value changes (with baseline):
 
 iob-in nodes automatically cache all received state values and can be triggered externally by Function nodes to resend their last cached values. This feature is **configurable** and **organized by trigger groups**.
 
+For a deeper walkthrough of dynamic topic switching and array switching, see [External Triggering - Dynamic Topic Switching](../external-triggering-dynamic.md).
+
 ### Configuration (Advanced Tab)
 
 **Enable external triggering** (Checkbox)
