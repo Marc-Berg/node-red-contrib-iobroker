@@ -80,6 +80,16 @@ The diagram shows the recommended architecture with a dedicated Admin adapter in
 | **WS ioB log** | Live log monitoring | System health monitoring | [📖 Details](docs/nodes/iob-log.md) |
 | **WS ioB sendTo** | Send commands to ioBroker adapters | Telegram notifications, database queries | [📖 Details](docs/nodes/iob-sendto.md) |
 
+## 🧪 Examples
+
+Ready-to-import Node-RED example flows are available in [examples](examples).
+
+Use them like this:
+1. Open Node-RED and choose **Menu > Import**.
+2. Open the left menu **Examples**.
+3. Select a JSON file and import it.
+4. Deploy the flow and make sure the `iob-config` node points to a working ioBroker instance.
+
 ## 🔧 Configuration
 
 ### Recommended Setup: Dedicated Admin Instance
@@ -129,7 +139,6 @@ If you prefer not to use a Admin instance:
 - **📋 Release Notes**: [Changelog](https://github.com/Marc-Berg/node-red-contrib-iobroker/blob/main/CHANGELOG.md)
 - **🔍 Troubleshooting**: [Troubleshooting Guide](https://github.com/Marc-Berg/node-red-contrib-iobroker/blob/main/docs/troubleshooting.md)
 - **📊 Logging**: [Logging Guide](https://github.com/Marc-Berg/node-red-contrib-iobroker/blob/main/docs/logging.md) - Understanding log messages and troubleshooting
-- **⚡ External Triggering**: [Dynamic Topic Switching](https://github.com/Marc-Berg/node-red-contrib-iobroker/blob/main/docs/external-triggering-dynamic.md)
 - **🎯 Use Cases**: [Common Use Cases](https://github.com/Marc-Berg/node-red-contrib-iobroker/blob/main/docs/use-cases.md)
 - **📖 Full Documentation**: [GitHub Repository](https://github.com/Marc-Berg/node-red-contrib-iobroker)
 - **🐛 Bug Reports**: [GitHub Issues](https://github.com/Marc-Berg/node-red-contrib-iobroker/issues)

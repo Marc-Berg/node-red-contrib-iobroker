@@ -79,6 +79,16 @@ Das Diagramm zeigt die empfohlene Architektur mit einer dedizierten Admin Adapte
 | **WS ioB log** | Live-Log Überwachung | Systemzustand überwachen | [📖 Details](docs/nodes/iob-log.md) |
 | **WS ioB sendTo** | Befehle an ioBroker Adapter senden | Telegram-Benachrichtigungen, Datenbankabfragen | [📖 Details](docs/nodes/iob-sendto.md) |
 
+## 🧪 Beispiele
+
+Im Ordner [examples](examples) liegen direkt importierbare Node-RED Beispiel-Flows.
+
+So verwendest du sie:
+1. In Node-RED **Menü > Importieren** öffnen.
+2. Links das Menü **Beispiele** öffnen.
+3. Eine JSON-Datei markieren und importieren.
+4. Flow deployen und sicherstellen, dass der `iob-config` Node mit einer funktionierenden ioBroker Instanz verbunden ist.
+
 ## 🔧 Konfiguration
 
 ### Empfohlene Einrichtung: Dedizierte Admin Instanz
