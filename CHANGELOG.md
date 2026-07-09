@@ -1,5 +1,10 @@
 # Changelog
 
+## [1.4.1] - 2026-07-09
+
+### **Changed**
+- Updated dependencies
+
 ## [1.4.0] - 2026-05-15
 
 ### **Added**
