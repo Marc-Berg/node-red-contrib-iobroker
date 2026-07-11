@@ -11,10 +11,19 @@ on:
 
 jobs:
   dry-run:
+    if: ${{ github.ref == 'refs/heads/chore/npm-publish-hardening' || github.ref == 'refs/heads/main' }}
     runs-on: ubuntu-latest
     permissions:
       contents: read
     steps:
+      - name: Validate allowed branch
+        run: |
+          echo "Workflow ref: ${GITHUB_REF}"
+          if [ "${GITHUB_REF}" != "refs/heads/chore/npm-publish-hardening" ] && [ "${GITHUB_REF}" != "refs/heads/main" ]; then
+            echo "❌ Branch not allowed for dry-run workflow"
+            exit 1
+          fi
+
       - name: Checkout code
         uses: actions/checkout@v5
 
