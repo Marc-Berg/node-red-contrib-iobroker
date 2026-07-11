@@ -1,5 +1,11 @@
 # Changelog
 
+## [1.4.2] - 2026-07-11
+
+### **Changed**
+- Updated `express` dependency
+- Migrated npm publishing workflows to Trusted Publishing (OIDC)
+
 ## [1.4.1] - 2026-07-09
 
 ### **Changed**
