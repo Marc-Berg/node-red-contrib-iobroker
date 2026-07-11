@@ -92,20 +92,17 @@ jobs:
         uses: actions/setup-node@v5
         with:
           node-version: 22
-          registry-url: https://registry.npmjs.org/
           cache: 'npm'
       - name: Install dependencies
         run: npm ci
       - name: Publish to NPM
-        env:
-          NODE_AUTH_TOKEN: ""
         run: |
           if [ "${{ needs.check-version.outputs.is_prerelease }}" = "true" ]; then
             echo "🚀 Publishing pre-release version ${{ needs.check-version.outputs.new_version }} to NPM with tag 'next'"
-            npm publish --tag next --provenance
+            npm publish --registry=https://registry.npmjs.org/ --tag next --provenance
           else
             echo "🚀 Publishing stable version ${{ needs.check-version.outputs.new_version }} to NPM with tag 'latest'"
-            npm publish --provenance
+            npm publish --registry=https://registry.npmjs.org/ --provenance
           fi
   create-github-release:
     needs: [check-version]
