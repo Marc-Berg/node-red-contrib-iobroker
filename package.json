@@ -16,7 +16,7 @@
   "license": "MIT",
   "repository": {
     "type": "git",
-    "url": "https://github.com/Marc-Berg/node-red-contrib-iobroker.git"
+    "url": "git+https://github.com/Marc-Berg/node-red-contrib-iobroker.git"
   },
   "homepage": "https://github.com/Marc-Berg/node-red-contrib-iobroker#readme",
   "bugs": {
