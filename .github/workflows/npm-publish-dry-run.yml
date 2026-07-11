@@ -1,0 +1,45 @@
+name: NPM Publish Dry Run
+
+on:
+  workflow_dispatch:
+    inputs:
+      check_auth:
+        description: 'Run npm whoami with NPM_TOKEN'
+        required: false
+        default: false
+        type: boolean
+
+jobs:
+  dry-run:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v5
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v5
+        with:
+          node-version: 20
+          registry-url: https://registry.npmjs.org/
+          cache: npm
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Show package content (dry-run)
+        run: npm pack --dry-run
+
+      - name: Optional auth check (npm whoami)
+        if: ${{ inputs.check_auth == true }}
+        run: npm whoami
+        env:
+          NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
+
+      - name: Simulate npm publish (dry-run)
+        run: |
+          echo "🧪 Running npm publish --dry-run"
+          npm publish --dry-run
+        env:
+          NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
