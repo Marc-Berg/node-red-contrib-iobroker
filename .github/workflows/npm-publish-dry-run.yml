@@ -2,12 +2,6 @@ name: NPM Publish Dry Run
 
 on:
   workflow_dispatch:
-    inputs:
-      check_auth:
-        description: 'Run npm whoami with NPM_TOKEN'
-        required: false
-        default: false
-        type: boolean
 
 jobs:
   dry-run:
@@ -15,6 +9,7 @@ jobs:
     runs-on: ubuntu-latest
     permissions:
       contents: read
+      id-token: write
     steps:
       - name: Validate allowed branch
         run: |
@@ -40,15 +35,7 @@ jobs:
       - name: Show package content (dry-run)
         run: npm pack --dry-run
 
-      - name: Optional auth check (npm whoami)
-        if: ${{ inputs.check_auth == true }}
-        run: npm whoami
-        env:
-          NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
-
-      - name: Simulate npm publish (dry-run)
+      - name: Simulate npm publish with trusted publishing (dry-run)
         run: |
-          echo "🧪 Running npm publish --dry-run"
-          npm publish --dry-run
-        env:
-          NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
+          echo "🧪 Running npm publish --dry-run --provenance"
+          npm publish --dry-run --provenance

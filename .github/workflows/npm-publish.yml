@@ -84,6 +84,7 @@ jobs:
     runs-on: ubuntu-latest
     permissions:
       contents: read
+      id-token: write
     steps:
       - name: Checkout code
         uses: actions/checkout@v5
@@ -98,9 +99,7 @@ jobs:
       - name: Publish to NPM
         run: |
           echo "🚀 Publishing stable version ${{ needs.check-version.outputs.new_version }} to NPM"
-          npm publish
-        env:
-          NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
+          npm publish --provenance
   create-github-release:
     needs: [check-version]
     if: ${{ needs.check-version.outputs.version_changed == 'true' }}
