@@ -1,6 +1,6 @@
 {
   "name": "node-red-contrib-iobroker",
-  "version": "1.4.1",
+  "version": "1.4.2",
   "description": "Node-RED nodes for ioBroker integration via WebSocket. Provides input, output, get, object management, historical data access, and live log monitoring capabilities.",
   "keywords": [
     "node-red",
@@ -16,7 +16,7 @@
   "license": "MIT",
   "repository": {
     "type": "git",
-    "url": "https://github.com/Marc-Berg/node-red-contrib-iobroker.git"
+    "url": "git+https://github.com/Marc-Berg/node-red-contrib-iobroker.git"
   },
   "homepage": "https://github.com/Marc-Berg/node-red-contrib-iobroker#readme",
   "bugs": {
