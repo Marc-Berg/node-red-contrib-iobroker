@@ -28,7 +28,7 @@
   "dependencies": {
     "dayjs": "^1.11.21",
     "express": "^4.22.2",
-    "ws": "^8.21.0"
+    "ws": "^8.21.1"
   },
   "files": [
     "nodes/*.js",
