@@ -27,7 +27,7 @@
   },
   "dependencies": {
     "dayjs": "^1.11.21",
-    "express": "^4.22.2",
+    "express": "^5.2.1",
     "ws": "^8.21.1"
   },
   "files": [
