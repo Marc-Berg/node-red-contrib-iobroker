@@ -1,15 +1,21 @@
 # Changelog
 
-## [1.5.1-beta.1] - 2026-10-05
+## [1.5.1] - 2026-10-05
 
 ### **Fixed**
 - Escaped dynamic object IDs, labels, and search text in the shared TreeView to prevent HTML injection in the Node-RED editor
 - Preserved `0` percentile and quantile values from node configuration and message overrides
 - Fixed the `silly` log level so its zero threshold includes all log messages and `msg.log.level` preserves the numeric value `0`
+- Kept distinct wildcard subscriptions unless coverage can be confirmed, preventing valid state patterns from being skipped
 
 ### **Improved**
 - Removed redundant child-list scans while building TreeView hierarchies
 - Reused existing match and ancestor markers when filtering TreeView searches instead of recursively rescanning descendants
+- Cleared operation timeout timers after success, failure, or timeout
+
+### **Changed**
+- Updated `dayjs`, `express`, and `ws` to patched compatible versions
+- Restricted npm publishing to stable releases; prereleases remain available as GitHub pre-releases
 
 ## [1.5.0] - 2026-10-05
 
