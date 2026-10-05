@@ -37,6 +37,18 @@
         CHUNK_SIZE: 100,
         CACHE_DURATION: 5 * 60 * 1000
     };
+
+    const HTML_ENTITIES = {
+        '&': '&amp;',
+        '<': '&lt;',
+        '>': '&gt;',
+        '"': '&quot;',
+        "'": '&#39;'
+    };
+
+    function escapeHTML(value) {
+        return String(value).replace(/[&<>"']/g, character => HTML_ENTITIES[character]);
+    }
     
     const cache = new Map();
     
@@ -128,7 +140,7 @@
                 $(`#node-input-${nodeType === 'iobin' ? 'state' : nodeType.replace('iob', '')}`).after(info);
             }
             
-            const warningText = warnings.length ? `<div style="color: #f39c12; margin-top: 5px;"><i class="fa fa-exclamation-triangle"></i> ${warnings.join('; ')}</div>` : '';
+            const warningText = warnings.length ? `<div style="color: #f39c12; margin-top: 5px;"><i class="fa fa-exclamation-triangle"></i> ${warnings.map(escapeHTML).join('; ')}</div>` : '';
             info.html(`
                 <div style="background: #e8f4fd; border: 1px solid #bee5eb; border-radius: 4px; padding: 10px; font-size: 13px; color: #0c5460; margin-top: 5px;">
                     <i class="fa fa-info-circle" style="color: #17a2b8; margin-right: 5px;"></i>
@@ -392,7 +404,7 @@
         render() {
             const nodes = this.data.filtered;
             if (!nodes.length) {
-                this.content.innerHTML = `<div class="iob-empty">${this.data.searchMode ? `No results for "${this.data.searchTerm}"` : 'No items'}</div>`;
+                this.content.innerHTML = `<div class="iob-empty">${this.data.searchMode ? `No results for "${escapeHTML(this.data.searchTerm)}"` : 'No items'}</div>`;
                 return;
             }
             
@@ -413,16 +425,22 @@
             const label = this.highlightSearch(node.label);
             const padding = (node.depth * 16) + 8;
             
-            return `<div class="${classes.join(' ')}" data-id="${node.id}" style="padding-left:${padding}px">
+            const escapedId = escapeHTML(node.id);
+
+            return `<div class="${classes.join(' ')}" data-id="${escapedId}" style="padding-left:${padding}px">
                 <span class="iob-icon">${icon}</span>
-                <span class="iob-label" title="${node.id}">${label}</span>
+                <span class="iob-label" title="${escapedId}">${label}</span>
             </div>`;
         }
         
         highlightSearch(text) {
-            if (!this.data.searchMode || !this.data.searchTerm) return text;
+            if (!this.data.searchMode || !this.data.searchTerm) return escapeHTML(text);
             const term = this.data.searchTerm.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
-            return text.replace(new RegExp(`(${term})`, 'gi'), '<mark>$1</mark>');
+            const parts = String(text).split(new RegExp(`(${term})`, 'gi'));
+            return parts.map((part, index) => index % 2
+                ? `<mark>${escapeHTML(part)}</mark>`
+                : escapeHTML(part)
+            ).join('');
         }
         
         handleClick(e) {
@@ -441,7 +459,7 @@
         scrollToSelected() {
             if (!this.selectedId) return;
             
-            const selectedElement = this.container.querySelector(`[data-id="${this.selectedId}"]`);
+            const selectedElement = this.container.querySelector('.iob-item.selected');
             if (!selectedElement) return;
             
             const elementTop = selectedElement.offsetTop;
@@ -586,7 +604,8 @@
         function updateLabel(text, isFolder = false) {
             stateLabel.find('.iob-info').remove();
             if (text) {
-                const info = $(`<span class="iob-info${isFolder ? ' folder' : ''}" title="${text}">${text}</span>`);
+                const escapedText = escapeHTML(text);
+                const info = $(`<span class="iob-info${isFolder ? ' folder' : ''}" title="${escapedText}">${escapedText}</span>`);
                 stateLabel.append(info);
             }
         }
@@ -814,7 +833,7 @@
             searchTimeout = setTimeout(() => {
                 if (treeView && treeData) {
                     const results = treeView.search($(this).val().trim());
-                    elements.stats.html(results.searchTerm ? 
+                    elements.stats.text(results.searchTerm ?
                         `Found ${results.results.length} matches for "${results.searchTerm}"` : 
                         `Showing all ${itemType}`
                     ).toggle(!!results.searchTerm);
