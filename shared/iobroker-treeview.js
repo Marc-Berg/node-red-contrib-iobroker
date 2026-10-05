@@ -233,7 +233,7 @@
             for (const [nodeId, node] of this.nodes) {
                 if (node.parent) {
                     const parent = this.nodes.get(node.parent);
-                    if (parent && !parent.children.includes(nodeId)) parent.children.push(nodeId);
+                    if (parent) parent.children.push(nodeId);
                 }
             }
             
