@@ -321,17 +321,8 @@
         
         filterForSearch() {
             for (const node of this.nodes.values()) {
-                node.visible = node.isMatch || node.isPathToMatch || this.hasMatchingChildren(node.id);
+                node.visible = node.isMatch || node.isPathToMatch;
             }
-        }
-        
-        hasMatchingChildren(nodeId) {
-            const node = this.nodes.get(nodeId);
-            if (!node || node.isLeaf) return false;
-            return node.children.some(childId => {
-                const child = this.nodes.get(childId);
-                return child && (child.isMatch || this.hasMatchingChildren(childId));
-            });
         }
         
         expandPathsToMatches() {
