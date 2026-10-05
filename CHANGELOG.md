@@ -1,5 +1,10 @@
 # Changelog
 
+## [1.5.0] - 2026-10-05
+
+### **Changed**
+- Added an `iob-config` option to control acceptance of self-signed TLS certificates. Self-signed certificates remain accepted by default for compatibility; disable the option to verify certificates and hostnames.
+
 ## [1.4.2] - 2026-07-11
 
 ### **Changed**
