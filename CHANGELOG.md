@@ -1,5 +1,12 @@
 # Changelog
 
+## [1.5.1] - 2026-10-05
+
+### **Fixed**
+- Escaped dynamic object IDs, labels, and search text in the shared TreeView to prevent HTML injection in the Node-RED editor
+- Preserved `0` percentile and quantile values from node configuration and message overrides
+- Fixed the `silly` log level so its zero threshold includes all log messages
+
 ## [1.5.0] - 2026-10-05
 
 ### **Changed**
