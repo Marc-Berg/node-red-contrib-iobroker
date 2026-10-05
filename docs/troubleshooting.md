@@ -48,6 +48,8 @@ INFO [NodeRegistry] Resubscribing to 8 state patterns
 2. Verify SSL port configuration
 3. Test with SSL disabled first to isolate issues
 
+For compatibility, **Allow self-signed certificates** is enabled by default in the `iob-config` profile. This disables certificate and hostname verification for both HTTPS and WSS. Disable it when the server uses a certificate issued by a trusted CA.
+
 **Success Log:**
 ```
 INFO [SocketClient] SSL connection established

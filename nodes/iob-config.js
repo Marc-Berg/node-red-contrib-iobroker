@@ -280,6 +280,7 @@ module.exports = function (RED) {
         this.user = typeof credentials.user === 'string' ? credentials.user.trim() : '';
         this.password = typeof credentials.password === 'string' ? credentials.password : '';
         this.usessl = n.usessl || false;
+        this.allowSelfSigned = n.allowSelfSigned !== false;
 
         const sslInfo = this.usessl ? ' (SSL enabled)' : '';
         const authInfo = this.user ? ' (with authentication)' : '';

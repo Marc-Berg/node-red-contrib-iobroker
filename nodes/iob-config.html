@@ -60,6 +60,7 @@
             iobhost: { value: "iobroker.local", required: true },
             iobport: { value: 8082, required: true, validate: RED.validators.number() },
             usessl: { value: false },
+            allowSelfSigned: { value: true },
             isDefault: { value: false }
         },
         credentials: {
@@ -70,6 +71,8 @@
             return this.name;
         },
         oneditprepare: function () {
+            $("#node-config-input-allowSelfSigned").prop('checked', this.allowSelfSigned !== false);
+
             // Function to show SSL info based on current settings
             function updateSSLInfo() {
                 var useSSL = $("#node-config-input-usessl").prop('checked');
@@ -150,8 +153,15 @@
             <ul style="margin: 8px 0 0 20px; padding: 0;">
                 <li>WebSocket will use WSS protocol</li>
                 <li>OAuth authentication will use HTTPS</li>
-                <li>Self-signed certificates are accepted</li>
+                <li>Self-signed certificates are accepted by default for compatibility</li>
             </ul>
+        </div>
+        <div class="form-row" style="margin-top: 10px;">
+            <label for="node-config-input-allowSelfSigned" style="width: auto;">
+                <input type="checkbox" id="node-config-input-allowSelfSigned" style="width: auto; margin-right: 5px;">
+                Allow self-signed certificates (disable certificate verification)
+            </label>
+            <div class="form-tips">Enabled by default for compatibility. Disable only when the server certificate is issued by a trusted CA.</div>
         </div>
     </div>
 </script>
@@ -172,7 +182,7 @@
     <ul>
         <li>WebSocket connections use WSS (WebSocket Secure)</li>
         <li>OAuth authentication uses HTTPS</li>
-        <li>Self-signed certificates are accepted</li>
+        <li>Self-signed certificates are accepted by default for compatibility. Disable “Allow self-signed certificates” when the server uses a certificate issued by a trusted CA; enabling it disables certificate and hostname verification.</li>
     </ul>
     
     <p>📖 <a href="https://github.com/Marc-Berg/node-red-contrib-iobroker/blob/main/README.md" target="_blank">Project README</a></p>

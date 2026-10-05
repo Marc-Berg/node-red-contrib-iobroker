@@ -105,6 +105,7 @@ Das Diagramm zeigt die empfohlene Architektur mit einer dedizierten Admin Adapte
 - **Host**: IP-Adresse (z.B. 192.168.1.100) oder Hostname (z.B. iobroker.local)
 - **Port**: Dein dedizierter Admin Instanz Port (z.B. 8091)
 - **SSL verwenden**: Für HTTPS/WSS Verbindungen aktivieren
+- **Selbstsignierte Zertifikate zulassen**: Aus Kompatibilitätsgründen standardmäßig aktiv; deaktiviert die Zertifikats- und Hostnamenprüfung. Deaktiviere die Option, wenn der Server ein Zertifikat einer vertrauenswürdigen CA verwendet.
 - **Standardprofil**: Wenn mehrere Profile vorhanden sind, kann eines für die automatische Auswahl im Editor markiert werden
 
 **Authentifizierungseinstellungen:**
