@@ -7,6 +7,11 @@ const timezone = require('dayjs/plugin/timezone');
 dayjs.extend(utc);
 dayjs.extend(timezone);
 
+function parseNumberOrDefault(value, fallback) {
+    const parsed = parseFloat(value);
+    return Number.isFinite(parsed) ? parsed : fallback;
+}
+
 module.exports = function (RED) {
     function iobhistory(config) {
         RED.nodes.createNode(this, config);
@@ -33,8 +38,8 @@ module.exports = function (RED) {
             maxEntries: parseInt(config.maxEntries) || 2000,
             outputProperty: config.outputProperty?.trim() || "payload",
             outputFormat: config.outputFormat || "array",
-            percentile: parseFloat(config.percentile) || 50,
-            quantile: parseFloat(config.quantile) || 0.5,
+            percentile: parseNumberOrDefault(config.percentile, 50),
+            quantile: parseNumberOrDefault(config.quantile, 0.5),
             integralUnit: parseInt(config.integralUnit) || 3600,
             queryMode: config.queryMode || "parallel",
             removeBorderValues: config.removeBorderValues || false,
@@ -145,9 +150,9 @@ module.exports = function (RED) {
             }
 
             if (aggregate === 'percentile') {
-                options.percentile = msg.percentile || settings.percentile;
+                options.percentile = parseNumberOrDefault(msg.percentile, settings.percentile);
             } else if (aggregate === 'quantile') {
-                options.quantile = msg.quantile || settings.quantile;
+                options.quantile = parseNumberOrDefault(msg.quantile, settings.quantile);
             } else if (aggregate === 'integral') {
                 options.integralUnit = msg.integralUnit || settings.integralUnit;
             }

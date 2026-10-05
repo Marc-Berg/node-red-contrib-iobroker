@@ -32,7 +32,7 @@ module.exports = function (RED) {
             error: 4
         };
 
-        const minimumLevel = LOG_LEVELS[settings.logLevel] || LOG_LEVELS.info;
+        const minimumLevel = LOG_LEVELS[settings.logLevel] ?? LOG_LEVELS.info;
 
         function shouldProcessLogMessage(logLevel) {
             const messageLevel = LOG_LEVELS[logLevel];
