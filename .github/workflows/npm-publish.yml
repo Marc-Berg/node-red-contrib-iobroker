@@ -110,7 +110,7 @@ jobs:
           fi
   create-github-release:
     needs: [check-version]
-    if: ${{ needs.check-version.outputs.version_changed == 'true' }}
+    if: ${{ needs.check-version.outputs.version_changed == 'true' || (github.event_name == 'workflow_dispatch' && inputs.force_publish == true) }}
     runs-on: ubuntu-latest
     permissions:
       contents: write
