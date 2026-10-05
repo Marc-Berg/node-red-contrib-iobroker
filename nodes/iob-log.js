@@ -85,7 +85,7 @@ module.exports = function (RED) {
                     message: message,
                     from: source,
                     ts: timestamp,
-                    level: LOG_LEVELS[severity] || LOG_LEVELS.info
+                    level: LOG_LEVELS[severity] ?? LOG_LEVELS.info
                 };
 
                 if (settings.includeSource && source) {
