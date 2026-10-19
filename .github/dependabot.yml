@@ -10,3 +10,7 @@ updates:
     open-pull-requests-limit: 10
     commit-message:
       prefix: "deps"
+    ignore:
+      # Node-RED (incl. 5.x) ships Express 4
+      - dependency-name: "express"
+        update-types: ["version-update:semver-major"]
