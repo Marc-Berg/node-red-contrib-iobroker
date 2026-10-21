@@ -1,5 +1,11 @@
 # Changelog
 
+## [1.5.2] - 2026-10-21
+
+### **Fixed**
+- TLS certificate errors (e.g. self-signed certificate with verification enabled) are no longer retried; they are treated as permanent and reported once
+- Nodes (`iob-in`, `iob-inobject`, `iob-log` and others) now show "Auth failed" instead of staying in "Retrying..." after a certificate error
+
 ## [1.5.1] - 2026-10-05
 
 ### **Fixed**

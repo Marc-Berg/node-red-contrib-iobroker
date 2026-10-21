@@ -1,5 +1,6 @@
 const connectionManager = require('../lib/manager/websocket-manager');
 const { NodeHelpers, NodePatterns } = require('../lib/utils/node-helpers');
+const { ErrorClassifier } = require('../lib/utils/error-classifier');
 
 module.exports = function (RED) {
     function iobin(config) {
@@ -658,7 +659,7 @@ module.exports = function (RED) {
 
                 } catch (error) {
                     // Only log subscribe errors if not caused by known connection issues
-                    const isAuthError = error.message && (error.message.includes('Authentication failed') || error.message.includes('auth_failed'));
+                    const isAuthError = error.message && (error.message.includes('Authentication failed') || error.message.includes('auth_failed') || ErrorClassifier.isCertificateError(error.message));
                     if (!isAuthError) {
                         node.error(`Failed to subscribe to multiple states: ${error.message}`);
                     }
@@ -710,7 +711,7 @@ module.exports = function (RED) {
             } catch (error) {
                 const errorMsg = error.message || 'Unknown error';
 
-                if (errorMsg.includes('auth_failed') || errorMsg.includes('Authentication failed')) {
+                if (errorMsg.includes('auth_failed') || errorMsg.includes('Authentication failed') || ErrorClassifier.isCertificateError(errorMsg)) {
                     setStatus("red", "ring", "Auth failed");
                 } else if (errorMsg.includes('not possible in state')) {
                     setStatus("red", "ring", "Connection failed");

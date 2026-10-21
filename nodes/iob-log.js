@@ -1,5 +1,6 @@
 const connectionManager = require('../lib/manager/websocket-manager');
 const { NodeHelpers } = require('../lib/utils/node-helpers');
+const { ErrorClassifier } = require('../lib/utils/error-classifier');
 
 module.exports = function (RED) {
     function ioblog(config) {
@@ -173,7 +174,7 @@ module.exports = function (RED) {
             } catch (error) {
                 const errorMsg = error.message || 'Unknown error';
 
-                if (errorMsg.includes('auth_failed') || errorMsg.includes('Authentication failed')) {
+                if (errorMsg.includes('auth_failed') || errorMsg.includes('Authentication failed') || ErrorClassifier.isCertificateError(errorMsg)) {
                     setStatus("red", "ring", "Auth failed");
                 } else if (errorMsg.includes('not possible in state')) {
                     setStatus("red", "ring", "Connection failed");
