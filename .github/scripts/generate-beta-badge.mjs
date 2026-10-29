@@ -1,4 +1,4 @@
-import { writeFile } from 'node:fs/promises';
+import { readFile, writeFile } from 'node:fs/promises';
 
 const owner = process.env.GITHUB_REPOSITORY_OWNER;
 const repo = process.env.GITHUB_REPOSITORY?.split('/')[1];
@@ -6,6 +6,20 @@ const token = process.env.GITHUB_TOKEN;
 
 function getBaseVersion(tagName) {
   return String(tagName || '').replace(/[-+].*$/, '');
+}
+
+function compareBaseVersions(a, b) {
+  const left = getBaseVersion(a).replace(/^v/, '').split('.').map(Number);
+  const right = getBaseVersion(b).replace(/^v/, '').split('.').map(Number);
+
+  for (let i = 0; i < 3; i++) {
+    const diff = (left[i] || 0) - (right[i] || 0);
+    if (diff !== 0) {
+      return diff;
+    }
+  }
+
+  return 0;
 }
 
 if (!owner || !repo) {
@@ -33,20 +47,27 @@ if (!response.ok) {
 
 const releases = await response.json();
 
-const latestRelevantPrerelease = releases.find((release) => {
-  if (!release || release.prerelease !== true) {
-    return false;
-  }
+const { name: packageName } = JSON.parse(await readFile('package.json', 'utf8'));
+const npmResponse = await fetch(`https://registry.npmjs.org/${encodeURIComponent(packageName)}/latest`);
 
-  const prereleaseBaseVersion = getBaseVersion(release.tag_name);
+if (!npmResponse.ok) {
+  throw new Error(`npm registry request failed: ${npmResponse.status} ${npmResponse.statusText}`);
+}
 
-  return !releases.some((candidate) => (
-    candidate &&
-    candidate.prerelease === false &&
-    candidate.draft === false &&
-    getBaseVersion(candidate.tag_name) === prereleaseBaseVersion
-  ));
-});
+const { version: npmLatestVersion } = await npmResponse.json();
+
+const latestStableVersion = [
+  npmLatestVersion,
+  ...releases
+    .filter((release) => release && release.prerelease === false && release.draft === false)
+    .map((release) => release.tag_name)
+].reduce((latest, candidate) => (compareBaseVersions(candidate, latest) > 0 ? candidate : latest));
+
+const latestRelevantPrerelease = releases.find((release) => (
+  release &&
+  release.prerelease === true &&
+  compareBaseVersions(release.tag_name, latestStableVersion) > 0
+));
 
 const message = latestRelevantPrerelease?.tag_name || '-';
 
